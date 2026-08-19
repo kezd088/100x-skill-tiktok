@@ -1,0 +1,13 @@
+{
+  "name": "100x-prompt-compose",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Validation tooling for the 100x-prompt-compose skill (ComposedPromptBundle output contract). Not published -- this package.json exists only so scripts/validate.js can pull in ajv for real JSON Schema enforcement (structural checks: required/additionalProperties/enum/pattern/anyOf/allOf-if-then) instead of a hand-rolled re-implementation. Cross-item/cross-file checks that JSON Schema draft-07 cannot express (axiom 1 template-body reconstruction against templates.json, axiom 2 reference-lock referential integrity, axiom 4 per-model duration cap + banned-word + trailing-phrase compliance) stay hand-written in scripts/validate.js -- see that file's header comment, axioms.md, and profiles/veo.md + profiles/seedance.md.",
+  "scripts": {
+    "validate": "node scripts/validate.js",
+    "selftest": "node scripts/validate.js --selftest"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}

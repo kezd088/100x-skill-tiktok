@@ -1,0 +1,13 @@
+{
+  "name": "100x-video-reverse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Validation tooling for the 100x-video-reverse skill (VideoReverseBundle output contract). Not published -- this package.json exists only so scripts/validate.js can pull in ajv for real JSON Schema enforcement (structural checks: required/additionalProperties/enum/pattern/minimum/minLength), following the same ajv8 wiring as 100x-visual-fission and 100x-search-query. Cross-item/cross-field aggregate checks that JSON Schema draft-07 cannot express (time_bucket continuity C1-C5, per-model duration cap, word-boundary banned-word scan, dual-axis referential integrity, slot/template mutual closure, bilingual structural alignment) stay hand-written in scripts/validate.js -- see that file's header comment and axioms.md.",
+  "scripts": {
+    "validate": "node scripts/validate.js",
+    "selftest": "node scripts/validate.js --selftest"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}

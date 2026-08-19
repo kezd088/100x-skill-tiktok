@@ -1,0 +1,74 @@
+{
+  "source": {
+    "duration_sec": 14.0,
+    "aspect_ratio": "9:16",
+    "frames_analyzed": 7,
+    "extraction_method": "scene-detect+interval-fill"
+  },
+  "target_model": "seedance",
+  "shots": [
+    {
+      "shot_id": 1,
+      "time_bucket": "0.0-4.0",
+      "shot_purpose": "hook",
+      "camera_note": "static locked camera, symmetric split framing",
+      "prompt_en": "Split screen comparison of the same woman's forearm skin, left half shows dry rough texture under flat light, right half shows visibly more hydrated and even texture under the same flat light, static camera, no text, no subtitles, no watermarks",
+      "prompt_zh": "同一位女性前臂皮肤的分屏对比，左侧在平光下呈现干燥粗糙的质地，右侧在同样平光下呈现明显更水润均匀的质地，固定机位。"
+    },
+    {
+      "shot_id": 2,
+      "time_bucket": "4.0-9.0",
+      "shot_purpose": "demo",
+      "prompt_en": "Close-up of two hands gently massaging a small amount of white cream onto the same forearm, circular motion, plain bathroom counter surface visible in the background, soft overhead light, no text, no subtitles, no watermarks",
+      "prompt_zh": "特写镜头拍摄双手在同一前臂上轻轻按摩涂抹少量白色乳霜，画圈手法，背景可见简单的浴室台面，顶部柔光。"
+    },
+    {
+      "shot_id": 3,
+      "time_bucket": "9.0-14.0",
+      "shot_purpose": "reveal",
+      "camera_note": "static locked camera, symmetric split framing",
+      "prompt_en": "Split screen comparison again on the same forearm, left half repeats the original dry rough texture footage, right half shows the arm after fourteen days with visibly more even and hydrated texture, same flat lighting on both sides, no text, no subtitles, no watermarks",
+      "prompt_zh": "同一前臂再次进行分屏对比，左侧重复最初干燥粗糙质地的画面，右侧展示十四天后明显更均匀水润的质地，两侧灯光保持相同的平光。"
+    }
+  ],
+  "visual_forms": [
+    {
+      "form_type": "before_after_split",
+      "appears_in_shots": [1, 3],
+      "prompt_en": "Split screen comparison of the same woman's forearm skin under identical flat lighting on both halves, left half showing dry rough texture, right half showing more even hydrated texture, static locked camera, no text, no subtitles, no watermarks",
+      "prompt_zh": "同一女性前臂皮肤在两侧完全相同的平光下进行分屏对比，左侧呈现干燥粗糙质地，右侧呈现更均匀水润的质地，固定机位不移动。"
+    },
+    {
+      "form_type": "hands_demo",
+      "appears_in_shots": [2],
+      "prompt_en": "Close-up of two hands applying and gently massaging a small amount of white cream onto skin in a circular motion, plain bathroom counter surface in the background, soft overhead light, no text, no subtitles, no watermarks",
+      "prompt_zh": "特写镜头拍摄双手将少量白色乳霜涂抹并以画圈手法轻轻按摩至皮肤上，背景为简单的浴室台面，顶部柔光。"
+    }
+  ],
+  "slot_template": {
+    "template_en": "Split screen comparison of the same forearm skin, left half showing {SKIN_CONCERN}, right half showing visibly improved texture after {TIMEFRAME} of applying a {PRODUCT_FORM} on a {BACKGROUND} in the background, identical flat lighting on both halves, no text, no subtitles, no watermarks",
+    "template_zh": "同一前臂皮肤的分屏对比，左侧呈现{SKIN_CONCERN}，右侧呈现使用{PRODUCT_FORM}并在背景可见{BACKGROUND}、经过{TIMEFRAME}后明显改善的质地，两侧灯光保持完全相同的平光。",
+    "slots": [
+      { "name": "SKIN_CONCERN", "observed_value": "dry rough texture", "candidates": ["dry rough texture", "dull uneven tone", "visible dryness and flaking"] },
+      { "name": "PRODUCT_FORM", "observed_value": "white cream", "candidates": ["white cream", "light gel", "thick balm"] },
+      { "name": "TIMEFRAME", "observed_value": "fourteen days", "candidates": ["fourteen days", "seven days", "thirty days"] },
+      { "name": "BACKGROUND", "observed_value": "plain bathroom counter", "candidates": ["plain bathroom counter", "plain bedroom dresser", "plain kitchen counter"] }
+    ]
+  },
+  "cross_shot_analysis": {
+    "invariants": [
+      { "aspect": "person", "description": "Same woman's forearm and hands appear in every shot", "holds_in_shots": [1, 2, 3] },
+      { "aspect": "lighting", "description": "Before and after comparison shots use identical flat lighting on both halves for a fair comparison", "holds_in_shots": [1, 3] }
+    ],
+    "varying_axes": [
+      { "axis": "composition", "observed_values": ["split screen comparison", "single close-up frame"] },
+      { "axis": "action", "observed_values": ["static forearm display", "circular massaging motion"] }
+    ]
+  },
+  "meta": {
+    "generated_by": "100x-video-reverse",
+    "frames_source": "evals/_fixtures/example-02-skincare-before-after-en/frames-meta.json",
+    "warnings": [],
+    "note": "合成样例，用于 100x-video-reverse 的 schema/公理校验测试。人物、产品、frames_source 路径均为虚构，不对应任何真实品牌、真实账号或真实视频。target_model=seedance，3 镜头覆盖 before_after_split + hands_demo 两种画面形态；before_after_split 复现在镜头 1 与 3（非连续），两侧对比刻意使用相同平光，呼应真实前后对比素材的可信度要求。"
+  }
+}

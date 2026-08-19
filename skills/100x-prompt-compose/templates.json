@@ -1,0 +1,309 @@
+{
+  "meta": {
+    "name": "真实感 UGC 带货 · 提示词模板库（公开仓移植版）",
+    "version": "2026-06-23",
+    "purpose": "用户选一个模板，对着自己的产品/模特填变量，即出可用的图片/视频生成提示词。垂直真实感 UGC 带货。",
+    "how_to_integrate": "每个 template 的 variables[] 渲染成表单字段；body 用 {key} 做字符串插值；末尾自动拼 realism_suffix（body 内已内嵌 {realism_suffix} 占位符，不需要额外拼接）。视频类按 model_hint 再过一遍 model_wrappers 适配 Veo/Seedance/即创。",
+    "public_adaptation_note": "本文件提供 14 组通用可复用的提示词模板资产（14 个模板 id 全部保留：IMG-01~05、VID-A~G、PART-HOOK、PART-CTA）。包含模板正文、变量定义、hard_rules 与 library 内容，用于真实感 UGC 提示词组装。",
+    "render_notes": [
+      "IMG-02 的 {problem_clause} 和 IMG-05 的 {layout_desc} 是 conditional[] 计算字段，不在 variables[] 里，由渲染器按 conditional 规则算出后再参与 {key} 替换（IMG-02：problem 变量为空时 problem_clause 解析为空字符串；IMG-05：layout=\"上下\"→\"上图/下图\"，layout=\"左右\"→\"左图/右图\"）。",
+      "VID-A / VID-F 的 body 里【效果公式：{effect_formula}——按所选公式展开变化描写】、PART-HOOK 的【按 hook_type 选骨架】{hook_clause} 都是「作者态占位括注」，不是最终输出文本：渲染时整段方括号连同其中的 {key} 一起替换成 effect_library[取值] 或 hook_library[取值] 对应的完整描述句，绝不把方括号本身或元指令文字带进最终提示词。"
+    ],
+    "hard_rules": [
+      "每条提示词结尾必须带 realism_suffix（真实感后缀）。",
+      "产品首次出现必须锁外观（参考图 或 文字描述）；后续写「参考图X产品」。",
+      "人物首次出现必须锁 年龄+种族+性别+穿着+外貌；后续写「参考图X人物」。",
+      "场景禁止写光线（明亮阳光/柔和灯光）；光线由后缀统一控制；可写天气。",
+      "面向美区 TikTok：口播台词用美式口语化英文。",
+      "对比图必须注明「不带任何文字」；8宫格必须注明「发型发色不变，衣服改变」。"
+    ]
+  },
+  "realism_suffix": {
+    "图片通用": "无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实环境。",
+    "视频自拍": "无补光灯，无美颜，人物面部没有高光，真实皮肤纹理和瑕疵。",
+    "加强防影棚": "无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实生活环境，轻微手持晃动，不要影棚感。"
+  },
+  "model_wrappers": {
+    "veo": "Veo 3.1：把内容切成 ≤8s 的生成单元，每段五段式（① GU定位 ② Visual 4-6句英文散文 ③ Dialogue: Spoken dialogue (say EXACTLY, word-for-word): {台词} ④ Timing: 台词在0.5-2.8s，3.0-8.0s继续运动不要停 ⑤ Style Lock: Keep lighting, color grade, and overall visual feel consistent with the reference frame.）。禁双引号、禁 cinematic/stunning/flawless 等AI套路词。详细规则见 profiles/veo.md。",
+    "seedance": "Seedance 2.0 / Dreamina：≤10s一段，纯英文散文（主体+动作+光线UGC感+外貌锚点+镜头），中文台词写 In Mandarin Chinese: {台词}。每段末尾必须加 no text, no subtitles, no watermarks。禁 cinematic/stunning/flawless 等21禁词。详细规则见 profiles/seedance.md。",
+    "即创": "中文图生视频：直接用 body 的中文提示词；按七大叙事镜头（情绪/痛点/产品/场景/对比/转折/CTA）组织。本 skill 未持有该模型的时长上限/禁词表来源材料，仅做叙事镜头分类标注，不做时长/禁词硬校验（见 SKILL.md 已知局限）。"
+  },
+  "variable_glossary": {
+    "product_name": "产品名（中英皆可），如「除锈喷雾 / Iron Remover」",
+    "product_desc": "产品外观文字描述（颜色/形状/容量/标签文字/材质）——用于 IMG-01 首次建立产品外观锁",
+    "product_lock": "产品外观锁：有图填「（参考图X产品，外形必须与图一致）」；无图填一段外观文字描述（首次出现时二选一，后续必须用参考图写法）",
+    "persona": "模特：约[年龄]岁的[种族][性别]，[穿着] + [外貌关键特征]。如「约30岁拉丁裔女性，干净盘发，戴蓝色医用手套」——用于 IMG-02 首次建立人物外观锁，或用于不需要锁定复用的一次性人物描述",
+    "persona_ref": "已建过模特参考图时填「参考图X人物」",
+    "scene": "美国本土真实场景（不要写光线），如「家庭浴室 / 卧室门口 / 老旧车库」",
+    "scenes": "多场景变体（IMG-03 用，逗号分隔 3 个场景）",
+    "place": "出没位置/场景（VID-B 用）",
+    "rooms": "清洁房间列表（VID-G 用，逗号分隔）",
+    "line_en": "美式口语化英文口播台词",
+    "target": "功效对象：物品 + 污渍颜色 + 类型，如「白色浴缸上的红褐色锈渍」",
+    "problem": "问题状态，如「下颌红肿痤疮 / 牙齿黄黑牙结石 / 法令纹」",
+    "body_part": "部位，如「脸颊 / 牙齿 / 腰腹」",
+    "effect_formula": "效果公式：像素橡皮擦 / 泡沫爆发 / 泡沫变色 / 噼啪声 / 玻璃板实验（取值来自 effect_library 的 key）",
+    "role": "角色身份：兽医 / 美容师 / 养宠主人 / 农场主 / 专家",
+    "breed": "宠物品种，如「吉娃娃 / 金毛」"
+  },
+  "templates": [
+    {
+      "id": "IMG-01-product-lock",
+      "name": "① 产品外观锁定图（建产品参考图）",
+      "category": "图片",
+      "use_when": "没有产品实拍图、需要先生成一张可复用的产品参考图",
+      "applicable": ["全品类"],
+      "establishes_lock": "产品",
+      "variables": [
+        {"key": "product_desc", "label": "产品外观描述", "placeholder": "颜色/形状/容量/标签文字/材质", "example": "白色塑料圆柱形喷雾瓶，50ml，紫到蓝渐变标签，蓝色盾牌图标，白色喷嘴，透明瓶盖"}
+      ],
+      "body": "生成一张产品白底图。产品外观为：{product_desc}。真实塑料/材质质感，标签印刷清晰，无反光眩光。{realism_suffix}",
+      "suffix_key": "图片通用",
+      "note": "生成后这张图即「参考图X产品」，后续所有分镜引用它锁外观。"
+    },
+    {
+      "id": "IMG-02-persona-whitebg",
+      "name": "② 模特白底图（建人物参考图）",
+      "category": "图片",
+      "use_when": "需要一个固定模特，后续所有视频/图片复用同一张脸",
+      "applicable": ["真人出镜类"],
+      "establishes_lock": "人物",
+      "variables": [
+        {"key": "persona", "label": "模特设定", "placeholder": "年龄+种族+性别+外貌", "example": "约45岁白人男性"},
+        {"key": "problem", "label": "需展示的问题（可选）", "placeholder": "显老/皮肤问题等", "example": "下颌和侧脸明显红肿痤疮，毛孔发炎"}
+      ],
+      "conditional": {"problem_clause": "若填了 problem：面部和脖颈处有明显且符合年龄的{problem}（显老）。"},
+      "body": "手机后摄视角。生成一个{persona}的白底图片。人物表情平静（无笑容）。{problem_clause}{realism_suffix}",
+      "suffix_key": "图片通用",
+      "note": "真实度不够可从 Pinterest 搜真人参考图（Young female / Real kitchens 等）。"
+    },
+    {
+      "id": "IMG-03-8grid",
+      "name": "③ 8宫格渐变图（前后对比素材）",
+      "category": "图片",
+      "use_when": "护肤/美白等渐变改善类，做「使用前→后」素材",
+      "applicable": ["护肤", "美白", "抗皱", "牙贴"],
+      "references_lock": ["人物"],
+      "variables": [
+        {"key": "persona_ref", "label": "模特参考图", "placeholder": "参考图X人物", "example": "参考图1人物"},
+        {"key": "problem", "label": "改善的问题", "placeholder": "", "example": "法令纹和松弛"},
+        {"key": "scenes", "label": "3个家庭场景", "placeholder": "逗号分隔", "example": "厨房,客厅,卧室"}
+      ],
+      "body": "生成{persona_ref}的8宫格图片。每张图人物的发型、发色不变，衣服款式会改变。8张图背景在{scenes}三个场景随机切换。{problem}从第1张初始状态到第8张完全消失。{realism_suffix}",
+      "suffix_key": "图片通用",
+      "note": "硬规：必须注明「发型发色不变，衣服改变」。生成有问题可改6宫格。逐格作为前后对比视频的首图。"
+    },
+    {
+      "id": "IMG-04-cover-hook",
+      "name": "④ 首图/封面图（问题特写·Hook图）",
+      "category": "图片",
+      "use_when": "需要一张抓眼的封面/首帧，放大问题",
+      "applicable": ["功效类", "宠物口腔", "清洁"],
+      "variables": [
+        {"key": "subject", "label": "主体", "placeholder": "宠物品种/人物部位", "example": "吉娃娃侧面后牙和牙床"},
+        {"key": "problem", "label": "问题极致描写", "placeholder": "", "example": "极厚干燥结壳、深黄褐色发黑的钙化牙结石完全封死"},
+        {"key": "persona", "label": "操作人（可选）", "placeholder": "年龄种族性别穿着", "example": "约30岁白人女性"},
+        {"key": "scene", "label": "场景", "placeholder": "不写光线", "example": "家庭客厅"}
+      ],
+      "body": "手机后摄视角，特写{subject}。{persona}双手掰开展示，让其呈现张大露出状态（{problem}）。背景是{scene}。{realism_suffix}",
+      "suffix_key": "图片通用"
+    },
+    {
+      "id": "IMG-05-before-after",
+      "name": "⑤ 前后对比图（上下/左右）",
+      "category": "图片",
+      "use_when": "需要一张「问题→改善」的对比图",
+      "applicable": ["护肤", "美白", "清洁", "除锈"],
+      "variables": [
+        {"key": "layout", "label": "版式", "placeholder": "上下 或 左右", "example": "左右"},
+        {"key": "body_part", "label": "部位/对象", "placeholder": "", "example": "面部"},
+        {"key": "problem", "label": "问题", "placeholder": "", "example": "法令纹"}
+      ],
+      "conditional": {"layout_desc": "上下=上图/下图；左右=左图/右图"},
+      "body": "生成一张{body_part}特写的{layout}对比图（不带任何文字）。{layout_desc}有{problem}，另一侧为{problem}消失、如年轻人一般。{realism_suffix}",
+      "suffix_key": "图片通用",
+      "note": "硬规：必须注明「不带任何文字」。"
+    },
+    {
+      "id": "VID-A-efficacy-stack",
+      "name": "⑥ 功效堆叠（一喷见效·视频）",
+      "category": "视频",
+      "structure": "A 功效堆叠型",
+      "use_when": "去污/清洁/美白/除锈等「一喷见效」类，同产品×不同污渍场景重复展示",
+      "applicable": ["去污喷雾", "清洁剂", "美白喷雾", "除锈喷雾", "宠物口腔"],
+      "model_hint": ["veo", "seedance", "即创"],
+      "references_lock": ["产品"],
+      "variables": [
+        {"key": "persona", "label": "人物/手部", "placeholder": "", "example": "戴蓝色医用手套的手"},
+        {"key": "product_name", "label": "产品名", "placeholder": "", "example": "除锈喷雾"},
+        {"key": "product_lock", "label": "产品锁", "placeholder": "参考图或文字", "example": "（参考图1产品，外形与图一致）"},
+        {"key": "target", "label": "对象+污渍", "placeholder": "物品+颜色+类型", "example": "白色浴缸上的红褐色锈渍"},
+        {"key": "effect_formula", "label": "效果公式", "placeholder": "像素橡皮擦/泡沫爆发/泡沫变色/噼啪声/玻璃板实验", "example": "泡沫爆发"},
+        {"key": "scene", "label": "场景", "placeholder": "不写光线", "example": "家庭浴室"}
+      ],
+      "body": "手机后摄，固定机位。{persona}手持{product_name}（{product_lock}）对准{target}。【效果公式：{effect_formula}——按所选公式展开变化描写】。背景是可见的{scene}。{realism_suffix}",
+      "suffix_key": "图片通用",
+      "effect_library": {
+        "像素橡皮擦": "抹布缓慢沉重压过污渍，断裂式替换——抹布前是污渍色、抹布后是物品原色，色差为零。",
+        "泡沫爆发": "喷洒瞬间浓稠白色活性泡沫爆发覆盖污渍并翻腾，随后百洁布擦去，显露洁净微湿无瑕表面。",
+        "泡沫变色": "对准喷雾，白泡沫爆发包裹，几秒内由白变深黄，黄沫退去露出洁白锃亮。",
+        "噼啪声": "泡沫严丝合缝包裹结石，变深黄并发出微小噼啪声，黄液滴落，露出如瓷洁白。",
+        "玻璃板实验": "玻璃板左侧一滩污渍液体、右侧碎蛋壳，分别喷洒后左侧变无色、右侧冒泡化成透明水。"
+      }
+    },
+    {
+      "id": "VID-B-dual-track",
+      "name": "⑦ 双轨叙事（口播+震撼B-roll·视频）",
+      "category": "视频",
+      "structure": "B A-roll+B-roll 双轨",
+      "use_when": "害虫/蟑螂/鼠害等强功能、需要恐怖冲击的产品",
+      "applicable": ["蟑螂药", "驱鼠", "害虫"],
+      "model_hint": ["veo", "seedance"],
+      "variables": [
+        {"key": "persona", "label": "口播人物", "placeholder": "", "example": "约35岁白人男性农场主"},
+        {"key": "product_name", "label": "产品", "placeholder": "", "example": "蟑螂药饵"},
+        {"key": "line_en", "label": "口播台词(英文)", "placeholder": "", "example": "Time to declare war on the roaches."},
+        {"key": "pest", "label": "害虫", "placeholder": "", "example": "蟑螂"},
+        {"key": "place", "label": "出没位置/场景", "placeholder": "", "example": "厨房橱柜缝隙"}
+      ],
+      "body": "【A-roll】iPhone前置自拍。{persona}，手持{product_name}，说话时头部自然转动伴手势。人物说：{line_en}\n【B-roll·恐怖】低画质夜视监控模式，{place}。高ISO噪点，压抑恐怖氛围。起初一片寂静，突然大量{pest}从缝隙中猛地窜出、四散奔逃。画面因恐惧剧烈手持晃动。{realism_suffix}",
+      "suffix_key": "视频自拍",
+      "note": "A轨口播+B轨恐怖交替剪辑。恐怖动作词：猛地窜出/密密麻麻爬满/突然仰天暴毙。"
+    },
+    {
+      "id": "VID-C-before-after",
+      "name": "⑧ 前后对比（护肤渐变·视频）",
+      "category": "视频",
+      "structure": "C UGC前后对比",
+      "use_when": "护肤/抗皱/美白等渐变效果类",
+      "applicable": ["抗皱", "祛痘", "水杨酸", "美白"],
+      "model_hint": ["veo", "seedance"],
+      "references_lock": ["人物"],
+      "variables": [
+        {"key": "persona_ref", "label": "模特参考图", "placeholder": "", "example": "参考图1人物"},
+        {"key": "body_part", "label": "部位", "placeholder": "", "example": "脸颊"},
+        {"key": "problem", "label": "问题", "placeholder": "", "example": "法令纹"},
+        {"key": "serum_color", "label": "产品质地/颜色", "placeholder": "", "example": "乳白色精华"}
+      ],
+      "body": "手机前置摄像，固定机位。{persona_ref}展示一只手心里的{serum_color}，开始在{body_part}上轻轻涂抹有{problem}的区域。核心：药膏被吸收消失（渐变式），{problem}随之同帧100%渐变消退，露出光滑洁净皮肤。一镜到底，无分镜。人物不说话，仅做动作。{realism_suffix}",
+      "suffix_key": "视频自拍",
+      "note": "配合 IMG-03 8宫格按问题递减顺序取首图。"
+    },
+    {
+      "id": "VID-D-talking-share",
+      "name": "⑨ 口播分享（真人推荐·视频）",
+      "category": "视频",
+      "structure": "D UGC口播分享",
+      "use_when": "护肤/宠物用品等需要「真人亲测推荐」的产品",
+      "applicable": ["护肤", "宠物", "个护"],
+      "model_hint": ["veo", "seedance", "即创"],
+      "references_lock": ["产品"],
+      "variables": [
+        {"key": "persona", "label": "人物", "placeholder": "", "example": "约28岁拉丁裔女性"},
+        {"key": "body_part", "label": "展示部位/状态", "placeholder": "", "example": "细致洁白的牙齿"},
+        {"key": "product_name", "label": "产品", "placeholder": "", "example": "宠物洁齿喷雾"},
+        {"key": "product_lock", "label": "产品锁", "placeholder": "", "example": "（参考图1产品）"},
+        {"key": "line_open", "label": "开场台词(英文)", "placeholder": "", "example": "Everyone asks how my dog's teeth are so white..."},
+        {"key": "line_rec", "label": "推荐台词(英文)", "placeholder": "", "example": "Grab this at the link below."}
+      ],
+      "body": "手机前置自拍。{persona}靠近镜头特写{body_part}，用平静语气说：{line_open}\n随后从下方用一只手拿出{product_name}（{product_lock}）展示，平静地说：{line_rec}{realism_suffix}",
+      "suffix_key": "视频自拍"
+    },
+    {
+      "id": "VID-E-role-pov",
+      "name": "⑩ 角色视角（兽医/美容师/专家·视频）",
+      "category": "视频",
+      "structure": "E 角色视角叙事",
+      "use_when": "宠物/医疗等需要专业背书的产品",
+      "applicable": ["宠物口腔", "宠物护理", "医疗个护"],
+      "model_hint": ["veo", "seedance"],
+      "variables": [
+        {"key": "role", "label": "角色身份", "placeholder": "兽医/美容师/养宠主人", "example": "兽医"},
+        {"key": "role_outfit", "label": "角色穿着", "placeholder": "", "example": "蓝色手术服"},
+        {"key": "breed", "label": "宠物品种", "placeholder": "", "example": "金毛"},
+        {"key": "problem", "label": "问题", "placeholder": "", "example": "牙齿厚重黄黑牙结石"},
+        {"key": "product_name", "label": "产品", "placeholder": "", "example": "宠物洁齿喷雾"},
+        {"key": "line_en", "label": "专业口吻台词(英文)", "placeholder": "", "example": "In the clinic, we see this every day."},
+        {"key": "scene", "label": "场景", "placeholder": "", "example": "诊所候诊台"}
+      ],
+      "body": "手机后置，固定机位。背景为{scene}。台上有只{breed}趴着，自然张嘴可见{problem}。{role}（{role_outfit}）另一只手持{product_name}，上前安抚并掰开嘴特写展示。人物以专业口吻说：{line_en}{realism_suffix}",
+      "suffix_key": "图片通用"
+    },
+    {
+      "id": "VID-F-dark-humor",
+      "name": "⑪ 黑色幽默/反转（清洁·视频）",
+      "category": "视频",
+      "structure": "F 黑色幽默/剧情",
+      "use_when": "清洁喷雾等可做悬疑反转剧情的产品",
+      "applicable": ["清洁喷雾", "去污"],
+      "model_hint": ["veo", "seedance"],
+      "variables": [
+        {"key": "suspect_action", "label": "悬疑开场动作", "placeholder": "", "example": "从屋里拖出一个长约2米的麻袋"},
+        {"key": "product_name", "label": "产品", "placeholder": "", "example": "多功能清洁喷雾"},
+        {"key": "stain", "label": "污渍", "placeholder": "颜色+位置", "example": "白色沙发上的深红色颜料污渍"}
+      ],
+      "body": "【悬疑开场】门口监控摄像头，低画质夜视，高ISO噪点，压抑氛围。一个穿黑衣戴口罩墨镜的男人正在{suspect_action}，动作鬼鬼祟祟到处张望。\n【反转·清洁】iPhone后置POV，戴黑色医用手套的手手持{product_name}，原来是清洁{stain}——【套效果公式：泡沫爆发或像素橡皮擦】，另一只手比耶。{realism_suffix}",
+      "suffix_key": "加强防影棚",
+      "effect_library": {
+        "泡沫爆发": "喷洒瞬间浓稠白色活性泡沫爆发覆盖污渍并翻腾，随后百洁布擦去，显露洁净微湿无瑕表面。",
+        "像素橡皮擦": "抹布缓慢沉重压过污渍，断裂式替换——抹布前是污渍色、抹布后是物品原色，色差为零。"
+      }
+    },
+    {
+      "id": "VID-G-immersive-job",
+      "name": "⑫ 沉浸工作流（上门清洁POV·视频）",
+      "category": "视频",
+      "structure": "G 第一人称沉浸工作流",
+      "use_when": "清洁上门服务类",
+      "applicable": ["清洁用品", "保洁服务"],
+      "model_hint": ["veo", "seedance"],
+      "variables": [
+        {"key": "rooms", "label": "清洁房间", "placeholder": "逗号分隔", "example": "厨房,浴室,客厅"},
+        {"key": "target", "label": "各处污渍", "placeholder": "", "example": "灶台油污、瓷砖霉斑"},
+        {"key": "product_name", "label": "产品", "placeholder": "", "example": "强力清洁喷雾"}
+      ],
+      "body": "手持手机第一人称POV，0.8倍广角，镜头晃动模拟步行。流程：敲门→屋主开门邀请进入→干脆戴上蓝色医用手套→逐个清洁{rooms}（戴手套的手持{product_name}对准{target}，套效果公式展示洁净）→收工：屋主递20美元+5美元小费，双手接过，POV鞠躬，挥手拜拜走出门。{realism_suffix}",
+      "suffix_key": "加强防影棚"
+    },
+    {
+      "id": "PART-HOOK",
+      "name": "⑬ Hook 开头（前3秒·拼接件）",
+      "category": "通用件",
+      "use_when": "给任意视频拼一个抓注意力的开头",
+      "applicable": ["全品类"],
+      "variables": [
+        {"key": "hook_type", "label": "Hook类型", "placeholder": "恐怖冲击/问题特写/情绪反应/悬疑/萌宠", "example": "问题特写"},
+        {"key": "subject", "label": "对象", "placeholder": "", "example": "狗的牙齿"},
+        {"key": "detail", "label": "细节", "placeholder": "", "example": "厚层深褐色牙结石，牙龈红肿"}
+      ],
+      "conditional": {"hook_clause": "按 hook_type 取 hook_library 对应模板，再把其中的 [subject]/[detail] 用 subject/detail 变量替换"},
+      "body": "【按 hook_type 选骨架】{hook_clause}{realism_suffix}",
+      "suffix_key": "图片通用",
+      "hook_library": {
+        "恐怖冲击": "[场景]。安静铺垫，起初一片寂静。突然[大量害虫/震撼物]从缝隙猛地窜出。画面因恐惧剧烈手持晃动。",
+        "问题特写": "POV特写{subject}，完全展开露出[{detail}]。随后一只手从画面入镜触碰/操作。",
+        "情绪反应": "人物准备亲吻/靠近[对象]，随后闻到臭味/发现问题，表情瞬间凝固极度嫌弃，猛地后仰、皱鼻、挥手。",
+        "悬疑": "监控场景，一个神秘穿着的人正在[可疑动作]，动作鬼鬼祟祟到处张望。",
+        "萌宠": "iPhone平放地面低角度，一只[品种]从画面下方入镜，对着产品狂吠/拱入画面。背景天空绿树。"
+      }
+    },
+    {
+      "id": "PART-CTA",
+      "name": "⑭ CTA 结尾（购买引导·拼接件）",
+      "category": "通用件",
+      "use_when": "给视频收尾加购买引导",
+      "applicable": ["全品类"],
+      "variables": [
+        {"key": "object", "label": "受益对象", "placeholder": "", "example": "your dog's teeth"},
+        {"key": "urgency", "label": "紧迫点(可选)", "placeholder": "", "example": "before they get worse"}
+      ],
+      "body": "手机前置或后摄。人物自然收尾，平静而有感染力地说英文 CTA，例如：Grab this for {object} at the link below — your {object} will thank you! Don't wait {urgency}. {realism_suffix}",
+      "suffix_key": "视频自拍",
+      "cta_examples": [
+        "Grab this {product} at the link below and your {object} will thank you!",
+        "And the best part? It's safe for pets and children. You should try it too!",
+        "Do yourself a favor — grab a bottle before it's gone. Don't say I didn't warn you!"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,696 @@
+app:
+  name: "Visual Reference Search (Pinterest/TikTok/Reddit)"
+  description: "Takes the 45-query SearchQueryBundle produced by 100x-search-query (15 queries each for Pinterest/TikTok/Reddit) and actually executes search: real API calls against Reddit's official Data API, and honestly-labeled manual-fallback search URLs for Pinterest and TikTok, whose official APIs have no legitimate general keyword-search endpoint at any access tier a normal business can obtain in 2026. See visual-reference-search.dify.notes.md for full source citations."
+  icon: "🔎"
+  icon_type: emoji
+  icon_background: "#D1E9FF"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables:
+    - description: "Reddit script-app client_id, from reddit.com/prefs/apps. As of 2026, issuing NEW OAuth credentials reportedly requires Reddit's manual approval/ticket process (Responsible Builder Policy) rather than instant self-serve signup -- see notes.md. An already-approved app's credentials go here."
+      id: 7a9ac6e3-0000-4000-9000-0000000000e1
+      name: REDDIT_CLIENT_ID
+      selector: [env, REDDIT_CLIENT_ID]
+      value: ""
+      value_type: string
+    - description: "Reddit script-app client_secret, paired with REDDIT_CLIENT_ID."
+      id: 7a9ac6e3-0000-4000-9000-0000000000e2
+      name: REDDIT_CLIENT_SECRET
+      selector: [env, REDDIT_CLIENT_SECRET]
+      value: ""
+      value_type: string
+    - description: "Required by Reddit API policy: a unique, descriptive User-Agent string, e.g. 'visual-reference-search/1.0 (by /u/your_username)'. Generic/shared User-Agents get rate-limited harder."
+      id: 7a9ac6e3-0000-4000-9000-0000000000e3
+      name: REDDIT_USER_AGENT
+      selector: [env, REDDIT_USER_AGENT]
+      value: ""
+      value_type: string
+  features:
+    file_upload:
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods: [local_file, remote_url]
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: [local_file, remote_url]
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        data:
+          title: "Start"
+          type: start
+          variables:
+            - label: "Pinterest queries (100x-search-query output: queries.pinterest, 15 items)"
+              variable: pinterest_queries
+              type: json
+              required: true
+            - label: "TikTok queries (100x-search-query output: queries.tiktok, 15 items)"
+              variable: tiktok_queries
+              type: json
+              required: true
+            - label: "Reddit queries (100x-search-query output: queries.reddit, 15 items)"
+              variable: reddit_queries
+              type: json
+              required: true
+        position: { x: 30, y: 420 }
+        positionAbsolute: { x: 30, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 140
+
+      - id: build_meta
+        type: custom
+        data:
+          title: "Build Meta Summary"
+          type: code
+          code_language: python3
+          code: |
+            def main() -> dict:
+                return {
+                    "result": {
+                        "generated_by": "visual-reference-search",
+                        "platform_modes": {
+                            "reddit": "api",
+                            "pinterest": "manual_fallback",
+                            "tiktok": "manual_fallback",
+                        },
+                        "notes": (
+                            "reddit: real automated search via Reddit's official Data API "
+                            "(OAuth2 app-only client_credentials grant, GET /search). "
+                            "pinterest and tiktok: as of 2026 neither platform's official API "
+                            "offers general keyword-based content search at any access tier a "
+                            "normal business account can obtain, so both return pre-built manual "
+                            "search URLs instead of fetched results. See this app's companion "
+                            "notes.md for full source citations and the per-platform verdict."
+                        ),
+                    }
+                }
+          variables: []
+          outputs:
+            result:
+              type: object
+          selected: false
+        position: { x: 350, y: 40 }
+        positionAbsolute: { x: 350, y: 40 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 90
+
+      - id: reddit_build_auth_header
+        type: custom
+        data:
+          title: "Reddit: Build Basic Auth Header"
+          type: code
+          code_language: python3
+          code: |
+            import base64
+
+
+            def main(client_id: str, client_secret: str) -> dict:
+                raw = f"{client_id}:{client_secret}".encode("utf-8")
+                return {"basic_auth_header": base64.b64encode(raw).decode("ascii")}
+          variables:
+            - variable: client_id
+              value_selector: [env, REDDIT_CLIENT_ID]
+            - variable: client_secret
+              value_selector: [env, REDDIT_CLIENT_SECRET]
+          outputs:
+            basic_auth_header:
+              type: string
+          selected: false
+        position: { x: 350, y: 220 }
+        positionAbsolute: { x: 350, y: 220 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 90
+
+      - id: reddit_get_token
+        type: custom
+        data:
+          title: "Reddit: Fetch OAuth Token"
+          type: http-request
+          method: post
+          url: "https://www.reddit.com/api/v1/access_token"
+          headers: |
+            Authorization: Basic {{#reddit_build_auth_header.basic_auth_header#}}
+            User-Agent: {{#env.REDDIT_USER_AGENT#}}
+          params: ""
+          body:
+            type: x-www-form-urlencoded
+            data:
+              - id: token-body-grant-type
+                key: grant_type
+                type: text
+                value: client_credentials
+          authorization:
+            type: no-auth
+          timeout:
+            connect: 10
+            read: 30
+            write: 10
+          retry_config:
+            retry_enabled: false
+          selected: false
+        position: { x: 660, y: 220 }
+        positionAbsolute: { x: 660, y: 220 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 110
+
+      - id: reddit_parse_token
+        type: custom
+        data:
+          title: "Reddit: Parse Token"
+          type: code
+          code_language: python3
+          code: |
+            import json
+
+
+            def main(body: str) -> dict:
+                try:
+                    parsed = json.loads(body)
+                except Exception:
+                    parsed = {}
+                return {"access_token": parsed.get("access_token", "")}
+          variables:
+            - variable: body
+              value_selector: [reddit_get_token, body]
+          outputs:
+            access_token:
+              type: string
+          selected: false
+        position: { x: 970, y: 220 }
+        positionAbsolute: { x: 970, y: 220 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 90
+
+      - id: reddit_iteration
+        type: custom
+        data:
+          title: "Reddit: Search 15 Queries (real API)"
+          type: iteration
+          iterator_selector: [start, reddit_queries]
+          iterator_input_type: array[object]
+          output_selector: [reddit_normalize, result]
+          output_type: array[object]
+          is_parallel: false
+          parallel_nums: 1
+          error_handle_mode: continue-on-error
+          start_node_id: reddit_iteration_start
+          width: 940
+          height: 200
+        position: { x: 1280, y: 190 }
+        positionAbsolute: { x: 1280, y: 190 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 940
+        height: 200
+        zIndex: 1
+
+      - id: reddit_iteration_start
+        parentId: reddit_iteration
+        type: custom-iteration-start
+        draggable: false
+        selectable: false
+        data:
+          title: ""
+          type: iteration-start
+          isInIteration: true
+        position: { x: 24, y: 76 }
+        positionAbsolute: { x: 1304, y: 266 }
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+
+      - id: reddit_extract_query
+        parentId: reddit_iteration
+        type: custom
+        data:
+          title: "Extract Query"
+          type: code
+          isInIteration: true
+          isInLoop: false
+          iteration_id: reddit_iteration
+          code_language: python3
+          code: |
+            from urllib.parse import quote
+
+
+            def main(item: dict) -> dict:
+                if not isinstance(item, dict):
+                    item = {}
+                q = item.get("q", "")
+                return {
+                    "q": q,
+                    "q_encoded": quote(q),
+                    "intent_cn": item.get("intent_cn", ""),
+                    "stage": item.get("stage", ""),
+                }
+          variables:
+            - variable: item
+              value_selector: [reddit_iteration, item]
+          outputs:
+            q:
+              type: string
+            q_encoded:
+              type: string
+            intent_cn:
+              type: string
+            stage:
+              type: string
+          selected: false
+        position: { x: 110, y: 60 }
+        positionAbsolute: { x: 1390, y: 250 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 230
+        height: 90
+        zIndex: 1002
+
+      - id: reddit_search
+        parentId: reddit_iteration
+        type: custom
+        data:
+          title: "GET /search"
+          type: http-request
+          isInIteration: true
+          isInLoop: false
+          iteration_id: reddit_iteration
+          method: get
+          url: "https://oauth.reddit.com/search?q={{#reddit_extract_query.q_encoded#}}&sort=relevance&limit=15&type=link&raw_json=1"
+          headers: |
+            Authorization: bearer {{#reddit_parse_token.access_token#}}
+            User-Agent: {{#env.REDDIT_USER_AGENT#}}
+          params: ""
+          body:
+            type: none
+            data: []
+          authorization:
+            type: no-auth
+          timeout:
+            connect: 10
+            read: 30
+            write: 10
+          retry_config:
+            retry_enabled: false
+          selected: false
+        position: { x: 380, y: 60 }
+        positionAbsolute: { x: 1660, y: 250 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 230
+        height: 110
+        zIndex: 1002
+
+      - id: reddit_normalize
+        parentId: reddit_iteration
+        type: custom
+        data:
+          title: "Normalize Results"
+          type: code
+          isInIteration: true
+          isInLoop: false
+          iteration_id: reddit_iteration
+          code_language: python3
+          code: |
+            import json
+
+
+            def main(body: str, q: str, intent_cn: str, stage: str) -> dict:
+                try:
+                    parsed = json.loads(body)
+                    children = parsed.get("data", {}).get("children", [])
+                except Exception:
+                    children = []
+
+                results = []
+                for child in children:
+                    d = child.get("data", {}) if isinstance(child, dict) else {}
+                    image_url = ""
+                    preview = d.get("preview") if isinstance(d.get("preview"), dict) else {}
+                    images = preview.get("images", []) if isinstance(preview, dict) else []
+                    if images:
+                        source = images[0].get("source", {}) if isinstance(images[0], dict) else {}
+                        image_url = str(source.get("url", "")).replace("&amp;", "&")
+                    if not image_url:
+                        thumb = d.get("thumbnail", "")
+                        if isinstance(thumb, str) and thumb.startswith("http"):
+                            image_url = thumb
+                    if not image_url:
+                        continue
+                    permalink = d.get("permalink", "")
+                    results.append({
+                        "title": d.get("title", ""),
+                        "post_url": f"https://www.reddit.com{permalink}" if permalink else d.get("url", ""),
+                        "image_url": image_url,
+                        "subreddit": d.get("subreddit", ""),
+                        "author": d.get("author", ""),
+                        "score": d.get("score", 0),
+                    })
+                    if len(results) >= 5:
+                        break
+
+                return {
+                    "result": {
+                        "q": q,
+                        "intent_cn": intent_cn,
+                        "stage": stage,
+                        "source": "reddit",
+                        "execution_mode": "api",
+                        "results": results,
+                    }
+                }
+          variables:
+            - variable: body
+              value_selector: [reddit_search, body]
+            - variable: q
+              value_selector: [reddit_extract_query, q]
+            - variable: intent_cn
+              value_selector: [reddit_extract_query, intent_cn]
+            - variable: stage
+              value_selector: [reddit_extract_query, stage]
+          outputs:
+            result:
+              type: object
+          selected: false
+        position: { x: 660, y: 60 }
+        positionAbsolute: { x: 1940, y: 250 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 230
+        height: 110
+        zIndex: 1002
+
+      - id: pinterest_fallback
+        type: custom
+        data:
+          title: "Pinterest: Manual Fallback URLs (no API access)"
+          type: code
+          code_language: python3
+          code: |
+            from urllib.parse import quote
+
+
+            def main(queries: list) -> dict:
+                items = []
+                for entry in queries or []:
+                    if not isinstance(entry, dict):
+                        continue
+                    q = entry.get("q", "")
+                    items.append({
+                        "q": q,
+                        "intent_cn": entry.get("intent_cn", ""),
+                        "stage": entry.get("stage", ""),
+                        "source": "pinterest",
+                        "execution_mode": "manual_fallback",
+                        "results": [
+                            {
+                                "search_url": f"https://www.pinterest.com/search/pins/?q={quote(q)}",
+                                "note": (
+                                    "Manual fallback only -- not an automated result. "
+                                    "Pinterest API v5 has no endpoint that searches Pinterest's "
+                                    "general public pin content: its search-shaped endpoints "
+                                    "(GET /search/pins, GET /search/boards) are scoped to the "
+                                    "authenticated account's own pins/boards, and "
+                                    "GET /search/partner/pins is limited to approved commerce "
+                                    "catalog partners. Open this URL in a browser."
+                                ),
+                            }
+                        ],
+                    })
+                return {"results": items}
+          variables:
+            - variable: queries
+              value_selector: [start, pinterest_queries]
+          outputs:
+            results:
+              type: array[object]
+          selected: false
+        position: { x: 350, y: 460 }
+        positionAbsolute: { x: 350, y: 460 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 320
+        height: 100
+
+      - id: tiktok_fallback
+        type: custom
+        data:
+          title: "TikTok: Manual Fallback URLs (no API access)"
+          type: code
+          code_language: python3
+          code: |
+            from urllib.parse import quote
+
+
+            def main(queries: list) -> dict:
+                items = []
+                for entry in queries or []:
+                    if not isinstance(entry, dict):
+                        continue
+                    q = entry.get("q", "")
+                    items.append({
+                        "q": q,
+                        "intent_cn": entry.get("intent_cn", ""),
+                        "stage": entry.get("stage", ""),
+                        "source": "tiktok",
+                        "execution_mode": "manual_fallback",
+                        "results": [
+                            {
+                                "search_url": f"https://www.tiktok.com/search?q={quote(q)}",
+                                "note": (
+                                    "Manual fallback only -- not an automated result. TikTok has "
+                                    "no currently-obtainable API tier for general keyword video "
+                                    "discovery: the Research API explicitly excludes commercial/"
+                                    "advertiser/creator applicants, and the Display/Content "
+                                    "Posting API scopes (video.list, user.info.basic, "
+                                    "video.publish, video.upload) only ever cover the "
+                                    "authenticated user's own account. Open this URL in a "
+                                    "browser."
+                                ),
+                            }
+                        ],
+                    })
+                return {"results": items}
+          variables:
+            - variable: queries
+              value_selector: [start, tiktok_queries]
+          outputs:
+            results:
+              type: array[object]
+          selected: false
+        position: { x: 350, y: 640 }
+        positionAbsolute: { x: 350, y: 640 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 320
+        height: 100
+
+      - id: end
+        type: custom
+        data:
+          title: "End"
+          type: end
+          outputs:
+            - variable: reddit
+              value_selector: [reddit_iteration, output]
+            - variable: pinterest
+              value_selector: [pinterest_fallback, results]
+            - variable: tiktok
+              value_selector: [tiktok_fallback, results]
+            - variable: meta
+              value_selector: [build_meta, result]
+        position: { x: 2350, y: 350 }
+        positionAbsolute: { x: 2350, y: 350 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 130
+
+    edges:
+      - id: start-source-build_meta-target
+        source: start
+        sourceHandle: source
+        target: build_meta
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: start-source-reddit_build_auth_header-target
+        source: start
+        sourceHandle: source
+        target: reddit_build_auth_header
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: reddit_build_auth_header-source-reddit_get_token-target
+        source: reddit_build_auth_header
+        sourceHandle: source
+        target: reddit_get_token
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: http-request, isInIteration: false, isInLoop: false }
+
+      - id: reddit_get_token-source-reddit_parse_token-target
+        source: reddit_get_token
+        sourceHandle: source
+        target: reddit_parse_token
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: http-request, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: reddit_parse_token-source-reddit_iteration-target
+        source: reddit_parse_token
+        sourceHandle: source
+        target: reddit_iteration
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: iteration, isInIteration: false, isInLoop: false }
+
+      - id: reddit_iteration_start-source-reddit_extract_query-target
+        source: reddit_iteration_start
+        sourceHandle: source
+        target: reddit_extract_query
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: iteration-start
+          targetType: code
+          isInIteration: true
+          isInLoop: false
+          iteration_id: reddit_iteration
+
+      - id: reddit_extract_query-source-reddit_search-target
+        source: reddit_extract_query
+        sourceHandle: source
+        target: reddit_search
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: code
+          targetType: http-request
+          isInIteration: true
+          isInLoop: false
+          iteration_id: reddit_iteration
+
+      - id: reddit_search-source-reddit_normalize-target
+        source: reddit_search
+        sourceHandle: source
+        target: reddit_normalize
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: http-request
+          targetType: code
+          isInIteration: true
+          isInLoop: false
+          iteration_id: reddit_iteration
+
+      - id: start-source-pinterest_fallback-target
+        source: start
+        sourceHandle: source
+        target: pinterest_fallback
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: start-source-tiktok_fallback-target
+        source: start
+        sourceHandle: source
+        target: tiktok_fallback
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: build_meta-source-end-target
+        source: build_meta
+        sourceHandle: source
+        target: end
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: reddit_iteration-source-end-target
+        source: reddit_iteration
+        sourceHandle: source
+        target: end
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: iteration, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: pinterest_fallback-source-end-target
+        source: pinterest_fallback
+        sourceHandle: source
+        target: end
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: tiktok_fallback-source-end-target
+        source: tiktok_fallback
+        sourceHandle: source
+        target: end
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: end, isInIteration: false, isInLoop: false }
+
+    viewport: { x: 0, y: 0, zoom: 0.55 }

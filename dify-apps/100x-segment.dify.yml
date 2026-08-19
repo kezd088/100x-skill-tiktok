@@ -1,0 +1,1222 @@
+app:
+  name: "100x-segment · 口播脚本三层分段"
+  description: "英语/西语 TikTok·UGC 口播脚本 -> L1 段落模块+脚本原型、L2 镜头目的预判、L3 行内气口标记三层独立切分，公理化自检（结构层 + 跨字段聚合层）通过后再输出。移植自 100x-skill-tiktok 仓库的 100x-segment skill（axioms.md 4 条公理 + scripts/validate.js）。"
+  icon: "✂️"
+  icon_type: emoji
+  icon_background: "#E4FBCC"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.0.20@8f2b6e2c9a6a4a6b8f6c2d9e7a3b5c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods: [local_file, remote_url]
+      enabled: false
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: [local_file, remote_url]
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    nodes:
+      # ---------------------------------------------------------------
+      # Phase 1 · 接收 + 校验 (workflow.md Phase 1)
+      # ---------------------------------------------------------------
+      - id: "start"
+        type: custom
+        data:
+          title: "开始"
+          type: start
+          variables:
+            - label: "口播脚本原文 (英语/西语)"
+              variable: source_text
+              type: paragraph
+              required: true
+              max_length: 8000
+        position: { x: 30, y: 400 }
+        positionAbsolute: { x: 30, y: 400 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 90
+
+      - id: "intake_check"
+        type: custom
+        data:
+          title: "类别A校验 (Phase 1)"
+          type: code
+          desc: "source_text 唯一硬性必填字段。为空/纯空白 -> missing_input=true，走固定拒绝话术，不代猜、不接受视频文件替代（SKILL.md『独立调用保证』）。"
+          code_language: python3
+          code: |
+            def main(source_text: str) -> dict:
+                text = (source_text or "").strip()
+                missing = len(text) == 0
+                reject_message = (
+                    "100x-segment 需要一段口播脚本的纯文本。没有文本无法分段——请把脚本贴过来。"
+                    if missing else ""
+                )
+                return {
+                    "missing_input": missing,
+                    "clean_source_text": text,
+                    "reject_message_class_a": reject_message,
+                }
+          variables:
+            - variable: source_text
+              value_selector: ["start", "source_text"]
+          outputs:
+            missing_input:
+              type: boolean
+            clean_source_text:
+              type: string
+            reject_message_class_a:
+              type: string
+          selected: false
+        position: { x: 330, y: 400 }
+        positionAbsolute: { x: 330, y: 400 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 54
+
+      - id: "intake_gate"
+        type: custom
+        data:
+          title: "类别A缺失判定"
+          type: if-else
+          desc: "missing_input=true -> 固定拒绝话术终止；否则进入 Phase 1 语言检测。"
+          cases:
+            - id: "missing"
+              case_id: "missing"
+              logical_operator: and
+              conditions:
+                - id: "cond_missing_input"
+                  variable_selector: ["intake_check", "missing_input"]
+                  comparison_operator: is
+                  value: "true"
+                  varType: boolean
+          selected: false
+        position: { x: 630, y: 400 }
+        positionAbsolute: { x: 630, y: 400 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 126
+
+      - id: "reject_class_a"
+        type: custom
+        data:
+          title: "拒绝-缺少脚本文本"
+          type: end
+          outputs:
+            - variable: message
+              value_selector: ["intake_check", "reject_message_class_a"]
+              value_type: string
+        position: { x: 930, y: 140 }
+        positionAbsolute: { x: 930, y: 140 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 100
+
+      - id: "detect_language"
+        type: custom
+        data:
+          title: "语言判定 (Phase 1)"
+          type: llm
+          desc: "只输出 en/es/other 三选一；language 不是用户填的字段，是从 source_text 自动判定的（workflow.md Phase 1）。"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0
+          prompt_template:
+            - id: "prompt_detect_language_system"
+              role: system
+              text: |
+                You are the language-scope gate of 100x-segment, a TikTok/UGC voiceover-script segmentation tool. Your only job in this step: identify the dominant spoken language of the script text you are given.
+
+                Output exactly one lowercase word and nothing else -- no punctuation, no quotes, no explanation:
+                - en    the script's dominant language is English
+                - es    the script's dominant language is Spanish
+                - other the script is in any other language, OR it code-switches between languages badly enough that you cannot tell which one is dominant
+
+                Do not guess your way to "en" or "es" when you are not reasonably confident. When in doubt between a real answer and "other", prefer "other" -- a wrong guess here would apply the wrong language's breath-mark rules later in the pipeline. Do not translate, summarize, or comment on the text. Output only the single word.
+            - id: "prompt_detect_language_user"
+              role: user
+              text: |
+                Script:
+                {{#intake_check.clean_source_text#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          variables: []
+          selected: false
+        position: { x: 930, y: 420 }
+        positionAbsolute: { x: 930, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 98
+
+      - id: "parse_language"
+        type: custom
+        data:
+          title: "语言范围校验"
+          type: code
+          desc: "language 硬锁 en/es 两值（axioms.md 公理3/4 的气口判据表只定义了这两种语言）。判不出或不在范围内 -> other -> 固定拒绝话术，不猜、不代做（workflow.md『语言范围』）。"
+          code_language: python3
+          code: |
+            import re
+
+
+            def main(raw_output: str) -> dict:
+                text = (raw_output or "").strip().lower()
+                match = re.search(r"\b(en|es|other)\b", text)
+                language = match.group(1) if match else "other"
+                language_ok = language in ("en", "es")
+                reject_message = "" if language_ok else (
+                    "100x-segment v1 只支持英语和西语脚本的气口判据。这段文本看起来不是英语或西语，"
+                    "本 skill 暂时无法处理——如果这是英西混排，请只发其中一种语言的完整版本。"
+                )
+                return {
+                    "language": language,
+                    "language_ok": language_ok,
+                    "reject_message_language": reject_message,
+                }
+          variables:
+            - variable: raw_output
+              value_selector: ["detect_language", "text"]
+          outputs:
+            language:
+              type: string
+            language_ok:
+              type: boolean
+            reject_message_language:
+              type: string
+          selected: false
+        position: { x: 1230, y: 420 }
+        positionAbsolute: { x: 1230, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 54
+
+      - id: "language_gate"
+        type: custom
+        data:
+          title: "语言范围判定"
+          type: if-else
+          desc: "language_ok=true (en/es) -> 进入 Phase 2 生成；否则固定拒绝话术终止。"
+          cases:
+            - id: "ok"
+              case_id: "ok"
+              logical_operator: and
+              conditions:
+                - id: "cond_language_ok"
+                  variable_selector: ["parse_language", "language_ok"]
+                  comparison_operator: is
+                  value: "true"
+                  varType: boolean
+          selected: false
+        position: { x: 1530, y: 420 }
+        positionAbsolute: { x: 1530, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 126
+
+      - id: "reject_language"
+        type: custom
+        data:
+          title: "拒绝-语言超出范围"
+          type: end
+          outputs:
+            - variable: message
+              value_selector: ["parse_language", "reject_message_language"]
+              value_type: string
+        position: { x: 1830, y: 140 }
+        positionAbsolute: { x: 1830, y: 140 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 100
+
+      # ---------------------------------------------------------------
+      # Phase 2 · 三层生成 (workflow.md Phase 2A/2B/2C) -- L1/L2/L3 是三种
+      # 独立叠加的视角，2B/2C 都只依赖 2A 的 segments，互相不依赖，故并行。
+      # ---------------------------------------------------------------
+      - id: "segment_l1"
+        type: custom
+        data:
+          title: "L1 段落切分+原型判定 (2A)"
+          type: llm
+          desc: "workflow.md 2A：10 模块识别词典 + archetype A-G 格式规则。archetype 的 5/7 字母(A/B/C/D/F)语义定义属扩展 taxonomy，本工作流无法访问，只给出格式约束，见 notes.md 已知局限。"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0
+          prompt_template:
+            - id: "prompt_segment_l1_system"
+              role: system
+              text: |
+                You are the L1 paragraph-logic segmentation module of 100x-segment, a TikTok/UGC direct-response (DR) voiceover-script analyzer. You receive a full voiceover script (English or Spanish) and split it into narrative-function paragraphs ("segments"), each tagged with exactly one of 10 fixed module labels, plus one archetype tag for the whole script.
+
+                # When to start a new segment
+                Start a new segment when ANY of the following happen:
+                - the narrative function clearly changes (e.g. pain-point buildup switches to mechanism/ingredient explanation)
+                - a new module's typical opening language appears (see the table below)
+                - inside a staged-timeline module, a new "Day X / Week X" checkpoint appears -- this still counts as the SAME staged_timeline segment unless the narrative function as a whole switches to a different module
+
+                Do NOT start a new segment just to make segments shorter, and do NOT split one complete thought into two segments just because it is phrased as two sentences making the same point.
+
+                # The 10 modules (assign exactly one per segment)
+                | module | typical signal |
+                |---|---|
+                | hook | oath/promise opener, suspense question, breaking-news framing, warning-reversal opener, shocking statistic, conditional "if you... then..." opener |
+                | authority | years of experience, credentialed identity, institution name, celebrity endorsement, "as a [role]..." framing |
+                | pain | stacked pain-point language, naming who suffers ("if you're a...") |
+                | mechanism | ingredient names, mechanism explanation, "this helps your body do X" |
+                | staged_timeline | Day/Week checkpoints with increasing effect descriptions |
+                | dosage | usage instructions, reverse-mystique warning ("do NOT take too much") |
+                | risk_reversal | refund promise, "no results in X days" framing |
+                | scarcity | stock/slots/time-limit language |
+                | price_anchor | price comparison (vs. surgery / vs. list price), a specific dollar amount |
+                | cta | click/buy instruction, link-location instruction |
+
+                There is an 11th concept, "Localization" (region slang, brand-specific phrasing, currency/unit localization), that is deliberately NOT one of the 10 module values -- it is a style dimension threaded through every module, not a standalone segment. Never output "localization" as a module value.
+
+                # Archetype (one tag for the whole script)
+                Tag the whole script with either one letter from A-G, or a "PRIMARY+SECONDARY" pair of two DIFFERENT letters (primary skeleton letter first) if the script clearly layers a second technique on top of a primary skeleton, e.g. "G+E".
+                You are only given confirmed definitions for two of the seven letters:
+                - E = a reversal / reverse-psychology technique (e.g. a "don't take too much" warning-style framing layered onto another skeleton)
+                - G = a suspense / secret-experiment-reveal skeleton (a hidden-discovery or secret-research framing)
+                The definitions of A, B, C, D, and F are intentionally not available to you in this workflow (they live in a private taxonomy document this public workflow does not have access to). For those letters, make an internally-consistent best-effort choice based on the script's overall narrative shape, but treat that specific letter choice as low-confidence, not a hard fact.
+
+                # Output format
+                Output ONLY a single JSON object -- no markdown code fences, no commentary before or after it -- matching exactly this shape:
+                {"archetype": "<A-G, or PRIMARY+SECONDARY with two different letters, primary first>", "segments": [{"segment_id": 1, "module": "<one of the 10 module values>", "raw_text": "<verbatim slice of the script for this segment>"}]}
+
+                Rules for raw_text: copy the script's own wording character-for-character for that segment -- no paraphrasing, no words added or removed. Segments concatenated in order should reconstruct the full script. segment_id starts at 1 and increases by 1 in array order with no gaps.
+            - id: "prompt_segment_l1_user"
+              role: user
+              text: |
+                Language: {{#parse_language.language#}}
+
+                Script:
+                {{#intake_check.clean_source_text#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          variables: []
+          selected: false
+        position: { x: 1830, y: 420 }
+        positionAbsolute: { x: 1830, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 98
+
+      - id: "parse_l1"
+        type: custom
+        data:
+          title: "解析 2A 输出"
+          type: code
+          desc: "解析 segment_l1 的 JSON 文本（容错剥 markdown 代码围栏）。这是本次 3 次 LLM 调用拆分架构专属的拼装步骤，解析失败会在 2D 里标 [pipeline]，不是 axioms.md 里的判据。"
+          code_language: python3
+          code: |
+            import json
+            import re
+
+
+            def main(llm_text: str) -> dict:
+                text = (llm_text or "").strip()
+                fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+                if fence:
+                    text = fence.group(1).strip()
+                try:
+                    data = json.loads(text)
+                    if not isinstance(data, dict):
+                        raise ValueError("top-level JSON is not an object")
+                    archetype = data.get("archetype")
+                    segments = data.get("segments")
+                    if not isinstance(segments, list):
+                        raise ValueError("'segments' is missing or not an array")
+                    return {
+                        "archetype_raw": archetype if isinstance(archetype, str) else "",
+                        "segments_raw": segments,
+                        "parse_l1_ok": True,
+                        "parse_l1_error": "",
+                    }
+                except Exception as exc:
+                    return {
+                        "archetype_raw": "",
+                        "segments_raw": [],
+                        "parse_l1_ok": False,
+                        "parse_l1_error": "segment_l1 LLM output was not valid JSON: %s" % exc,
+                    }
+          variables:
+            - variable: llm_text
+              value_selector: ["segment_l1", "text"]
+          outputs:
+            archetype_raw:
+              type: string
+            segments_raw:
+              type: array[object]
+            parse_l1_ok:
+              type: boolean
+            parse_l1_error:
+              type: string
+          selected: false
+        position: { x: 2130, y: 420 }
+        positionAbsolute: { x: 2130, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 54
+
+      - id: "predict_shots"
+        type: custom
+        data:
+          title: "L2 镜头目的预判 (2B)"
+          type: llm
+          desc: "workflow.md 2B：module -> shot_purpose 启发式映射表（非硬规）。只依赖 2A 的 segments，与 2C 并行，互不依赖（三层是独立叠加视角，不是竞争规则）。"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0
+          prompt_template:
+            - id: "prompt_predict_shots_system"
+              role: system
+              text: |
+                You are the L2 predicted-shot-purpose module of 100x-segment. You receive the L1 segments (already split into narrative-function paragraphs, each with a module tag) of a TikTok/UGC voiceover script, and predict, per segment or small group of segments, what shot purpose it will likely need once someone actually storyboards this script on video. You do not see any video footage -- this is a text-only prediction for downstream planning, not a real shot list.
+
+                # The 7 shot_purpose values (assign exactly one per shot)
+                hook, build, reveal, demo, social_proof, cta, transition
+                (these are reused verbatim from the private storyboard skill's own enum, so its schema can consume this output without a remap)
+
+                # Reference mapping (heuristic, not a hard rule -- deviate when a segment's actual content clearly calls for a different purpose)
+                | module | common shot_purpose |
+                |---|---|
+                | hook | hook |
+                | authority | build (use social_proof instead if the segment reads as testimonial/credibility proof rather than plain buildup) |
+                | pain | build |
+                | mechanism | reveal |
+                | staged_timeline | demo |
+                | dosage | demo |
+                | risk_reversal | cta |
+                | scarcity | cta |
+                | price_anchor | cta |
+                | cta | cta |
+
+                # Grouping is allowed
+                A single segment may become multiple shots (e.g. a staged_timeline segment covering Day 1/7/14 can become 3 shots, each with segment_refs containing only that one segment_id -- the same segment_id may be reused across more than one shot). Multiple short segments may also collapse into ONE shot if they would obviously be filmed as a single continuous take (e.g. risk_reversal immediately followed by scarcity). Every input segment_id must appear in at least one shot's segment_refs -- do not leave any segment uncovered.
+
+                # Output format
+                Output ONLY a single JSON object -- no markdown code fences, no commentary -- matching exactly this shape:
+                {"shots": [{"shot_id": 1, "segment_refs": [1], "shot_purpose": "hook"}]}
+
+                shot_id starts at 1 and increases by 1 in array order with no gaps. Every value inside every segment_refs array must be a real segment_id from the input below.
+            - id: "prompt_predict_shots_user"
+              role: user
+              text: |
+                The L1 segments (segment_id, module, raw_text) for this script, given below as structured data:
+                {{#parse_l1.segments_raw#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          variables: []
+          selected: false
+        position: { x: 2430, y: 220 }
+        positionAbsolute: { x: 2430, y: 220 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 98
+
+      - id: "annotate_breaths"
+        type: custom
+        data:
+          title: "L3 气口标注 (2C)"
+          type: llm
+          desc: "workflow.md 2C + axioms.md 公理2/3 全部判据原样搬进 prompt（转折连词>句末标点/破折号>逗号分号，EN14词/ES16音节强制切分，缩写例外，价格/填充词软性建议）。最终强制力在 validate_bundle 节点里代码执行，不依赖模型遵从度。"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0
+          prompt_template:
+            - id: "prompt_annotate_breaths_system"
+              role: system
+              text: |
+                You are the L3 breath-mark annotation module of 100x-segment. You receive L1 segments (segment_id + raw_text) from a TikTok/UGC voiceover script in a single language (English or Spanish), and add INLINE breath marks to each segment's own text. You are not rewriting, translating, reordering, or trimming anything -- you are only inserting two marker characters into an otherwise-untouched copy of the same text.
+
+                # The two marks
+                ‖  = strong breath (a full stop / bigger pause)
+                ·  = weak breath (a light pause)
+
+                # Absolute rule: marks only ADD, never subtract
+                If every ‖ and · character is stripped back out of text_annotated and whitespace is normalized, the result must be EXACTLY the original raw_text, character for character -- no word added, removed, reordered, or changed. Every mark must have real whitespace on both sides (never glued directly to a word), must never appear at the very start or end of the segment's text, and two marks must never sit next to each other with no words between them.
+
+                # Priority order for deciding a mark's strength (highest priority wins -- once one rule matches a breath point, stop; do not also apply a lower-priority rule to that same point)
+                1. STRONG -- the word(s) right after the breath point open with a contrastive/turn conjunction:
+                   English: "but", "so", "and then"
+                   Spanish: "pero", "entonces", "y"
+                   This overrides even a preceding comma (a comma immediately before "but"/"pero" etc. still gets a STRONG mark, not the comma's default weak). Exception: if "so" is immediately followed by "much" or "many" (the English intensifier use, e.g. "so much that..."), that is NOT the contrastive-conjunction sense of "so" -- do not force a strong mark just because of that "so". Other intensifier uses of "so" (e.g. "so tired that...") are a known ambiguity; use your best judgment.
+                2. STRONG -- the breath point follows sentence-ending punctuation (. ! ? , possibly repeated like "??") or an em dash (—). This is MANDATORY: any sentence-ending punctuation or em dash that is not the very last thing in the segment MUST be followed by a strong ‖ mark. Do not treat a period that is part of a common abbreviation as a sentence end (a.m., p.m., Mr., Mrs., Ms., Dr., vs., etc., e.g., i.e., U.S., U.K. / Spanish: Sr., Sra., Srta., Dr., Dra., Ud., Uds., etc.).
+                3. WEAK -- the breath point follows a comma or semicolon and rule 1 did not already apply.
+                4. FORCED BREAK -- a run of text between two marks (or from the start of the segment to the first mark, or from the last mark to the end) must not exceed English 14 words / Spanish 16 syllables (estimated). If it would, insert an additional mark (its strength still follows rules 1-3 based on what surrounds it) so no unbroken run exceeds the limit. Shorter runs are always fine -- only the upper limit is a hard rule. Real UGC sentences run longer than they look -- check every run, especially in Spanish.
+                5. SOFT SUGGESTION (not mandatory, use your judgment) -- after a filler word (English: "like", "okay so", "wait"; Spanish: "o sea", "bueno"), a breath mark is usually natural.
+
+                # Additional soft guidance (not a hard rule)
+                Do not place a breath mark immediately before what looks like a price or number being emphasized rather than a real breathing point (e.g. the pause right before "$29" is emphasis, not breath -- avoid marking it).
+
+                # Output format
+                Output ONLY a single JSON object -- no markdown code fences, no commentary -- matching exactly this shape:
+                {"segments": [{"segment_id": 1, "text_annotated": "<raw_text with ‖ and · inserted>"}]}
+
+                Include one entry for every segment_id given to you below, in the same order.
+            - id: "prompt_annotate_breaths_user"
+              role: user
+              text: |
+                Language: {{#parse_language.language#}}
+
+                The L1 segments (segment_id, raw_text) for this script, given below as structured data:
+                {{#parse_l1.segments_raw#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          variables: []
+          selected: false
+        position: { x: 2430, y: 620 }
+        positionAbsolute: { x: 2430, y: 620 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 98
+
+      # ---------------------------------------------------------------
+      # Phase 2D · 自检 (S1-S8) + 渲染 -- 结构层(ajv 等价) + 跨字段聚合层
+      # (原 scripts/validate.js 的 4 个手写函数) 全部用 Python stdlib 复刻，
+      # 同一强度移植，见 100x-segment.dify.notes.md。
+      # ---------------------------------------------------------------
+      - id: "validate_bundle"
+        type: custom
+        data:
+          title: "自检 S1-S8 (2D)"
+          type: code
+          desc: "结构层(module/shot_purpose enum、archetype pattern、additionalProperties、minItems 等，原本 ajv 执行) + 聚合层(公理2 checkIntegrity / 公理3 checkBreathPlacement / 公理4 checkSequentialIds+checkShotSegmentLinkage，原本 scripts/validate.js 手写)。同一强度移植，纯 Python 标准库 (json/re)，不依赖第三方 jsonschema 包。"
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            STRONG = '‖'
+            WEAK = '·'
+            EM_DASH = '—'
+
+            LANGUAGE_ENUM = ('en', 'es')
+            MODULE_ENUM = ('hook', 'authority', 'pain', 'mechanism', 'staged_timeline',
+                           'dosage', 'risk_reversal', 'scarcity', 'price_anchor', 'cta')
+            SHOT_PURPOSE_ENUM = ('hook', 'build', 'reveal', 'demo', 'social_proof', 'cta', 'transition')
+            ARCHETYPE_RE = re.compile(r'^([A-G])(\+(?!\1)[A-G])?$')
+
+            SEGMENT_ALLOWED_KEYS = {'segment_id', 'module', 'raw_text', 'text_annotated'}
+            SHOT_ALLOWED_KEYS = {'shot_id', 'segment_refs', 'shot_purpose'}
+
+            CONTRASTIVE_CONJUNCTIONS = {
+                'en': ['and then', 'but', 'so'],
+                'es': ['pero', 'entonces', 'y'],
+            }
+            SO_INTENSIFIER_RE = re.compile(r'^so\s+(much|many)\b', re.IGNORECASE)
+            FILLER_WORDS = {
+                'en': ['okay so', 'wait', 'like'],
+                'es': ['o sea', 'bueno'],
+            }
+            RUN_CAP = {'en': 14, 'es': 16}
+            SENTENCE_END_RE = re.compile(r'[.!?]+$')
+            SENTENCE_CLOSING_WRAP = '"\'”’»›)\\]'
+            PRICE_OR_NUMBER_RE = re.compile(
+                r'^(\$\s?\d|\d+\s?(%|dollars?|d[oó]lares?|lbs?|kg|days?|weeks?|d[ií]as?|semanas?))',
+                re.IGNORECASE,
+            )
+            ABBREVIATIONS = {
+                'en': ['a.m.', 'p.m.', 'mr.', 'mrs.', 'ms.', 'dr.', 'vs.', 'etc.', 'e.g.', 'i.e.', 'u.s.', 'u.k.'],
+                'es': ['sr.', 'sra.', 'srta.', 'dr.', 'dra.', 'ud.', 'uds.', 'etc.'],
+            }
+
+            MARK_CLASS = STRONG + WEAK
+
+
+            def _extract_json_object(raw_text):
+                text = (raw_text or '').strip()
+                fence = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+                if fence:
+                    text = fence.group(1).strip()
+                return text
+
+
+            def is_abbreviation_period(text, period_index, language):
+                lst = ABBREVIATIONS.get(language, [])
+                window = text[max(0, period_index - 7):period_index + 1].lower()
+                return any(window.endswith(ab) for ab in lst)
+
+
+            def following_run_starts_with_phrase(run, phrase):
+                trimmed = run.lstrip().lower()
+                if phrase == 'so' and SO_INTENSIFIER_RE.match(trimmed):
+                    return False
+                pattern = r'^' + re.escape(phrase) + r'(\s|$|[,.;!?])'
+                return re.match(pattern, trimmed, re.IGNORECASE) is not None
+
+
+            def estimate_en_word_count(run):
+                return len([w for w in run.strip().split() if w])
+
+
+            def estimate_es_syllable_count(run):
+                words = [w for w in run.strip().split() if w]
+                total = 0
+                vowel_group_re = re.compile(r'[aeiouáéíóúü]+', re.IGNORECASE)
+                for w in words:
+                    groups = vowel_group_re.findall(w)
+                    total += len(groups) if groups else 1
+                return total
+
+
+            def split_runs(text_annotated):
+                parts = re.split(r'([' + MARK_CLASS + '])', text_annotated)
+                runs = parts[0::2]
+                marks = parts[1::2]
+                return runs, marks
+
+
+            def check_integrity(segment, errors):
+                stripped = re.sub('[' + MARK_CLASS + ']', '', segment.get('text_annotated', ''))
+
+                def normalize(s):
+                    return re.sub(r'\s+', ' ', s).strip()
+
+                if normalize(stripped) != normalize(segment.get('raw_text', '')):
+                    errors.append(
+                        "[axiom2] segment_id=%s: text_annotated with marks stripped does not match "
+                        "raw_text (breath marks must only ADD characters, never delete/reorder/reword)"
+                        % segment.get('segment_id')
+                    )
+
+
+            def check_breath_placement(segment, language, errors, warnings):
+                text = segment.get('text_annotated', '') or ''
+                trimmed = text.strip()
+                seg_id = segment.get('segment_id')
+
+                if re.match('^[' + MARK_CLASS + ']', trimmed):
+                    errors.append("[axiom3] segment_id=%s: text_annotated must not start with a breath mark "
+                                  "(nothing precedes it to breathe after)" % seg_id)
+                if re.search('[' + MARK_CLASS + ']$', trimmed):
+                    errors.append("[axiom3] segment_id=%s: text_annotated must not end with a breath mark "
+                                  "(segment boundary already implies a stop)" % seg_id)
+                if re.search('[' + MARK_CLASS + ']\\s*[' + MARK_CLASS + ']', text):
+                    errors.append("[axiom3] segment_id=%s: two breath marks with no words between them "
+                                  "(doubled mark)" % seg_id)
+
+                glue_before_re = re.compile('[^\\s' + MARK_CLASS + '][' + MARK_CLASS + ']')
+                glue_after_re = re.compile('[' + MARK_CLASS + '][^\\s' + MARK_CLASS + ']')
+                if glue_before_re.search(text) or glue_after_re.search(text):
+                    errors.append("[axiom3] segment_id=%s: a breath mark is glued directly to a word with no "
+                                  "surrounding space (workflow.md 2C requires marks to be space-separated on "
+                                  "both sides)" % seg_id)
+
+                runs, marks = split_runs(text)
+
+                for i, mark in enumerate(marks):
+                    before = runs[i]
+                    after = runs[i + 1]
+
+                    matched_phrase = None
+                    for p in CONTRASTIVE_CONJUNCTIONS.get(language, []):
+                        if following_run_starts_with_phrase(after, p):
+                            matched_phrase = p
+                            break
+                    following_is_contrastive = matched_phrase is not None
+                    preceding_is_sentence_end = bool(SENTENCE_END_RE.search(before.strip())) or before.strip().endswith(EM_DASH)
+                    preceding_is_comma = bool(re.search(r'[,;]\s*$', before))
+
+                    required_strength = None
+                    required_reason = None
+                    if following_is_contrastive:
+                        required_strength = STRONG
+                        required_reason = 'precedes a contrastive-conjunction opener ("%s")' % matched_phrase
+                    elif preceding_is_sentence_end:
+                        required_strength = STRONG
+                        required_reason = 'follows sentence-final punctuation or an em dash'
+                    elif preceding_is_comma:
+                        required_strength = WEAK
+                        required_reason = 'follows a comma/semicolon'
+
+                    if required_strength and mark != required_strength:
+                        found_label = 'strong (‖)' if mark == STRONG else 'weak (·)'
+                        want_label = 'strong (‖)' if required_strength == STRONG else 'weak (·)'
+                        errors.append("[axiom3] segment_id=%s mark#%d: %s -- must be %s, found %s"
+                                      % (seg_id, i + 1, required_reason, want_label, found_label))
+
+                sentence_end_missing_mark = False
+                mark_chars_re = re.compile('^\\s*[' + MARK_CLASS + ']')
+                wrap_prefix_re = re.compile('^[' + SENTENCE_CLOSING_WRAP + ']*')
+                punct_run_re = re.compile(r'[.!?]+')
+                for m in punct_run_re.finditer(text):
+                    run_end = m.end()
+                    last_char = m.group(0)[-1]
+                    if last_char == '.' and is_abbreviation_period(text, run_end - 1, language):
+                        continue
+                    wrap_len = len(wrap_prefix_re.match(text[run_end:]).group(0))
+                    after_wrap = run_end + wrap_len
+                    rest = text[after_wrap:]
+                    if mark_chars_re.match(rest):
+                        continue
+                    gap_re = re.compile(r'^\s+\S') if last_char == '.' else re.compile(r'^\s*\S')
+                    if gap_re.match(rest):
+                        sentence_end_missing_mark = True
+                        break
+                if sentence_end_missing_mark:
+                    errors.append("[axiom3] segment_id=%s: found sentence-final punctuation followed by more "
+                                  "text with no breath mark at all (mid-segment sentence ends must get a "
+                                  "strong ‖)" % seg_id)
+
+                em_dash_no_mark_re = re.compile(EM_DASH + '(?!\\s*[' + MARK_CLASS + '])\\s*\\S')
+                if em_dash_no_mark_re.search(text):
+                    errors.append("[axiom3] segment_id=%s: found an em dash followed by more text with no "
+                                  "breath mark at all (em dash is treated as a strong breath point)" % seg_id)
+
+                cap = RUN_CAP[language]
+                estimate = estimate_es_syllable_count if language == 'es' else estimate_en_word_count
+                for i, run in enumerate(runs):
+                    n = estimate(run)
+                    if n > cap:
+                        unit = 'syllables (estimated)' if language == 'es' else 'words'
+                        errors.append("[axiom3] segment_id=%s run#%d: %d %s with no breath mark inside it, "
+                                      "exceeds the %d-%s one-breath cap for %s"
+                                      % (seg_id, i + 1, n, unit, cap, unit, language))
+
+                for phrase in FILLER_WORDS.get(language, []):
+                    re_pat = re.compile(r'\b' + re.escape(phrase) + r'\b(?!\s*[' + MARK_CLASS + r'])(?=\s*[A-Za-zÀ-ÿ])',
+                                        re.IGNORECASE)
+                    if re_pat.search(text):
+                        warnings.append('segment_id=%s: filler word "%s" appears without a following breath '
+                                        'mark (soft check, axiom3 filler-word rule)' % (seg_id, phrase))
+                for i in range(len(marks)):
+                    if PRICE_OR_NUMBER_RE.match(runs[i + 1].lstrip()):
+                        warnings.append("segment_id=%s mark#%d: sits immediately before what looks like a "
+                                        "price/number token -- emphasis pauses before prices should not be "
+                                        "marked as breath points (soft heuristic, known false-positive/"
+                                        "negative risk, see axioms.md #3)" % (seg_id, i + 1))
+
+
+            def check_sequential_ids(bundle, errors):
+                for i, s in enumerate(bundle.get('segments', [])):
+                    if s.get('segment_id') != i + 1:
+                        errors.append("[axiom4] segments[%d].segment_id is %r, expected %d (sequential, "
+                                      "1-based, array order)" % (i, s.get('segment_id'), i + 1))
+                for i, s in enumerate(bundle.get('shots', [])):
+                    if s.get('shot_id') != i + 1:
+                        errors.append("[axiom4] shots[%d].shot_id is %r, expected %d (sequential, 1-based, "
+                                      "array order)" % (i, s.get('shot_id'), i + 1))
+
+
+            def check_shot_segment_linkage(bundle, errors):
+                segment_ids = set(s.get('segment_id') for s in bundle.get('segments', []))
+                covered = set()
+                for i, shot in enumerate(bundle.get('shots', [])):
+                    for ref in shot.get('segment_refs', []) or []:
+                        if ref not in segment_ids:
+                            errors.append("[axiom4] shots[%d] (shot_id=%r): segment_refs contains %r, which "
+                                          "is not a real segment_id in segments[]" % (i, shot.get('shot_id'), ref))
+                        else:
+                            covered.add(ref)
+                for sid in segment_ids:
+                    if sid not in covered:
+                        errors.append("[axiom4] segment_id=%r is never referenced by any shots[].segment_refs "
+                                      "(zero-orphan rule)" % sid)
+
+
+            def check_structural(bundle, errors):
+                language = bundle.get('language')
+                if language not in LANGUAGE_ENUM:
+                    errors.append("[schema] language %r is not one of %s" % (language, list(LANGUAGE_ENUM)))
+
+                archetype = bundle.get('archetype')
+                if not isinstance(archetype, str) or not ARCHETYPE_RE.match(archetype):
+                    errors.append("[schema] archetype %r does not match pattern ^([A-G])(\\+(?!\\1)[A-G])?$"
+                                  % archetype)
+
+                if not isinstance(bundle.get('source_text'), str) or len(bundle.get('source_text', '')) < 1:
+                    errors.append("[schema] source_text must be a non-empty string")
+
+                segments = bundle.get('segments')
+                if not isinstance(segments, list) or len(segments) < 1:
+                    errors.append("[schema] segments must be a non-empty array")
+                    segments = []
+                for i, s in enumerate(segments):
+                    if not isinstance(s, dict):
+                        errors.append("[schema] segments[%d] must be an object" % i)
+                        continue
+                    extra = set(s.keys()) - SEGMENT_ALLOWED_KEYS
+                    if extra:
+                        errors.append("[schema] segments[%d] has additional properties not allowed: %s"
+                                      % (i, sorted(extra)))
+                    missing = SEGMENT_ALLOWED_KEYS - set(s.keys())
+                    if missing:
+                        errors.append("[schema] segments[%d] is missing required field(s): %s" % (i, sorted(missing)))
+                        continue
+                    if not isinstance(s.get('segment_id'), int) or isinstance(s.get('segment_id'), bool) or s.get('segment_id') < 1:
+                        errors.append("[schema] segments[%d].segment_id must be an integer >= 1" % i)
+                    if s.get('module') not in MODULE_ENUM:
+                        errors.append("[schema] segments[%d].module %r is not one of the 10-value enum %s"
+                                      % (i, s.get('module'), list(MODULE_ENUM)))
+                    if not isinstance(s.get('raw_text'), str) or len(s.get('raw_text', '')) < 1:
+                        errors.append("[schema] segments[%d].raw_text must be a non-empty string" % i)
+                    if not isinstance(s.get('text_annotated'), str) or len(s.get('text_annotated', '')) < 1:
+                        errors.append("[schema] segments[%d].text_annotated must be a non-empty string" % i)
+
+                shots = bundle.get('shots')
+                if not isinstance(shots, list) or len(shots) < 1:
+                    errors.append("[schema] shots must be a non-empty array")
+                    shots = []
+                for i, s in enumerate(shots):
+                    if not isinstance(s, dict):
+                        errors.append("[schema] shots[%d] must be an object" % i)
+                        continue
+                    extra = set(s.keys()) - SHOT_ALLOWED_KEYS
+                    if extra:
+                        errors.append("[schema] shots[%d] has additional properties not allowed: %s"
+                                      % (i, sorted(extra)))
+                    missing = SHOT_ALLOWED_KEYS - set(s.keys())
+                    if missing:
+                        errors.append("[schema] shots[%d] is missing required field(s): %s" % (i, sorted(missing)))
+                        continue
+                    if not isinstance(s.get('shot_id'), int) or isinstance(s.get('shot_id'), bool) or s.get('shot_id') < 1:
+                        errors.append("[schema] shots[%d].shot_id must be an integer >= 1" % i)
+                    refs = s.get('segment_refs')
+                    if not isinstance(refs, list) or len(refs) < 1:
+                        errors.append("[schema] shots[%d].segment_refs must be a non-empty array" % i)
+                    else:
+                        if len(set(refs)) != len(refs):
+                            errors.append("[schema] shots[%d].segment_refs must have unique items" % i)
+                        for r in refs:
+                            if not isinstance(r, int) or isinstance(r, bool) or r < 1:
+                                errors.append("[schema] shots[%d].segment_refs contains a non-integer or <1 value: %r"
+                                              % (i, r))
+                    if s.get('shot_purpose') not in SHOT_PURPOSE_ENUM:
+                        errors.append("[schema] shots[%d].shot_purpose %r is not one of the 7-value enum %s"
+                                      % (i, s.get('shot_purpose'), list(SHOT_PURPOSE_ENUM)))
+
+
+            def render_markdown(bundle):
+                lines = []
+                lines.append("## 设定")
+                lines.append("- 语言（language）：%s" % bundle.get('language'))
+                lines.append("- 原型（archetype）：%s" % bundle.get('archetype'))
+                lines.append("")
+                lines.append("## 段落表")
+                lines.append("")
+                lines.append("| 段号 | 模块 | 原文（含气口标记） | 镜头目的 |")
+                lines.append("|---|---|---|---|")
+                shot_purpose_by_segment = {}
+                for shot in bundle.get('shots', []):
+                    for ref in shot.get('segment_refs', []) or []:
+                        shot_purpose_by_segment.setdefault(ref, []).append(shot.get('shot_purpose'))
+                for seg in bundle.get('segments', []):
+                    purposes = ','.join(shot_purpose_by_segment.get(seg.get('segment_id'), []))
+                    text = (seg.get('text_annotated') or '').replace('|', '\\|')
+                    lines.append("| S%s | %s | %s | %s |" % (seg.get('segment_id'), seg.get('module'), text, purposes))
+                return '\n'.join(lines)
+
+
+            def main(source_text: str, language: str, archetype_raw: str, segments_raw: list,
+                     shots_text: str, breaths_text: str, parse_l1_ok: bool, parse_l1_error: str) -> dict:
+                errors = []
+                warnings = []
+
+                if not parse_l1_ok:
+                    errors.append("[pipeline] segment_l1 (Phase 2A) output could not be parsed: %s" % parse_l1_error)
+
+                shots_candidate = _extract_json_object(shots_text)
+                try:
+                    shots_data = json.loads(shots_candidate)
+                    shots_raw = shots_data.get('shots')
+                    if not isinstance(shots_raw, list):
+                        raise ValueError("'shots' is missing or not an array")
+                except Exception as exc:
+                    errors.append("[pipeline] predict_shots (Phase 2B) output could not be parsed: %s" % exc)
+                    shots_raw = []
+
+                breaths_candidate = _extract_json_object(breaths_text)
+                try:
+                    breaths_data = json.loads(breaths_candidate)
+                    breaths_segments = breaths_data.get('segments')
+                    if not isinstance(breaths_segments, list):
+                        raise ValueError("'segments' is missing or not an array")
+                    text_annotated_by_id = {}
+                    for item in breaths_segments:
+                        if isinstance(item, dict):
+                            text_annotated_by_id[item.get('segment_id')] = item.get('text_annotated')
+                except Exception as exc:
+                    errors.append("[pipeline] annotate_breaths (Phase 2C) output could not be parsed: %s" % exc)
+                    text_annotated_by_id = {}
+
+                assembled_segments = []
+                if isinstance(segments_raw, list):
+                    for raw_seg in segments_raw:
+                        if not isinstance(raw_seg, dict):
+                            errors.append("[pipeline] segment_l1 produced a non-object segment entry: %r" % (raw_seg,))
+                            continue
+                        seg = dict(raw_seg)
+                        sid = seg.get('segment_id')
+                        if sid in text_annotated_by_id:
+                            seg['text_annotated'] = text_annotated_by_id[sid]
+                        else:
+                            errors.append("[pipeline] segment_id=%r has no matching entry from annotate_breaths "
+                                          "(Phase 2C) -- breath-mark annotation is missing for this segment" % sid)
+                            seg['text_annotated'] = seg.get('raw_text', '')
+                        assembled_segments.append(seg)
+                else:
+                    errors.append("[pipeline] segment_l1 did not produce a 'segments' array")
+
+                bundle = {
+                    'source_text': source_text,
+                    'language': language,
+                    'archetype': archetype_raw,
+                    'segments': assembled_segments,
+                    'shots': shots_raw,
+                    'meta': {'generated_by': '100x-segment', 'warnings': []},
+                }
+
+                check_structural(bundle, errors)
+
+                if not errors:
+                    check_sequential_ids(bundle, errors)
+                    check_shot_segment_linkage(bundle, errors)
+                    for seg in bundle['segments']:
+                        check_integrity(seg, errors)
+                        check_breath_placement(seg, language, errors, warnings)
+
+                bundle['meta']['warnings'] = warnings
+                is_valid = len(errors) == 0
+
+                return {
+                    'is_valid': is_valid,
+                    'errors': errors,
+                    'warnings': warnings,
+                    'error_count': len(errors),
+                    'error_report': '\n'.join('- ' + e for e in errors) if errors else '',
+                    'bundle_json': bundle,
+                    'markdown_table': render_markdown(bundle) if is_valid else '',
+                }
+          variables:
+            - variable: source_text
+              value_selector: ["intake_check", "clean_source_text"]
+            - variable: language
+              value_selector: ["parse_language", "language"]
+            - variable: archetype_raw
+              value_selector: ["parse_l1", "archetype_raw"]
+            - variable: segments_raw
+              value_selector: ["parse_l1", "segments_raw"]
+            - variable: shots_text
+              value_selector: ["predict_shots", "text"]
+            - variable: breaths_text
+              value_selector: ["annotate_breaths", "text"]
+            - variable: parse_l1_ok
+              value_selector: ["parse_l1", "parse_l1_ok"]
+            - variable: parse_l1_error
+              value_selector: ["parse_l1", "parse_l1_error"]
+          outputs:
+            is_valid:
+              type: boolean
+            errors:
+              type: array[string]
+            warnings:
+              type: array[string]
+            error_count:
+              type: number
+            error_report:
+              type: string
+            bundle_json:
+              type: object
+            markdown_table:
+              type: string
+          selected: false
+        position: { x: 2730, y: 420 }
+        positionAbsolute: { x: 2730, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 54
+
+      - id: "validation_gate"
+        type: custom
+        data:
+          title: "自检通过判定"
+          type: if-else
+          desc: "is_valid=true (S1-S8 全过) -> 输出双形态产出；否则输出具体失败判据清单，不是笼统『请重新检查』(仓库自有纪律)。"
+          cases:
+            - id: "pass"
+              case_id: "pass"
+              logical_operator: and
+              conditions:
+                - id: "cond_is_valid"
+                  variable_selector: ["validate_bundle", "is_valid"]
+                  comparison_operator: is
+                  value: "true"
+                  varType: boolean
+          selected: false
+        position: { x: 3030, y: 420 }
+        positionAbsolute: { x: 3030, y: 420 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 126
+
+      - id: "segment_success"
+        type: custom
+        data:
+          title: "输出-分段结果"
+          type: end
+          outputs:
+            - variable: segment_bundle
+              value_selector: ["validate_bundle", "bundle_json"]
+              value_type: object
+            - variable: markdown_table
+              value_selector: ["validate_bundle", "markdown_table"]
+              value_type: string
+            - variable: warnings
+              value_selector: ["validate_bundle", "warnings"]
+              value_type: array[string]
+        position: { x: 3330, y: 220 }
+        positionAbsolute: { x: 3330, y: 220 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 150
+
+      - id: "segment_failure"
+        type: custom
+        data:
+          title: "输出-自检未通过"
+          type: end
+          outputs:
+            - variable: failed_checks
+              value_selector: ["validate_bundle", "errors"]
+              value_type: array[string]
+            - variable: error_report
+              value_selector: ["validate_bundle", "error_report"]
+              value_type: string
+            - variable: partial_bundle
+              value_selector: ["validate_bundle", "bundle_json"]
+              value_type: object
+        position: { x: 3330, y: 620 }
+        positionAbsolute: { x: 3330, y: 620 }
+        sourcePosition: right
+        targetPosition: left
+        selected: false
+        width: 244
+        height: 150
+
+    edges:
+      - id: "start-source-intake_check-target"
+        source: "start"
+        sourceHandle: source
+        target: "intake_check"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: "intake_check-source-intake_gate-target"
+        source: "intake_check"
+        sourceHandle: source
+        target: "intake_gate"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: "intake_gate-missing-reject_class_a-target"
+        source: "intake_gate"
+        sourceHandle: "missing"
+        target: "reject_class_a"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: "intake_gate-false-detect_language-target"
+        source: "intake_gate"
+        sourceHandle: "false"
+        target: "detect_language"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: "detect_language-source-parse_language-target"
+        source: "detect_language"
+        sourceHandle: source
+        target: "parse_language"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: "parse_language-source-language_gate-target"
+        source: "parse_language"
+        sourceHandle: source
+        target: "language_gate"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: "language_gate-ok-segment_l1-target"
+        source: "language_gate"
+        sourceHandle: "ok"
+        target: "segment_l1"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: "language_gate-false-reject_language-target"
+        source: "language_gate"
+        sourceHandle: "false"
+        target: "reject_language"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: "segment_l1-source-parse_l1-target"
+        source: "segment_l1"
+        sourceHandle: source
+        target: "parse_l1"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: "parse_l1-source-predict_shots-target"
+        source: "parse_l1"
+        sourceHandle: source
+        target: "predict_shots"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: "parse_l1-source-annotate_breaths-target"
+        source: "parse_l1"
+        sourceHandle: source
+        target: "annotate_breaths"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: "predict_shots-source-validate_bundle-target"
+        source: "predict_shots"
+        sourceHandle: source
+        target: "validate_bundle"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: "annotate_breaths-source-validate_bundle-target"
+        source: "annotate_breaths"
+        sourceHandle: source
+        target: "validate_bundle"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: "validate_bundle-source-validation_gate-target"
+        source: "validate_bundle"
+        sourceHandle: source
+        target: "validation_gate"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: "validation_gate-pass-segment_success-target"
+        source: "validation_gate"
+        sourceHandle: "pass"
+        target: "segment_success"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: "validation_gate-false-segment_failure-target"
+        source: "validation_gate"
+        sourceHandle: "false"
+        target: "segment_failure"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false }
+
+    viewport: { x: 0, y: 0, zoom: 0.35 }

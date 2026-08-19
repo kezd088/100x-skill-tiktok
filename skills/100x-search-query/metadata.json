@@ -1,0 +1,46 @@
+{
+  "id": "100x-search-query",
+  "name": "100x-search-query",
+  "version": "1.5.0",
+  "author": "100x",
+  "layer": "L2-creative-generation",
+  "step": "3.4-search-query",
+  "type": "generative",
+  "status": "v1.5",
+  "summary": "Product/persona card in -> Pinterest/TikTok/Reddit search-phrase bundle out, for sourcing visual references and content inspiration.",
+  "validation": {
+    "structural_and_per_item": "schema.json (JSON Schema draft-07) -- enforces bucket size, q ASCII pattern, intent_cn format+length, stage enum. This is everything vanilla JSON Schema CAN express.",
+    "cross_item_aggregate": "scripts/validate.js -- the real, runnable enforcement of axiom 2 (per-bucket keyword density), axiom 3 (5A stage coverage across all 45 items), axiom 5 (persona-informed coverage when meta.persona_informed is true), and the sensitive-category content-policy check, none of which schema.json can express. Loads schema.json at runtime for the stage enum + intent_cn pattern so the two files can't silently drift. Run 'node scripts/validate.js --selftest' for the built-in regression suite (13 checks: 2 real evals/ files, the 'all items stage:Advocate' counterexample, a zero-density Pinterest counterexample, 2 sensitive-category counterexamples, 2 ajv structural-enforcement regressions (additionalProperties/enum), 4 sensitive-category bypass-class regressions, and 2 axiom-5 regressions).",
+    "content_policy": "workflow.md Phase 1 step 6: if category/product_name/source copy hits BOTH a sensitive-category signal (adult/two-sex-health category words, incl. common euphemisms/near-synonyms) AND an authority-claim signal (fda/certified/doctor-endorsed words, incl. near-synonyms) at the same time, generation still proceeds but meta.warnings MUST carry a specific notice. scripts/validate.js re-checks this against the ENTIRE output bundle's text (category + product_name + all q + all intent_cn) for BOTH signals as a second line of defense. KNOWN, NOT FULLY CLOSED limitations (disclosed in workflow.md/SKILL.md, not hidden): (a) fixed keyword-list check, not semantic -- any rephrasing outside the expanded word lists still evades it; (b) still cannot see raw source input text that never surfaces in category/product_name/q/intent_cn. Phase 1 (which does see raw input) remains the first line of defense; this script is the second, imperfect one."
+  },
+  "input_contract": {
+    "class_a_required_as_user_input": ["category"],
+    "class_a_required_in_output_schema_only": ["product_name"],
+    "class_a_note": "category is the only field the USER must actually supply -- missing it triggers a hard reject+re-ask (workflow.md Phase 1 step 2). product_name is required in schema.json's OUTPUT contract (must be a non-empty string) but is NOT required as user input: if the user can't give a real brand/product name, workflow.md Phase 1 fills a '[品类锚点] <category>' placeholder and proceeds normally.",
+    "class_b_optional_soft_degrade": ["core_benefit", "target_audience", "brand_tone", "topic_angle"],
+    "class_c_upstream_optional_silent_skip": ["persona_card", "insight_result", "viral_point_result"],
+    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). Input is described informally here and in workflow.md Phase 1, not enforced by a separate input JSON Schema file."
+  },
+  "output_contract": "schema.json (SearchQueryBundle, self-contained in this skill)",
+  "requires_data": [
+    "corpus.labeled_transcripts",
+    "taxonomy.category_generic"
+  ],
+  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus at inference time. 'corpus.labeled_transcripts' records that the axioms/workflow were validated against a multi-language reference transcript corpus (EN + ES). No corpus content is stored in this repo. 'taxonomy.category_generic' is the generic category enum referenced in workflow.md Phase 1 (this repo's taxonomies/ directory is not populated yet -- TODO).",
+  "methodology_origin": {
+    "source_system": "inspiration-methodology",
+    "source_components": [
+      "Core axioms definition",
+      "Three-phase workflow specification",
+      "Self-check and reflection criteria",
+      "Source classification structure"
+    ],
+    "adaptation_summary": "Self-contained implementation of the search query generation methodology. Cleaned of external dependencies. Schema and validation rules are self-contained."
+  },
+  "language_scope": {
+    "output_language": "en-only, no exceptions (axioms.md #1) -- output must satisfy schema.json's ASCII-only q pattern.",
+    "input_language": "source product copy may be in any language; tested across multi-lingual inputs (EN and ES); output language is unaffected"
+  },
+  "banned_terms_ref": "SKILL.md#禁用词",
+  "eval_policy": "evals/ contains synthetic/fictional products only. No real transcript text, account name, product name, or Feishu link may appear in this skill's files."
+}

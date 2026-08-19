@@ -1,0 +1,938 @@
+app:
+  name: "100x-exaggerate · 夸张反差设计器"
+  description: "TikTok/UGC 脚本文案输入 -> 夸张手法(5选1闭集) + 反差点(4选1闭集)设计，逐字锚定原文，强度按市场/帽度天花板机器校验，未通过全部校验不放行终稿。"
+  icon: "🎭"
+  icon_type: emoji
+  icon_background: "#FDE68A"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.2.6@e2665624a156f52160927bceac9e169bd7e5ae6b936ae82575e14c90af390e6e
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods: [local_file, remote_url]
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: [local_file, remote_url]
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: code
+      id: start_1-source-calibrate_ceiling-target
+      source: "start_1"
+      sourceHandle: source
+      target: "calibrate_ceiling"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: llm
+      id: calibrate_ceiling-source-generate_beats-target
+      source: "calibrate_ceiling"
+      sourceHandle: source
+      target: "generate_beats"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: generate_beats-source-validate_bundle-target
+      source: "generate_beats"
+      sourceHandle: source
+      target: "validate_bundle"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: if-else
+      id: validate_bundle-source-route_valid-target
+      source: "validate_bundle"
+      sourceHandle: source
+      target: "route_valid"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: route_valid-true-assemble_output-target
+      source: "route_valid"
+      sourceHandle: "true"
+      target: "assemble_output"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: template-transform
+      id: route_valid-false-format_fail_report-target
+      source: "route_valid"
+      sourceHandle: "false"
+      target: "format_fail_report"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: template-transform
+        targetType: end
+      id: assemble_output-source-end_pass-target
+      source: "assemble_output"
+      sourceHandle: source
+      target: "end_pass"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: template-transform
+        targetType: end
+      id: format_fail_report-source-end_fail-target
+      source: "format_fail_report"
+      sourceHandle: source
+      target: "end_fail"
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        title: "接收脚本 + 校准输入"
+        type: start
+        selected: false
+        variables:
+          - label: "脚本/文案原文 (source_script)"
+            variable: source_script
+            type: paragraph
+            required: true
+            max_length: 50000
+          - label: "帽度等级 hat_level（可选，缺失按 workflow.md Phase 1 三级降级处理）"
+            variable: hat_level
+            type: select
+            required: false
+            options: [blackhat, grayhat, whitehat]
+          - label: "目标市场 market（可选，如 美区 / US / 西语区 / 通用）"
+            variable: market
+            type: text-input
+            required: false
+            max_length: 200
+      height: 142
+      id: "start_1"
+      position: { x: 30, y: 320 }
+      positionAbsolute: { x: 30, y: 320 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "Phase 1 · 类别B三级降级"
+        type: code
+        selected: false
+        code_language: python3
+        code: |
+          def main(hat_level_in: str, market_in: str) -> dict:
+              # workflow.md Phase 1 "类别B（软性，三级降级）":
+              #   1. 两者都提供 -> 直接用
+              #   2. 只提供 hat_level，缺 market -> 不追问；market 按公理3的保守默认处理
+              #   3. 两者都缺 -> hat_level 内联推断为 grayhat；market 同样按保守默认
+              # 注：workflow.md 原文枚举的是这 3 种组合，"只提供 market 缺 hat_level" 这
+              # 一组合未被显式列出——本节点按公理3的机制自然外推：hat_level 缺失时始终推断
+              # 为 grayhat（与组合3同一条规则来源），market 既然已提供就不再套用保守默认
+              # （与组合1同一条规则来源）。这是一次忠实的插值，不是新发明的判断，具体说明
+              # 见 100x-exaggerate.dify.notes.md。
+              valid_hats = {"blackhat", "grayhat", "whitehat"}
+              warnings = []
+
+              hat_level = (hat_level_in or "").strip().lower()
+              market = (market_in or "").strip()
+
+              if hat_level and hat_level not in valid_hats:
+                  warnings.append(
+                      f'hat_level "{hat_level_in}" 不在 blackhat/grayhat/whitehat 闭集内，'
+                      f'已忽略并按未提供处理'
+                  )
+                  hat_level = ""
+
+              if hat_level and market:
+                  effective_hat_level = hat_level
+                  effective_market = market
+              elif hat_level and not market:
+                  effective_hat_level = hat_level
+                  effective_market = ""
+                  warnings.append(
+                      "market 未提供，emotion_reaction_hyperbole 已按保守默认收紧至 "
+                      "moderate（axioms.md 公理3）"
+                  )
+              elif not hat_level and market:
+                  effective_hat_level = "grayhat"
+                  effective_market = market
+                  warnings.append(
+                      "hat_level 未提供，已按 grayhat 推断；market 按用户提供值使用"
+                      "（workflow.md Phase 1 三级降级未显式列出这一组合，此处按公理3机制"
+                      "自然外推，详见 notes.md）"
+                  )
+              else:
+                  effective_hat_level = "grayhat"
+                  effective_market = ""
+                  warnings.append(
+                      "hat_level/market 均未提供，已按 grayhat + 保守市场默认推断"
+                      "（workflow.md Phase 1 类别B降级规则）"
+                  )
+
+              return {
+                  "effective_hat_level": effective_hat_level,
+                  "effective_market": effective_market,
+                  "warnings": warnings,
+              }
+        variables:
+          - value_selector: ["start_1", "hat_level"]
+            variable: hat_level_in
+          - value_selector: ["start_1", "market"]
+            variable: market_in
+        outputs:
+          effective_hat_level:
+            type: string
+          effective_market:
+            type: string
+          warnings:
+            type: array[string]
+      height: 90
+      id: "calibrate_ceiling"
+      position: { x: 340, y: 320 }
+      positionAbsolute: { x: 340, y: 320 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "Phase 2A/2B · 生成夸张点+反差点"
+        type: llm
+        selected: false
+        model:
+          provider: langgenius/openai/openai
+          name: gpt-4o-mini
+          mode: chat
+          completion_params:
+            temperature: 0.4
+        prompt_template:
+          - id: "9e05cb8e-0000-4000-9000-0000000e0001"
+            role: system
+            text: |
+              你是 100x-exaggerate：TikTok/UGC 脚本的"夸张手法 + 反差点"设计器。
+
+              输入：一段脚本/文案原文（source_script）+ 已确定的 hat_level
+              （blackhat/grayhat/whitehat）+ market（可能是空字符串，表示未指定，
+              需按保守默认处理）。这两个校准输入已经过 Phase 1 三级降级处理，直接使用，
+              不要自己再猜测或改写。
+
+              任务：
+              1. 找出脚本里可以标注"夸张技法"的断言/宣称句，为每一条选择最贴近的技法，
+                 不强行凑满5种都出现。
+              2. 找出脚本里可以配对"反差"的两处真实不同表述，为每一条选择最贴近的反差
+                 类型，不强行凑满4种都出现。
+              3. 每条都必须给出逐字摘录（不改写、不概括、不翻译），因为下游会做逐字
+                 子串校验——摘录必须一字不差地作为 source_script 的子串出现，大小写
+                 敏感。
+              4. intensity 是天花板内的选择，不是"能拉多高就拉多高"——一条语气克制的
+                 原文即使天花板允许 aggressive，也可以标 moderate，忠于原文语气优先于
+                 用满配额。
+
+              夸张技法闭集枚举（5选1，只能使用下面这5个英文值，不许自创新词）：
+              - numeric_hyperbole（数字夸张）：用具体夸张数字/金额/件数制造效果感知
+              - time_compression_hyperbole（时间压缩夸张）：把效果压缩进不合常理的
+                短周期宣称
+              - analogy_scale_hyperbole（类比放大夸张）：用具象事物类比放大/缩小效果
+              - emotion_reaction_hyperbole（情绪反应夸张）：演员/旁观者的夸张情绪反应
+              - authority_absolutism_hyperbole（权威绝对化夸张）：借权威/专家/数据做
+                近乎无条件的效果断言——只标注脚本里已经存在的宣称，不替脚本编造新的
+                机构名/认证/头衔
+
+              反差类型闭集枚举（4选1，只能使用下面这4个英文值，不许自创新词）：
+              - state_before_after（状态前后反差）：使用前/后两种状态的落差
+              - tone_register（基调反差）：叙事基调的骤然转换（例如怀疑转笃定、
+                悬疑恐怖转日常促销）
+              - value_price（价值反差）：参照物/原价与实际价格·价值的落差
+              - warning_vs_promotion（警示反差）：表面警告语气与实际促购意图的反差
+
+              强度天花板（intensity 三档，mild < moderate < aggressive）：
+              - 基线按 hat_level：whitehat=mild，grayhat=moderate，blackhat=aggressive
+              - 额外规则（只对 emotion_reaction_hyperbole 这一个技法生效，其余4个技法
+                不受此约束）：如果 market 命中"美区/美国/US/USA/United States/America"
+                这类别名（market 为空字符串时按保守默认视为命中），
+                emotion_reaction_hyperbole 的天花板收紧到 moderate，即使 hat_level 是
+                blackhat（基线 aggressive）也不例外。
+              - 你给出的 intensity 只是建议值，下游会用同一套规则重新计算天花板并硬性
+                拒绝超限的产出，请按此规则自我约束，避免整份产出因一条 beat 超限被打回。
+
+              反差两端要求：anchor_quote_a 与 anchor_quote_b 必须来自脚本里真实不同的
+              两处表述，不能把同一句话抄两遍或稍微改写几个字充数——两端要有真实可感知
+              的落差。
+
+              禁用：
+              - 不编造脚本原文没有的效果/数字/权威背书/认证/见证
+              - 不为了凑数量堆砌 beats，也不强行让5种技法/4种反差类型都出现
+              - 不使用"让我/希望/或许/大概/可能/也许/让我们"这类弱化表达，不使用AI
+                客服腔调（如 as an AI / I'd be happy to / feel free to）
+
+              若脚本中确实找不到多条可用的夸张/反差落点（例如接近纯参数罗列），仍然
+              只输出你能找到的最贴近项，不要编造；exaggeration_beats 和 contrast_beats
+              下游各要求至少1条，无法留空数组。
+
+              输出格式：只输出一个 JSON 对象，不要 Markdown 代码围栏、不要任何解释
+              文字，不要在 JSON 前后添加任何其他内容。格式：
+              {
+                "exaggeration_beats": [
+                  {
+                    "beat_id": "EXG_01",
+                    "script_span_quote": "<脚本原文逐字摘录>",
+                    "technique": "<5选1枚举值>",
+                    "label_cn": "<中文短标签，2-6字最佳，硬性上限10字>",
+                    "intensity": "<mild|moderate|aggressive>",
+                    "rationale": "<一句话说明技法+强度选择理由，中文>"
+                  }
+                ],
+                "contrast_beats": [
+                  {
+                    "beat_id": "CTR_01",
+                    "contrast_type": "<4选1枚举值>",
+                    "label_cn": "<中文短标签，2-6字最佳，硬性上限10字>",
+                    "anchor_quote_a": "<脚本原文逐字摘录A>",
+                    "anchor_quote_b": "<脚本原文逐字摘录B，必须与A不同>",
+                    "rationale": "<一句话说明反差理由，中文>"
+                  }
+                ]
+              }
+              beat_id 格式分别为 EXG_数字 / CTR_数字（如 EXG_01, EXG_02, CTR_01）。
+              label_cn 长度必须在 1-10 个字符之间。exaggeration_beats 和
+              contrast_beats 都至少输出1条。
+          - id: "9e05cb8e-0000-4000-9000-0000000e0002"
+            role: user
+            text: |
+              脚本原文（source_script）：
+              {{#start_1.source_script#}}
+
+              已确定的校准输入（Phase 1 已完成三级降级，直接使用，不要自行改变）：
+              - hat_level: {{#calibrate_ceiling.effective_hat_level#}}
+              - market: {{#calibrate_ceiling.effective_market#}}
+
+              请按 system 提示中的规则，输出本条脚本的 exaggeration_beats +
+              contrast_beats JSON，只输出 JSON。
+        context:
+          enabled: false
+          variable_selector: []
+        vision:
+          enabled: false
+      height: 98
+      id: "generate_beats"
+      position: { x: 650, y: 320 }
+      positionAbsolute: { x: 650, y: 320 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "Phase 2C/3 · 结构+公理2/3/4校验"
+        type: code
+        selected: false
+        code_language: python3
+        code: |
+          import json
+          import re
+
+
+          def main(source_script: str, hat_level: str, market: str, warnings_in: list,
+                    llm_raw: str) -> dict:
+              # This node is the Dify-sandbox hand port of schema.json (structural
+              # layer, normally ajv) + scripts/validate.js's three hand-written
+              # aggregate checks (axiom2 substring anchoring, axiom3 calibration
+              # ceiling, axiom4 contrast non-degeneracy). ajv itself cannot run in
+              # Dify's sandboxed code node, so every rule below is re-expressed in
+              # plain stdlib Python at the SAME strictness as the source skill --
+              # nothing added, nothing loosened. See 100x-exaggerate.dify.notes.md
+              # for the field-by-field mapping back to schema.json/axioms.md.
+              hat_level = hat_level or ""
+              market = market or ""
+              warnings_list = list(warnings_in or [])
+
+              # ---- 0. parse LLM JSON output (defensive fence-stripping only) ----
+              raw = (llm_raw or "").strip()
+              if raw.startswith("```"):
+                  raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
+                  raw = re.sub(r"```\s*$", "", raw)
+                  raw = raw.strip()
+
+              try:
+                  parsed = json.loads(raw)
+                  if not isinstance(parsed, dict):
+                      raise ValueError("top-level JSON is not an object")
+              except Exception as exc:
+                  meta_out = {
+                      "generated_by": "100x-exaggerate",
+                      "hat_level": hat_level,
+                      "market": market,
+                      "warnings": warnings_list,
+                  }
+                  return {
+                      "is_valid": "false",
+                      "status": "failed",
+                      "errors": [f"[parse] LLM output is not valid JSON: {exc}"],
+                      "error_count": 1,
+                      "exaggeration_beats_out": [],
+                      "contrast_beats_out": [],
+                      "meta_out": meta_out,
+                      "source_script_out": source_script or "",
+                      "bundle_json": "{}",
+                      "warnings_out": warnings_list,
+                  }
+
+              exaggeration_beats = parsed.get("exaggeration_beats")
+              if not isinstance(exaggeration_beats, list):
+                  exaggeration_beats = []
+              contrast_beats = parsed.get("contrast_beats")
+              if not isinstance(contrast_beats, list):
+                  contrast_beats = []
+
+              calibration_note = (
+                  f'hat_level="{hat_level}" 基线天花板按公理3三档表；'
+                  + (
+                      f'market="{market}" 已按公理3美区别名规则参与 '
+                      f'emotion_reaction_hyperbole 天花板计算'
+                      if market
+                      else "market 未提供，emotion_reaction_hyperbole 已按保守默认"
+                      "收紧至 moderate"
+                  )
+              )
+
+              meta = {
+                  "generated_by": "100x-exaggerate",
+                  "hat_level": hat_level,
+                  "market": market,
+                  "calibration_note": calibration_note,
+                  "warnings": warnings_list,
+              }
+
+              bundle = {
+                  "source_script": source_script or "",
+                  "meta": meta,
+                  "exaggeration_beats": exaggeration_beats,
+                  "contrast_beats": contrast_beats,
+              }
+
+              errors = []
+
+              # ---- 1. structural checks: hand port of schema.json -----------------
+              # (required / additionalProperties / enum / pattern / minLength /
+              # maxLength / minItems -- everything ajv would enforce via
+              # schema.json). Top-level additionalProperties:false and meta's three
+              # required fields are enforced BY CONSTRUCTION above (bundle/meta are
+              # literal dicts with exactly the allowed keys) rather than by an
+              # explicit runtime check -- see notes.md for why that is equivalent.
+              EXG_TECHNIQUES = {
+                  "numeric_hyperbole",
+                  "time_compression_hyperbole",
+                  "analogy_scale_hyperbole",
+                  "emotion_reaction_hyperbole",
+                  "authority_absolutism_hyperbole",
+              }
+              CTR_TYPES = {
+                  "state_before_after",
+                  "tone_register",
+                  "value_price",
+                  "warning_vs_promotion",
+              }
+              INTENSITIES = {"mild", "moderate", "aggressive"}
+              HAT_LEVELS = {"blackhat", "grayhat", "whitehat"}
+              EXG_ID_RE = re.compile(r"^EXG_[A-Za-z0-9_]+$")
+              CTR_ID_RE = re.compile(r"^CTR_[A-Za-z0-9_]+$")
+
+              struct_errors = []
+
+              if not isinstance(bundle["source_script"], str) or len(bundle["source_script"]) < 1:
+                  struct_errors.append("[schema:source_script] must be a non-empty string")
+
+              if hat_level not in HAT_LEVELS:
+                  struct_errors.append(
+                      f'[schema:meta.hat_level] "{hat_level}" is not one of {sorted(HAT_LEVELS)}'
+                  )
+
+              if len(exaggeration_beats) < 1:
+                  struct_errors.append(
+                      "[schema:exaggeration_beats] must be a non-empty array (minItems:1)"
+                  )
+              else:
+                  exg_required = {
+                      "beat_id", "script_span_quote", "technique", "label_cn",
+                      "intensity", "rationale",
+                  }
+                  for idx, item in enumerate(exaggeration_beats):
+                      loc = f"exaggeration_beats[{idx}]"
+                      if not isinstance(item, dict):
+                          struct_errors.append(f"[schema:{loc}] must be an object")
+                          continue
+                      missing = exg_required - set(item.keys())
+                      if missing:
+                          struct_errors.append(
+                              f"[schema:{loc}] missing required field(s): {sorted(missing)}"
+                          )
+                      extra = set(item.keys()) - exg_required
+                      if extra:
+                          struct_errors.append(
+                              f"[schema:{loc}] additionalProperties not allowed: {sorted(extra)}"
+                          )
+                      beat_id = item.get("beat_id")
+                      if not isinstance(beat_id, str) or not EXG_ID_RE.match(beat_id):
+                          struct_errors.append(
+                              f'[schema:{loc}.beat_id] "{beat_id}" does not match pattern '
+                              f'^EXG_[A-Za-z0-9_]+$'
+                          )
+                      quote = item.get("script_span_quote")
+                      if not isinstance(quote, str) or len(quote) < 1:
+                          struct_errors.append(
+                              f"[schema:{loc}.script_span_quote] must be a non-empty string"
+                          )
+                      technique = item.get("technique")
+                      if technique not in EXG_TECHNIQUES:
+                          struct_errors.append(
+                              f'[schema:{loc}.technique] "{technique}" is not one of '
+                              f'{sorted(EXG_TECHNIQUES)}'
+                          )
+                      label_cn = item.get("label_cn")
+                      if not isinstance(label_cn, str) or not (1 <= len(label_cn) <= 10):
+                          struct_errors.append(
+                              f"[schema:{loc}.label_cn] must be a string of length 1-10"
+                          )
+                      intensity = item.get("intensity")
+                      if intensity not in INTENSITIES:
+                          struct_errors.append(
+                              f'[schema:{loc}.intensity] "{intensity}" is not one of '
+                              f'{sorted(INTENSITIES)}'
+                          )
+                      rationale = item.get("rationale")
+                      if not isinstance(rationale, str) or len(rationale) < 1:
+                          struct_errors.append(
+                              f"[schema:{loc}.rationale] must be a non-empty string"
+                          )
+
+              if len(contrast_beats) < 1:
+                  struct_errors.append(
+                      "[schema:contrast_beats] must be a non-empty array (minItems:1)"
+                  )
+              else:
+                  ctr_required = {
+                      "beat_id", "contrast_type", "label_cn", "anchor_quote_a",
+                      "anchor_quote_b", "rationale",
+                  }
+                  for idx, item in enumerate(contrast_beats):
+                      loc = f"contrast_beats[{idx}]"
+                      if not isinstance(item, dict):
+                          struct_errors.append(f"[schema:{loc}] must be an object")
+                          continue
+                      missing = ctr_required - set(item.keys())
+                      if missing:
+                          struct_errors.append(
+                              f"[schema:{loc}] missing required field(s): {sorted(missing)}"
+                          )
+                      extra = set(item.keys()) - ctr_required
+                      if extra:
+                          struct_errors.append(
+                              f"[schema:{loc}] additionalProperties not allowed: {sorted(extra)}"
+                          )
+                      beat_id = item.get("beat_id")
+                      if not isinstance(beat_id, str) or not CTR_ID_RE.match(beat_id):
+                          struct_errors.append(
+                              f'[schema:{loc}.beat_id] "{beat_id}" does not match pattern '
+                              f'^CTR_[A-Za-z0-9_]+$'
+                          )
+                      contrast_type = item.get("contrast_type")
+                      if contrast_type not in CTR_TYPES:
+                          struct_errors.append(
+                              f'[schema:{loc}.contrast_type] "{contrast_type}" is not one of '
+                              f'{sorted(CTR_TYPES)}'
+                          )
+                      label_cn = item.get("label_cn")
+                      if not isinstance(label_cn, str) or not (1 <= len(label_cn) <= 10):
+                          struct_errors.append(
+                              f"[schema:{loc}.label_cn] must be a string of length 1-10"
+                          )
+                      qa = item.get("anchor_quote_a")
+                      if not isinstance(qa, str) or len(qa) < 1:
+                          struct_errors.append(
+                              f"[schema:{loc}.anchor_quote_a] must be a non-empty string"
+                          )
+                      qb = item.get("anchor_quote_b")
+                      if not isinstance(qb, str) or len(qb) < 1:
+                          struct_errors.append(
+                              f"[schema:{loc}.anchor_quote_b] must be a non-empty string"
+                          )
+                      rationale = item.get("rationale")
+                      if not isinstance(rationale, str) or len(rationale) < 1:
+                          struct_errors.append(
+                              f"[schema:{loc}.rationale] must be a non-empty string"
+                          )
+
+              errors.extend(struct_errors)
+
+              # ---- 2. axiom 2/3/4 aggregate checks -------------------------------
+              # Only run if structurally valid, mirroring validate.js's own pipeline
+              # order ("ajv structural pass first, aggregate checks only if it
+              # passes" -- see that file's validate() function).
+              if not struct_errors:
+                  script = bundle["source_script"]
+
+                  # axiom 2: literal substring anchoring (case-sensitive, exact).
+                  for item in exaggeration_beats:
+                      if item.get("script_span_quote") not in script:
+                          errors.append(
+                              f"[axiom2] {item.get('beat_id')}: script_span_quote is not a "
+                              f"literal substring of source_script"
+                          )
+                  for item in contrast_beats:
+                      if item.get("anchor_quote_a") not in script:
+                          errors.append(
+                              f"[axiom2] {item.get('beat_id')}: anchor_quote_a is not a "
+                              f"literal substring of source_script"
+                          )
+                      if item.get("anchor_quote_b") not in script:
+                          errors.append(
+                              f"[axiom2] {item.get('beat_id')}: anchor_quote_b is not a "
+                              f"literal substring of source_script"
+                          )
+
+                  # axiom 4: contrast pair non-degeneracy (normalized exact match
+                  # only -- same disclosed limitation as scripts/validate.js: this
+                  # cannot catch a same-meaning-different-words paraphrase).
+                  def normalize(s):
+                      return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+                  for item in contrast_beats:
+                      if normalize(item.get("anchor_quote_a")) == normalize(item.get("anchor_quote_b")):
+                          errors.append(
+                              f"[axiom4] {item.get('beat_id')}: anchor_quote_a and "
+                              f"anchor_quote_b are the same quote (normalized) -- no real "
+                              f"contrast gap"
+                          )
+
+                  # axiom 3: market/hat_level calibration ceiling. Byte-for-byte
+                  # port of scripts/validate.js's BASE_CEILING_BY_HAT_LEVEL /
+                  # US_MARKET_ALIASES / MARKET_SEGMENT_SPLIT_RE / isUsMarket /
+                  # emotionCeilingForMarket / calibrationCheck, including the v1.2
+                  # delimiter fix ('-'/'&' included) and the v1.1 exact-segment-match
+                  # fix (not a bare substring test).
+                  INTENSITY_RANK = {"mild": 1, "moderate": 2, "aggressive": 3}
+                  BASE_CEILING_BY_HAT_LEVEL = {"whitehat": 1, "grayhat": 2, "blackhat": 3}
+                  US_MARKET_ALIASES = {
+                      "美区", "美国", "us", "usa", "united states", "america",
+                  }
+                  MARKET_SEGMENT_SPLIT_RE = re.compile(r"[,，、;；|&()（）/-]+")
+
+                  def is_us_market(market_str):
+                      raw_m = market_str or ""
+                      segments = [
+                          seg.strip().lower()
+                          for seg in MARKET_SEGMENT_SPLIT_RE.split(raw_m)
+                          if seg.strip()
+                      ]
+                      return any(seg in US_MARKET_ALIASES for seg in segments)
+
+                  def emotion_ceiling_for_market(market_str):
+                      has_market = isinstance(market_str, str) and market_str.strip() != ""
+                      if not has_market:
+                          return INTENSITY_RANK["moderate"]
+                      return (
+                          INTENSITY_RANK["moderate"]
+                          if is_us_market(market_str)
+                          else INTENSITY_RANK["aggressive"]
+                      )
+
+                  base_ceiling = BASE_CEILING_BY_HAT_LEVEL.get(hat_level)
+                  if base_ceiling:
+                      for item in exaggeration_beats:
+                          item_rank = INTENSITY_RANK.get(item.get("intensity"))
+                          ceiling = base_ceiling
+                          if item.get("technique") == "emotion_reaction_hyperbole":
+                              ceiling = min(ceiling, emotion_ceiling_for_market(market))
+                          if item_rank is not None and item_rank > ceiling:
+                              ceiling_label = [
+                                  k for k, v in INTENSITY_RANK.items() if v == ceiling
+                              ][0]
+                              market_note = (
+                                  f' / market "{market}"'
+                                  if market
+                                  else " / market unspecified (conservative default applied)"
+                              )
+                              errors.append(
+                                  f'[axiom3] {item.get("beat_id")}: intensity '
+                                  f'"{item.get("intensity")}" exceeds calibration ceiling '
+                                  f'"{ceiling_label}" for technique "{item.get("technique")}" '
+                                  f'under hat_level "{hat_level}"{market_note}'
+                              )
+
+              is_valid = len(errors) == 0
+
+              return {
+                  "is_valid": "true" if is_valid else "false",
+                  "status": "passed" if is_valid else "failed",
+                  "errors": errors,
+                  "error_count": len(errors),
+                  "exaggeration_beats_out": exaggeration_beats if is_valid else [],
+                  "contrast_beats_out": contrast_beats if is_valid else [],
+                  "meta_out": meta,
+                  "source_script_out": bundle["source_script"],
+                  "bundle_json": json.dumps(bundle, ensure_ascii=False, indent=2),
+                  "warnings_out": warnings_list,
+              }
+        variables:
+          - value_selector: ["start_1", "source_script"]
+            variable: source_script
+          - value_selector: ["calibrate_ceiling", "effective_hat_level"]
+            variable: hat_level
+          - value_selector: ["calibrate_ceiling", "effective_market"]
+            variable: market
+          - value_selector: ["calibrate_ceiling", "warnings"]
+            variable: warnings_in
+          - value_selector: ["generate_beats", "text"]
+            variable: llm_raw
+        outputs:
+          is_valid:
+            type: string
+          status:
+            type: string
+          errors:
+            type: array[string]
+          error_count:
+            type: number
+          exaggeration_beats_out:
+            type: array[object]
+          contrast_beats_out:
+            type: array[object]
+          meta_out:
+            type: object
+          source_script_out:
+            type: string
+          bundle_json:
+            type: string
+          warnings_out:
+            type: array[string]
+      height: 90
+      id: "validate_bundle"
+      position: { x: 960, y: 320 }
+      positionAbsolute: { x: 960, y: 320 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "全部校验是否通过"
+        type: if-else
+        selected: false
+        desc: ""
+        cases:
+          - id: "true"
+            case_id: "true"
+            logical_operator: and
+            conditions:
+              - id: "cond-is-valid-001"
+                variable_selector: ["validate_bundle", "is_valid"]
+                comparison_operator: is
+                value: "true"
+                varType: string
+        conditions:
+          - id: "cond-is-valid-001"
+            variable_selector: ["validate_bundle", "is_valid"]
+            comparison_operator: is
+            value: "true"
+            varType: string
+        logical_operator: and
+      height: 126
+      id: "route_valid"
+      position: { x: 1270, y: 320 }
+      positionAbsolute: { x: 1270, y: 320 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "Phase 3 · 组装终稿 Markdown 摘要"
+        type: template-transform
+        selected: false
+        variables:
+          - variable: hat_level
+            value_selector: ["calibrate_ceiling", "effective_hat_level"]
+          - variable: market
+            value_selector: ["calibrate_ceiling", "effective_market"]
+          - variable: warnings
+            value_selector: ["validate_bundle", "warnings_out"]
+          - variable: exaggeration_beats
+            value_selector: ["validate_bundle", "exaggeration_beats_out"]
+          - variable: contrast_beats
+            value_selector: ["validate_bundle", "contrast_beats_out"]
+        template: |
+          # 夸张 / 反差设计结果
+
+          **帽度（hat_level）**: {{ hat_level }}
+          **市场（market）**: {{ market if market else "未指定（按保守默认处理）" }}
+          {% if warnings %}
+          **降级 / 提示记录**：
+          {% for w in warnings %}
+          - {{ w }}
+          {% endfor %}
+          {% endif %}
+
+          ## 夸张点 exaggeration_beats
+          {% for b in exaggeration_beats %}
+          ### {{ b.beat_id }} · {{ b.label_cn }} （{{ b.technique }} / {{ b.intensity }}）
+          > {{ b.script_span_quote }}
+
+          理由：{{ b.rationale }}
+
+          {% endfor %}
+          ## 反差点 contrast_beats
+          {% for c in contrast_beats %}
+          ### {{ c.beat_id }} · {{ c.label_cn }} （{{ c.contrast_type }}）
+          - A 端：{{ c.anchor_quote_a }}
+          - B 端：{{ c.anchor_quote_b }}
+
+          理由：{{ c.rationale }}
+
+          {% endfor %}
+      height: 90
+      id: "assemble_output"
+      position: { x: 1580, y: 180 }
+      positionAbsolute: { x: 1580, y: 180 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "格式化未通过报告"
+        type: template-transform
+        selected: false
+        variables:
+          - variable: errors
+            value_selector: ["validate_bundle", "errors"]
+          - variable: error_count
+            value_selector: ["validate_bundle", "error_count"]
+        template: |
+          # 校验未通过（{{ error_count }} 项）
+
+          本次生成未通过 100x-exaggerate 的机器校验，以下是逐条具体原因（不是通用
+          报错文案）：
+
+          {% for e in errors %}
+          - {{ e }}
+          {% endfor %}
+
+          常见修复方式：
+          - [schema:*] 结构类问题：检查必填字段/闭集枚举/beat_id 格式是否符合
+            schema.json
+          - [axiom2] 锚点类问题：确认引文是脚本原文的逐字子串，不是概括或翻译
+          - [axiom3] 强度超限：按 hat_level/market 决定的天花板降低 intensity，
+            不要改 technique
+          - [axiom4] 反差退化：为 anchor_quote_b（或 _a）换一处脚本里真正不同的表述
+      height: 90
+      id: "format_fail_report"
+      position: { x: 1580, y: 460 }
+      positionAbsolute: { x: 1580, y: 460 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "终稿输出（通过）"
+        type: end
+        selected: false
+        outputs:
+          - variable: status
+            value_selector: ["validate_bundle", "status"]
+            value_type: string
+          - variable: bundle_json
+            value_selector: ["validate_bundle", "bundle_json"]
+            value_type: string
+          - variable: summary_markdown
+            value_selector: ["assemble_output", "output"]
+            value_type: string
+          - variable: warnings
+            value_selector: ["validate_bundle", "warnings_out"]
+            value_type: array[string]
+      height: 166
+      id: "end_pass"
+      position: { x: 1890, y: 180 }
+      positionAbsolute: { x: 1890, y: 180 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        title: "终稿输出（未通过）"
+        type: end
+        selected: false
+        outputs:
+          - variable: status
+            value_selector: ["validate_bundle", "status"]
+            value_type: string
+          - variable: validation_errors
+            value_selector: ["validate_bundle", "errors"]
+            value_type: array[string]
+          - variable: error_count
+            value_selector: ["validate_bundle", "error_count"]
+            value_type: number
+          - variable: fail_report_markdown
+            value_selector: ["format_fail_report", "output"]
+            value_type: string
+          - variable: raw_llm_output
+            value_selector: ["generate_beats", "text"]
+            value_type: string
+      height: 186
+      id: "end_fail"
+      position: { x: 1890, y: 460 }
+      positionAbsolute: { x: 1890, y: 460 }
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport: { x: 0, y: 0, zoom: 0.6 }

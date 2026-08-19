@@ -1,0 +1,52 @@
+{
+  "product_name": "leg circulation powder sachet (synthetic example, based on a real Spanish-language ad's simple before/after narrative, not a real product)",
+  "category": "循环保健品(粉剂)",
+  "source_material_note": "Derived from the narrative SHAPE (heavy/tired legs -> relief, no explicit day markers, not the literal wording) of a real Spanish-language hat-graded TikTok ad transcript reviewed during this skill's build (see sources.md for the line reference; no transcript text is reproduced here). Text-only degraded Class A path (workflow.md Phase 1 step 5) -- identity anchors below are synthetic archetypes, not vision-reversed from any real photo.",
+  "constants": {
+    "person_identity_anchor": "woman in her 50s, short greying hair, kitchen apron",
+    "scene_identity_anchor": "kitchen counter beside a glass of water, midday natural light",
+    "product_identity_anchor": "red rice powder sachet in a small plain paper box"
+  },
+  "variables": [
+    { "dimension": "pose", "name": "leg contact", "observed_values": ["hand resting on calf", "standing upright, hands free"], "range_description": "touching/holding the tired leg vs. standing normally with no hand contact on the leg" }
+  ],
+  "media_plan": {
+    "structure": "head_tail",
+    "frame_count": 2,
+    "frames": [
+      { "role": "head", "day_index": null, "visual_action": "standing at the kitchen counter, one hand resting on the opposite calf, tired neutral expression", "uses_first_frame_as_reference": false },
+      { "role": "tail", "day_index": null, "visual_action": "using frame 1 as reference, standing upright without touching the legs, relaxed smiling expression, rest of the kitchen unchanged", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "source ad is a simple symptom-then-relief statement with no explicit day markers cited, so a two-frame head_tail plan matches without inventing a timeline the copy never stated."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "medium shot, hand on calf",
+      "character_prompt": "woman in her 50s, short greying hair, kitchen apron",
+      "scene_prompt": "kitchen counter beside a glass of water, midday natural light",
+      "action_prompt": "standing at the counter, one hand resting on the opposite calf, medium shot",
+      "combined_prompt": "woman in her 50s, short greying hair, kitchen apron, kitchen counter beside a glass of water, midday natural light, red rice powder sachet in a small plain paper box, standing at the counter, one hand resting on the opposite calf, medium shot",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "close-up, product on counter",
+      "character_prompt": "woman in her 50s, short greying hair, kitchen apron",
+      "scene_prompt": "kitchen counter beside a glass of water, midday natural light",
+      "action_prompt": "close-up on the sachet packet next to the glass of water, product-hero composition",
+      "combined_prompt": "woman in her 50s, short greying hair, kitchen apron, kitchen counter beside a glass of water, midday natural light, red rice powder sachet in a small plain paper box, close-up on the sachet packet next to the glass of water, product-hero composition",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "head", "day_index": null, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her 50s, short greying hair, kitchen apron, kitchen counter beside a glass of water, midday natural light, red rice powder sachet in a small plain paper box, standing at the kitchen counter, one hand resting on the opposite calf, tired neutral expression, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "tail", "day_index": null, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her 50s, short greying hair, kitchen apron, kitchen counter beside a glass of water, midday natural light, red rice powder sachet in a small plain paper box, using frame 1 as reference, standing upright without touching the legs, relaxed smiling expression, rest of the kitchen unchanged, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "head_tail",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

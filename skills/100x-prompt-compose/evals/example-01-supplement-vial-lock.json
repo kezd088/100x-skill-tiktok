@@ -1,0 +1,25 @@
+{
+  "template_id": "IMG-01-product-lock",
+  "template_name": "① 产品外观锁定图（建产品参考图）",
+  "category": "图片",
+  "variables_used": {
+    "product_desc": "透明玻璃小药瓶，30ml，白色环形瓶身贴纸标注每日剂量，配一根透明吸管，银色扣式开瓶盖 (synthetic example, not a real product)"
+  },
+  "rendered_body": "生成一张产品白底图。产品外观为：透明玻璃小药瓶，30ml，白色环形瓶身贴纸标注每日剂量，配一根透明吸管，银色扣式开瓶盖 (synthetic example, not a real product)。真实塑料/材质质感，标签印刷清晰，无反光眩光。无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实环境。",
+  "reference_locks": [
+    {
+      "entity": "产品",
+      "ref_number": 1,
+      "status": "first_lock",
+      "value": "透明玻璃小药瓶，30ml，白色环形瓶身贴纸标注每日剂量，配一根透明吸管，银色扣式开瓶盖 (synthetic example, not a real product)"
+    }
+  ],
+  "model": null,
+  "video_unit": null,
+  "meta": {
+    "generated_by": "100x-prompt-compose",
+    "existing_refs_input": { "产品": [], "人物": [] },
+    "established_refs_after": { "产品": [1], "人物": [] },
+    "warnings": []
+  }
+}

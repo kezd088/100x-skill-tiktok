@@ -1,0 +1,53 @@
+{
+  "product_name": "polvo de arroz rojo para circulación (ejemplo sintético, basado en la narrativa antes/después de un anuncio real en español, no es un producto real)",
+  "category": "循环保健品(粉剂)",
+  "source_material_note": "Derivado del arco narrativo de un transcripto real de anuncio TikTok en español calificado con hat (V000646) revisado en esta ejecución de validación. Ruta degradada solo-texto Clase A. Las afirmaciones del anuncio original sobre sensaciones internas se han reescrito como cambios de postura y expresión fotografiables, según axioma 4.",
+  "constants": {
+    "person_identity_anchor": "mujer de unos 55 años, cabello corto con mechas grises, vistiendo una blusa holgada de color crema y pantalones de casa azul marino",
+    "scene_identity_anchor": "cocina doméstica con encimera de madera clara, un vaso de agua sobre la mesa y una ventana con luz de media tarde",
+    "product_identity_anchor": "caja de cartón pequeña con un sobre individual de polvo rojo granulado, etiqueta con borde dorado y texto minimalista"
+  },
+  "variables": [
+    { "dimension": "pose", "name": "contacto con la pierna", "observed_values": ["una mano apoyada sobre la pantorrilla", "de pie con brazos libres a los lados"], "range_description": "gesto de tocar o sostener la pierna cansada vs postura libre sin contacto con las piernas" },
+    { "dimension": "camera", "name": "encuadre", "observed_values": ["plano medio de tres cuartos", "plano detalle del sobre junto al vaso de agua"], "range_description": "encuadre general para leer postura corporal vs plano cercano del producto en la mesa" }
+  ],
+  "media_plan": {
+    "structure": "head_tail",
+    "frame_count": 2,
+    "frames": [
+      { "role": "head", "day_index": null, "visual_action": "de pie junto a la encimera de la cocina, una mano apoyada sobre la pantorrilla contraria, expresión cansada neutra, luz natural de la ventana", "uses_first_frame_as_reference": false },
+      { "role": "tail", "day_index": null, "visual_action": "usando cuadro 1 como referencia, de pie erguida con ambos brazos libres a los lados, expresión relajada y sonriente, el sobre de producto visible junto al vaso sobre la encimera, resto de la cocina sin cambios", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "el anuncio fuente contrasta dos estados simples (piernas cansadas con arañitas -> alivio y relajación al tomar el producto), sin marcadores de tiempo explícitos ni acción de transición intermedia; un plan head_tail de dos cuadros refleja ese contraste sin inventar una línea temporal que el anuncio nunca mencionó."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "plano medio, tocando la pantorrilla",
+      "character_prompt": "mujer de unos 55 años, cabello corto con mechas grises, vistiendo una blusa holgada de color crema y pantalones de casa azul marino",
+      "scene_prompt": "cocina doméstica con encimera de madera clara, un vaso de agua sobre la mesa y una ventana con luz de media tarde",
+      "action_prompt": "de pie en la cocina, una mano sobre la pantorrilla, plano medio de tres cuartos, composición frontal",
+      "combined_prompt": "mujer de unos 55 años, cabello corto con mechas grises, vistiendo una blusa holgada de color crema y pantalones de casa azul marino, cocina doméstica con encimera de madera clara, un vaso de agua sobre la mesa y una ventana con luz de media tarde, caja de cartón pequeña con un sobre individual de polvo rojo granulado, etiqueta con borde dorado y texto minimalista, de pie en la cocina con una mano sobre la pantorrilla, plano medio de tres cuartos",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "plano detalle, sobre junto al vaso",
+      "character_prompt": "mujer de unos 55 años, cabello corto con mechas grises, vistiendo una blusa holgada de color crema y pantalones de casa azul marino",
+      "scene_prompt": "cocina doméstica con encimera de madera clara, un vaso de agua sobre la mesa y una ventana con luz de media tarde",
+      "action_prompt": "plano detalle del sobre de producto junto al vaso de agua sobre la encimera de madera, figura suave desenfocada en segundo plano, composición producto-héroe",
+      "combined_prompt": "mujer de unos 55 años, cabello corto con mechas grises, vistiendo una blusa holgada de color crema y pantalones de casa azul marino, cocina doméstica con encimera de madera clara, un vaso de agua sobre la mesa y una ventana con luz de media tarde, caja de cartón pequeña con un sobre individual de polvo rojo granulado, etiqueta con borde dorado y texto minimalista, plano detalle del sobre junto al vaso sobre la encimera con figura desenfocada en segundo plano, composición producto-héroe",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "head", "day_index": null, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "mujer de unos 55 años, cabello corto con mechas grises, vistiendo una blusa holgada de color crema y pantalones de casa azul marino, cocina doméstica con encimera de madera clara, un vaso de agua sobre la mesa y una ventana con luz de media tarde, caja de cartón pequeña con un sobre individual de polvo rojo granulado, etiqueta con borde dorado y texto minimalista, de pie junto a la encimera de la cocina, una mano apoyada sobre la pantorrilla contraria, expresión cansada neutra, luz natural de la ventana, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "tail", "day_index": null, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "mujer de unos 55 años, cabello corto con mechas grises, vistiendo una blusa holgada de color crema y pantalones de casa azul marino, cocina doméstica con encimera de madera clara, un vaso de agua sobre la mesa y una ventana con luz de media tarde, caja de cartón pequeña con un sobre individual de polvo rojo granulado, etiqueta con borde dorado y texto minimalista, usando cuadro 1 como referencia, de pie erguida con ambos brazos libres a los lados, expresión relajada y sonriente, el sobre visible junto al vaso sobre la encimera, resto de la cocina sin cambios, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "head_tail",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

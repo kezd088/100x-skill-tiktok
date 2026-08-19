@@ -1,0 +1,178 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-persona/PersonaSceneBundle.json",
+  "title": "PersonaSceneBundle",
+  "description": "Output contract for 100x-persona. Self-contained in this skill (this repo has no shared cross-skill schemas/ yet). One script draft in -> who-delivers-it (personas) + where-it's-set (scenes) + how-they-pair-to-script-spans (pairings) out. CORE DESIGN: scenes is a TOP-LEVEL sibling map to personas, not a string field nested inside a persona object -- this enforces the independent scene entity design. NOTE (structural limits of vanilla JSON Schema draft-07, same class of gap as 100x-search-query's schema.json): this file can enforce PER-ITEM shape (required fields, non-vague-word pattern on scene location fields, ID-format patterns on persona_ref/scene_ref) but CANNOT enforce CROSS-OBJECT referential integrity -- e.g. a pairing.persona_ref of 'PERSONA_GHOST' that matches the ^PERSONA_[A-Za-z0-9_]+$ pattern but does not exist as an actual key in the personas map passes this schema cleanly. Same limitation applies to: (a) evidence-quote-must-be-a-literal-substring-of-source_script checks (cross-field, not expressible in JSON Schema at all), and (b) orphan detection (every defined persona/scene key must be referenced by >=1 pairing). All three are enforced by the real, runnable scripts/validate.js, which loads this file at runtime and reuses its ID patterns and vague-word pattern so the two files can't silently drift. See axioms.md for the split.",
+  "type": "object",
+  "required": ["source_script", "personas", "scenes", "pairings", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "source_script": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The exact script/copy text this bundle was derived from, verbatim. This is the ground truth every *_evidence_quote / *_pain_quote / script_span_quote is checked against (literal substring, case-sensitive) by scripts/validate.js. Must not contain real customer/brand identifiers when used in this repo's evals/ (synthetic only)."
+    },
+    "personas": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^PERSONA_[A-Za-z0-9_]+$" },
+      "additionalProperties": { "$ref": "#/definitions/persona_item" },
+      "description": "Map of persona_id -> persona. Independent top-level entity map, keyed by ID. A persona describes WHO delivers the script (identity/authority + who they're speaking to), never a scene."
+    },
+    "scenes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^SCENE_[A-Za-z0-9_]+$" },
+      "additionalProperties": { "$ref": "#/definitions/scene_item" },
+      "description": "Map of scene_id -> scene. Independent top-level entity map, keyed by ID, sibling of `personas` (NOT nested inside any persona object). A scene describes WHERE/WHEN a script span is set -- it has its own identity and can in principle be reused across personas/pairings; it is never serialized as a bare string field on a persona."
+    },
+    "pairings": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/pairing_item" },
+      "description": "The join table: which persona delivers which scene at which script span. This is the only place personas and scenes are connected to each other and to the script."
+    },
+    "meta": {
+      "type": "object",
+      "required": ["generated_by", "warnings"],
+      "additionalProperties": true,
+      "properties": {
+        "generated_by": { "const": "100x-persona" },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Non-fatal flags, e.g. 'audience_pain_quote inferred from weak signal, low confidence' (workflow.md Phase 1 soft-degrade rule)."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "persona_item": {
+      "type": "object",
+      "required": [
+        "identity_label",
+        "authority_basis",
+        "authority_evidence_quote",
+        "audience_fit",
+        "audience_pain_quote",
+        "delivery_style",
+        "relationship_to_camera"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "identity_label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short label for who is speaking (e.g. '十一年经验夜班ICU护士'). Generic descriptor, never a real person's name or a customer category dictionary entry."
+        },
+        "authority_basis": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line explaining why this narrator is credible/relatable to say this (credential-based OR peer-relatability-based -- see axioms.md #2, script text is not required to contain a formal credential)."
+        },
+        "authority_evidence_quote": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Literal quote from source_script anchoring authority_basis. Must be an exact substring of source_script (axiom 2, checked by scripts/validate.js, not expressible in schema.json alone)."
+        },
+        "audience_fit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Who this persona is speaking to, in generic/category terms (never a customer-specific audience dictionary entry)."
+        },
+        "audience_pain_quote": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Literal quote from source_script anchoring audience_fit. Must be an exact substring of source_script (axiom 2, checked by scripts/validate.js)."
+        },
+        "delivery_style": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line on tone/register (e.g. '第一人称经历叙述，平实口语')."
+        },
+        "relationship_to_camera": {
+          "type": "string",
+          "enum": ["direct-to-camera", "confessional", "testimonial-witness", "voice-over", "duo-dialogue"],
+          "description": "Generic taxonomy of narrator-to-viewer address mode, not a customer-specific enum."
+        },
+        "appearance_note": {
+          "type": "string",
+          "description": "Optional. One-line wardrobe/visual descriptor. Not a generation prompt -- that belongs to a downstream prompt-composition skill."
+        }
+      }
+    },
+    "scene_item": {
+      "type": "object",
+      "required": ["scene_name", "trigger_moment", "location", "micro_coordinate", "visual_props", "atmosphere"],
+      "additionalProperties": false,
+      "properties": {
+        "scene_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short label for this scene, e.g. '卧室房门早间训练'."
+        },
+        "trigger_moment": {
+          "type": "string",
+          "minLength": 3,
+          "pattern": "^(?!.*(某处|随便|某个地方|某场景|某个场景|某个地点|某地|某时|待定|TBD|tbd|somewhere|Somewhere|anywhere|Anywhere)).+$",
+          "description": "When in the viewer's day/life this scene naturally occurs (axiom 3, P.A.I.N.S.-style 'Scene' dimension: actual moment, not an imagined generic one). Vague-word pattern blocks placeholder answers; see axioms.md #3 for the full list."
+        },
+        "location": {
+          "type": "string",
+          "minLength": 3,
+          "pattern": "^(?!.*(某处|随便|某个地方|某场景|某个场景|某个地点|某地|某时|待定|TBD|tbd|somewhere|Somewhere|anywhere|Anywhere)).+$",
+          "description": "Physical location/environment (axiom 3)."
+        },
+        "micro_coordinate": {
+          "type": "string",
+          "minLength": 3,
+          "pattern": "^(?!.*(某处|随便|某个地方|某场景|某个场景|某个地点|某地|某时|待定|TBD|tbd|somewhere|Somewhere|anywhere|Anywhere)).+$",
+          "description": "Specific positioning/framing within the location (e.g. '弹力带绕在卧室门把手上'), not just the location name repeated (axiom 3)."
+        },
+        "visual_props": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "At least 2 concrete, visible objects in frame. Generic categories only -- never a specific real brand/product name."
+        },
+        "atmosphere": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line on mood/lighting feel."
+        }
+      }
+    },
+    "pairing_item": {
+      "type": "object",
+      "required": ["pairing_id", "script_span_quote", "persona_ref", "scene_ref", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "pairing_id": { "type": "string", "minLength": 1 },
+        "segment_ref": {
+          "type": "string",
+          "description": "Optional. If an upstream 100x-segment segment id is available, echo it here. Absence never blocks this skill (class-C silent-skip, see workflow.md Phase 1)."
+        },
+        "script_span_quote": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Literal quote from source_script anchoring which span of the script this persona+scene pairing applies to. Must be an exact substring of source_script (checked by scripts/validate.js)."
+        },
+        "persona_ref": {
+          "type": "string",
+          "pattern": "^PERSONA_[A-Za-z0-9_]+$",
+          "description": "Must reference a key that exists in the top-level `personas` map. Schema.json can only check the ID FORMAT, not that the key actually exists -- that referential-integrity check is scripts/validate.js's job (axiom 1)."
+        },
+        "scene_ref": {
+          "type": "string",
+          "pattern": "^SCENE_[A-Za-z0-9_]+$",
+          "description": "Must reference a key that exists in the top-level `scenes` map. Same schema-vs-script split as persona_ref (axiom 1)."
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line on why this persona+scene combination fits this script span."
+        }
+      }
+    }
+  }
+}

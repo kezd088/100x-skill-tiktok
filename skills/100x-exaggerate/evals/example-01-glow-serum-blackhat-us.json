@@ -1,0 +1,64 @@
+{
+  "source_script": "Okay real talk, three weeks ago my under-eye skin looked so tired and crepey I couldn't even look at selfies. Then I started using two drops of this every single night before bed. By day three the fine lines around my eyes had visibly softened. She said my pores basically look ninety percent smaller under the ring light now. My dermatologist friend looked at my skin and said this is the closest thing to a filter in a bottle she has ever seen on a client. My best friend actually gasped and grabbed my face when she saw it. Please only use it once a day, because if you use it twice you might genuinely look ten years younger than everyone in your group chat and that gets awkward fast. Link is in my bio, it sells out every single restock.",
+  "meta": {
+    "generated_by": "100x-exaggerate",
+    "hat_level": "blackhat",
+    "market": "美区",
+    "calibration_note": "base ceiling for blackhat is aggressive; emotion_reaction_hyperbole is capped to moderate specifically because market includes 美区 (axioms.md #3), the other three techniques used here (time_compression_hyperbole/authority_absolutism_hyperbole/numeric_hyperbole) are not subject to that technique-specific cap",
+    "warnings": [
+      "synthetic example, not a real product (evals/ only)"
+    ]
+  },
+  "exaggeration_beats": [
+    {
+      "beat_id": "EXG_01",
+      "script_span_quote": "By day three the fine lines around my eyes had visibly softened.",
+      "technique": "time_compression_hyperbole",
+      "label_cn": "速效夸张",
+      "intensity": "aggressive",
+      "rationale": "把眼周细纹变化压缩到极短的三天窗口内，制造超常速效感，非情绪类技法不受美区上限约束"
+    },
+    {
+      "beat_id": "EXG_02",
+      "script_span_quote": "My dermatologist friend looked at my skin and said this is the closest thing to a filter in a bottle she has ever seen on a client.",
+      "technique": "authority_absolutism_hyperbole",
+      "label_cn": "权威绝对化",
+      "intensity": "aggressive",
+      "rationale": "借朋友身份的皮肤科背景做近乎绝对化的效果背书，未使用任何虚构认证/机构名"
+    },
+    {
+      "beat_id": "EXG_03",
+      "script_span_quote": "She said my pores basically look ninety percent smaller under the ring light now.",
+      "technique": "numeric_hyperbole",
+      "label_cn": "数字夸张",
+      "intensity": "aggressive",
+      "rationale": "用具体百分比量化毛孔缩小效果，非情绪类技法，blackhat基线上限允许aggressive"
+    },
+    {
+      "beat_id": "EXG_04",
+      "script_span_quote": "My best friend actually gasped and grabbed my face when she saw it.",
+      "technique": "emotion_reaction_hyperbole",
+      "label_cn": "情绪反应夸张",
+      "intensity": "moderate",
+      "rationale": "旁观者夸张反应，但强度按美区校准上限收在moderate，未拉满到aggressive，避免过度失真（axioms.md #3）"
+    }
+  ],
+  "contrast_beats": [
+    {
+      "beat_id": "CTR_01",
+      "contrast_type": "state_before_after",
+      "label_cn": "眼周前后反差",
+      "anchor_quote_a": "my under-eye skin looked so tired and crepey I couldn't even look at selfies",
+      "anchor_quote_b": "the fine lines around my eyes had visibly softened",
+      "rationale": "疲惫暗沉状态与细纹软化状态之间有明显可感知落差，两端非同一句"
+    },
+    {
+      "beat_id": "CTR_02",
+      "contrast_type": "warning_vs_promotion",
+      "label_cn": "警示转促购",
+      "anchor_quote_a": "Please only use it once a day, because if you use it twice you might genuinely look ten years younger than everyone in your group chat and that gets awkward fast.",
+      "anchor_quote_b": "Link is in my bio, it sells out every single restock.",
+      "rationale": "先用夸张的用量警告反向暗示效果太强，紧接着无缝转入抢购式促购语气，基调突变本身就是反差"
+    }
+  ]
+}

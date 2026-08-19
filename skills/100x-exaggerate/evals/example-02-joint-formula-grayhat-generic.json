@@ -1,0 +1,48 @@
+{
+  "source_script": "My knees used to ache so bad after every morning walk that I'd have to sit down halfway through. I didn't believe a powder could fix that, not even a little. Within two weeks of one scoop a day my knees stopped clicking on the stairs. A physical therapist I follow online said the collagen dose in here is honestly higher than most of the clinical ones she recommends. One tub costs less than a single copay for a PT session, and it lasts a full month.",
+  "meta": {
+    "generated_by": "100x-exaggerate",
+    "hat_level": "grayhat",
+    "calibration_note": "market not supplied by user, so workflow.md Phase 1's conservative default would apply to emotion_reaction_hyperbole if that technique appeared -- it does not appear in this bundle, so the market-specific cap in axioms.md #3 is not exercised here; the base grayhat ceiling (moderate) governs both techniques used",
+    "warnings": [
+      "synthetic example, not a real product (evals/ only)",
+      "market not supplied by user, no emotion_reaction_hyperbole beat present so the market-specific cap was not exercised"
+    ]
+  },
+  "exaggeration_beats": [
+    {
+      "beat_id": "EXG_01",
+      "script_span_quote": "Within two weeks of one scoop a day my knees stopped clicking on the stairs.",
+      "technique": "time_compression_hyperbole",
+      "label_cn": "周期夸张",
+      "intensity": "moderate",
+      "rationale": "把关节改善压缩到两周窗口，强度按grayhat基线上限收在moderate，不冲到aggressive"
+    },
+    {
+      "beat_id": "EXG_02",
+      "script_span_quote": "A physical therapist I follow online said the collagen dose in here is honestly higher than most of the clinical ones she recommends.",
+      "technique": "authority_absolutism_hyperbole",
+      "label_cn": "权威绝对化",
+      "intensity": "moderate",
+      "rationale": "借物理治疗师的专业身份做剂量层面的绝对化比较，未编造具体机构或认证名称"
+    }
+  ],
+  "contrast_beats": [
+    {
+      "beat_id": "CTR_01",
+      "contrast_type": "tone_register",
+      "label_cn": "怀疑转认可",
+      "anchor_quote_a": "I didn't believe a powder could fix that, not even a little.",
+      "anchor_quote_b": "the collagen dose in here is honestly higher than most of the clinical ones she recommends",
+      "rationale": "开场怀疑基调与后段近乎专业背书的笃定基调形成明显反差，两端非同一句"
+    },
+    {
+      "beat_id": "CTR_02",
+      "contrast_type": "value_price",
+      "label_cn": "性价比反差",
+      "anchor_quote_a": "a single copay for a PT session",
+      "anchor_quote_b": "it lasts a full month",
+      "rationale": "用更贵的参照物（PT问诊费）反衬产品按月计的持续价值，两端锚点不同"
+    }
+  ]
+}

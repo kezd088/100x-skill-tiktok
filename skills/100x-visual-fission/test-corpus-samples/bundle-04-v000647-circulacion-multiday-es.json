@@ -1,0 +1,57 @@
+{
+  "product_name": "fórmula de circulación en polvo (ejemplo sintético, basado en la narrativa día-por-día de un anuncio real en español, no es un producto real)",
+  "category": "循环保健品(粉剂)",
+  "source_material_note": "Derivado del arco narrativo de un transcripto real de anuncio TikTok en español calificado con hat (V000647) revisado en esta ejecución de validación. Ruta degradada solo-texto Clase A. Las afirmaciones de mecanismo interno del anuncio original ('sin efectos secundarios', 'esa sensación de ardor') han sido reescritas como cambios de postura/expresión genuinamente fotografiables, según axioma 4.",
+  "constants": {
+    "person_identity_anchor": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros",
+    "scene_identity_anchor": "sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana",
+    "product_identity_anchor": "frasco de vidrio pequeño con polvo rojo granulado visible, tapa metálica plateada y una etiqueta blanca con borde verde"
+  },
+  "variables": [
+    { "dimension": "pose", "name": "posición de pies", "observed_values": ["sentado con los pies elevados sobre un reposapiés", "de pie con peso equilibrado en ambos pies"], "range_description": "posición de descanso pasivo con pies elevados vs postura activa de pie equilibrada" },
+    { "dimension": "camera", "name": "encuadre", "observed_values": ["plano medio de cuerpo entero", "primer plano de pies y tobillos"], "range_description": "plano general para leer el lenguaje corporal vs detalle cercano de pies y tobillos para mostrar cambio visible" }
+  ],
+  "media_plan": {
+    "structure": "multi_day",
+    "frame_count": 4,
+    "frames": [
+      { "role": "day", "day_index": 1, "visual_action": "sentado en el sillón, pies elevados sobre el reposapiés, expresión de leve incomodidad corporal, luz natural a través de la ventana", "uses_first_frame_as_reference": false },
+      { "role": "day", "day_index": 3, "visual_action": "usando cuadro 1 como referencia, pies apoyados en el suelo junto al reposapiés, expresión neutra relajada, misma iluminación y disposición de la sala sin cambios", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 7, "visual_action": "usando cuadro 1 como referencia, de pie junto al sillón con peso equilibrado en ambos pies, expresión tranquila y alerta, sala sin cambios", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 14, "visual_action": "usando cuadro 1 como referencia, de pie con postura erguida y segura junto a la ventana, sosteniendo el frasco a la altura del pecho, expresión sonriente y enérgica, sala sin cambios", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "el anuncio fuente narra un arco día-por-día explícito ('En solo 24 horas... Después de una semana... Para el día 14'); la copia cita 4 hitos distintos (día 1/24h como punto de partida implícito, día 3 interpolado como transición, día 7, día 14), así que un plan multi_day de 4 cuadros mapea uno a uno sin inventar ni omitir ningún punto."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "plano medio cuerpo entero, sentado",
+      "character_prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros",
+      "scene_prompt": "sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana",
+      "action_prompt": "sentado en el sillón, sosteniendo el frasco de vidrio en una mano, plano medio de cuerpo entero, composición lateral",
+      "combined_prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros, sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana, frasco de vidrio pequeño con polvo rojo granulado visible, tapa metálica plateada y una etiqueta blanca con borde verde, sentado en el sillón sosteniendo el frasco en una mano, plano medio de cuerpo entero",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "primer plano pies, producto en repisa",
+      "character_prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros",
+      "scene_prompt": "sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana",
+      "action_prompt": "primer plano de pies y tobillos, el frasco descansando sobre una mesita auxiliar junto al sillón, figura borrosa de fondo, composición producto-héroe",
+      "combined_prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros, sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana, frasco de vidrio pequeño con polvo rojo granulado visible, tapa metálica plateada y una etiqueta blanca con borde verde, primer plano de pies y tobillos con el frasco en la mesita auxiliar y figura borrosa de fondo, composición producto-héroe",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 1, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros, sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana, frasco de vidrio pequeño con polvo rojo granulado visible, tapa metálica plateada y una etiqueta blanca con borde verde, sentado en el sillón, pies elevados sobre el reposapiés, expresión de leve incomodidad corporal, luz natural a través de la ventana, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 3, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros, sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana, frasco de vidrio pequeño con polvo rojo granulado visible, tapa metálica plateada y una etiqueta blanca con borde verde, usando cuadro 1 como referencia, pies apoyados en el suelo junto al reposapiés, expresión neutra relajada, misma iluminación y disposición de la sala sin cambios, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 3, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 7, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros, sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana, frasco de vidrio pequeño con polvo rojo granulado visible, tapa metálica plateada y una etiqueta blanca con borde verde, usando cuadro 1 como referencia, de pie junto al sillón con peso equilibrado en ambos pies, expresión tranquila y alerta, sala sin cambios, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 4, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 14, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "hombre de unos 45 años, cabello corto canoso, vistiendo una camiseta gris claro y pantalones cortos deportivos negros, sala de estar con un sillón de tela beige junto a una ventana con luz natural de media mañana, frasco de vidrio pequeño con polvo rojo granulado visible, tapa metálica plateada y una etiqueta blanca con borde verde, usando cuadro 1 como referencia, de pie con postura erguida y segura junto a la ventana, sosteniendo el frasco a la altura del pecho, expresión sonriente y enérgica, sala sin cambios, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "multi_day",
+    "generated_by": "100x-visual-fission",
+    "warnings": ["day_index=3 interpolated from source narrative which cites 24h/week/day14 milestones; day 3 added as a transition frame to meet the 4-frame multi_day minimum"]
+  }
+}

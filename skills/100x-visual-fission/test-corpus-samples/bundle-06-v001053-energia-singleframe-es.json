@@ -1,0 +1,52 @@
+{
+  "product_name": "complejo NAD plus para hombres (ejemplo sintético, basado en la narrativa de beneficio simple de un anuncio real en español, no es un producto real)",
+  "category": "男性保健品",
+  "source_material_note": "Derivado de la forma narrativa de un transcripto real de anuncio TikTok en español calificado con hat (V001053) revisado en esta ejecución de validación. El anuncio original es un diálogo de recomendación de producto con afirmaciones de beneficio energético, sin línea de tiempo ni contraste antes/después. Ruta degradada solo-texto Clase A.",
+  "constants": {
+    "person_identity_anchor": "hombre de unos 35 años, cabello corto castaño oscuro, complexión atlética, vistiendo una camiseta deportiva gris sin mangas y pantalón corto negro",
+    "scene_identity_anchor": "rincón del salón junto a una mesa auxiliar blanca con un teléfono y una botella de agua, luz natural suave de ventana lateral",
+    "product_identity_anchor": "frasco blanco opaco con tapa negra de rosca, etiqueta plateada rectangular y tipografía sans-serif en negrita"
+  },
+  "variables": [
+    { "dimension": "pose", "name": "actitud corporal", "observed_values": ["de pie relajado apoyado en la mesa", "de pie erguido mostrando el frasco al frente"], "range_description": "postura casual de conversación vs postura de presentación activa del producto" },
+    { "dimension": "camera", "name": "encuadre", "observed_values": ["plano medio de cintura hacia arriba", "primer plano del frasco en la mano"], "range_description": "plano de contexto mostrando la persona y el entorno vs plano detalle del producto sostenido" }
+  ],
+  "media_plan": {
+    "structure": "single_frame",
+    "frame_count": 1,
+    "frames": [
+      { "role": "head", "day_index": null, "visual_action": "de pie erguido junto a la mesa auxiliar, mostrando el frasco de suplemento hacia la cámara con ambas manos, expresión enérgica y sonriente, presentación directa al producto", "uses_first_frame_as_reference": false }
+    ],
+    "structure_justification": "el anuncio fuente es un diálogo de recomendación personal con afirmaciones de beneficio del producto, sin marcadores de tiempo, sin contraste antes/después y sin progresión intermedia; single_frame refleja la estructura sin inventar una línea temporal que el anuncio nunca mencionó."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "plano medio, mostrando el frasco al frente",
+      "character_prompt": "hombre de unos 35 años, cabello corto castaño oscuro, complexión atlética, vistiendo una camiseta deportiva gris sin mangas y pantalón corto negro",
+      "scene_prompt": "rincón del salón junto a una mesa auxiliar blanca con un teléfono y una botella de agua, luz natural suave de ventana lateral",
+      "action_prompt": "de pie erguido mostrando el frasco de suplemento hacia la cámara, plano medio de cintura hacia arriba, composición frontal centrada",
+      "combined_prompt": "hombre de unos 35 años, cabello corto castaño oscuro, complexión atlética, vistiendo una camiseta deportiva gris sin mangas y pantalón corto negro, rincón del salón junto a una mesa auxiliar blanca con un teléfono y una botella de agua, luz natural suave de ventana lateral, frasco blanco opaco con tapa negra de rosca, etiqueta plateada rectangular y tipografía sans-serif en negrita, de pie erguido mostrando el frasco hacia la cámara, plano medio de cintura hacia arriba",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "primer plano, frasco en primer plano",
+      "character_prompt": "hombre de unos 35 años, cabello corto castaño oscuro, complexión atlética, vistiendo una camiseta deportiva gris sin mangas y pantalón corto negro",
+      "scene_prompt": "rincón del salón junto a una mesa auxiliar blanca con un teléfono y una botella de agua, luz natural suave de ventana lateral",
+      "action_prompt": "primer plano del frasco de suplemento sostenido en una mano, la mesa auxiliar con el teléfono visible desenfocada al fondo, composición producto-héroe vertical",
+      "combined_prompt": "hombre de unos 35 años, cabello corto castaño oscuro, complexión atlética, vistiendo una camiseta deportiva gris sin mangas y pantalón corto negro, rincón del salón junto a una mesa auxiliar blanca con un teléfono y una botella de agua, luz natural suave de ventana lateral, frasco blanco opaco con tapa negra de rosca, etiqueta plateada rectangular y tipografía sans-serif en negrita, primer plano del frasco sostenido en una mano con la mesa auxiliar desenfocada al fondo, composición producto-héroe vertical",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "head", "day_index": null, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "hombre de unos 35 años, cabello corto castaño oscuro, complexión atlética, vistiendo una camiseta deportiva gris sin mangas y pantalón corto negro, rincón del salón junto a una mesa auxiliar blanca con un teléfono y una botella de agua, luz natural suave de ventana lateral, frasco blanco opaco con tapa negra de rosca, etiqueta plateada rectangular y tipografía sans-serif en negrita, de pie erguido junto a la mesa auxiliar, mostrando el frasco hacia la cámara con ambas manos, expresión enérgica y sonriente, presentación directa al producto, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "head", "day_index": null, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "hombre de unos 35 años, cabello corto castaño oscuro, complexión atlética, vistiendo una camiseta deportiva gris sin mangas y pantalón corto negro, rincón del salón junto a una mesa auxiliar blanca con un teléfono y una botella de agua, luz natural suave de ventana lateral, frasco blanco opaco con tapa negra de rosca, etiqueta plateada rectangular y tipografía sans-serif en negrita, primer plano del frasco sostenido en una mano, la mesa auxiliar con el teléfono visible desenfocada al fondo, composición producto-héroe vertical, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "single_frame",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

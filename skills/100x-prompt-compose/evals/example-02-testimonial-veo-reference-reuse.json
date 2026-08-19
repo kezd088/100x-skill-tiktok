@@ -1,0 +1,34 @@
+{
+  "template_id": "VID-D-talking-share",
+  "template_name": "⑨ 口播分享（真人推荐·视频）",
+  "category": "视频",
+  "variables_used": {
+    "persona": "约35岁东亚裔女性，扎低马尾，居家棉质T恤",
+    "body_part": "略显疲惫但恢复清亮的双眼",
+    "product_name": "每日复合营养液 (synthetic example, not a real product)",
+    "product_lock": "参考图1产品",
+    "line_open": "People keep asking why I've had so much more energy lately.",
+    "line_rec": "It's this little bottle right here, link's below."
+  },
+  "rendered_body": "手机前置自拍。约35岁东亚裔女性，扎低马尾，居家棉质T恤靠近镜头特写略显疲惫但恢复清亮的双眼，用平静语气说：People keep asking why I've had so much more energy lately.\n随后从下方用一只手拿出每日复合营养液 (synthetic example, not a real product)（参考图1产品）展示，平静地说：It's this little bottle right here, link's below.无补光灯，无美颜，人物面部没有高光，真实皮肤纹理和瑕疵。",
+  "reference_locks": [
+    {
+      "entity": "产品",
+      "ref_number": 1,
+      "status": "reference_reuse",
+      "value": "参考图1产品"
+    }
+  ],
+  "model": "veo",
+  "video_unit": {
+    "duration_seconds": 8.0,
+    "final_prompt_wrapped": "GU1 (reference range: 0.0-8.0s, generated duration: 8.0s). A woman in her mid-thirties with a low ponytail and a casual cotton t-shirt leans close to a smartphone front camera in a home bedroom, her tired-but-brightening eyes catching the light as she speaks, synthetic example, not a real product. She reaches off-screen and brings a small glass vial bottle into frame, holding it near her chest. Handheld slight sway, natural skin texture, visible pores, unfiltered home lighting. Spoken dialogue (say EXACTLY, word-for-word): People keep asking why I've had so much more energy lately. It's this little bottle right here, link's below. Mouth clearly visible when speaking, lip-sync aligned with the spoken dialogue. Spoken content happens within 0.5-6.0s. From 6.0s to 8.0s, continue holding the bottle steady at the same pace-do not slow down or freeze. Keep lighting, color grade, and overall visual feel consistent with the reference frame."
+  },
+  "meta": {
+    "generated_by": "100x-prompt-compose",
+    "existing_refs_input": { "产品": [1], "人物": [] },
+    "established_refs_after": { "产品": [1], "人物": [] },
+    "model_choice_source": "user_specified",
+    "warnings": []
+  }
+}

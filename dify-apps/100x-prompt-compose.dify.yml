@@ -1,0 +1,1847 @@
+version: "0.7.0"
+kind: app
+app:
+  name: "100x-prompt-compose 提示词组装器"
+  description: "选模板（或匹配需求描述）+ 填变量 -> 逐字渲染并按 Veo/Seedance/即创 包装的最终生成提示词（图片/视频/通用件）。"
+  icon: "🧩"
+  icon_type: emoji
+  icon_background: "#E0F2FE"
+  mode: workflow
+  use_icon_as_answer_icon: false
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.2.6@e2665624a156f52160927bceac9e169bd7e5ae6b936ae82575e14c90af390e6e
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        data:
+          type: start
+          title: "输入"
+          variables:
+            - label: "模板 ID（14 选 1，留空则用需求描述匹配）"
+              variable: template_id
+              type: select
+              required: false
+              options: ["IMG-01-product-lock", "IMG-02-persona-whitebg", "IMG-03-8grid", "IMG-04-cover-hook", "IMG-05-before-after", "VID-A-efficacy-stack", "VID-B-dual-track", "VID-C-before-after", "VID-D-talking-share", "VID-E-role-pov", "VID-F-dark-humor", "VID-G-immersive-job", "PART-HOOK", "PART-CTA"]
+            - label: "需求描述（template_id 留空时用于匹配模板，如“清洁喷雾的一喷见效效果”）"
+              variable: requirement_description
+              type: paragraph
+              required: false
+              max_length: 2000
+            - label: "变量填值（JSON 对象字符串，键为该模板 variables[].key，不代猜不编造）"
+              variable: variables_used_json
+              type: paragraph
+              required: true
+              max_length: 5000
+            - label: "视频模型（仅视频模板需要；留空则取该模板 model_hint 的第一个）"
+              variable: model
+              type: select
+              required: false
+              options: ["veo", "seedance", "即创"]
+            - label: "已建立的参考编号（JSON，如 {\"产品\":[1],\"人物\":[]}；留空视为全部首次出现）"
+              variable: existing_refs_input_json
+              type: paragraph
+              required: false
+              max_length: 1000
+        position: {x: 40, y: 380}
+        positionAbsolute: {x: 40, y: 380}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 220
+      - id: has_tid
+        type: custom
+        data:
+          type: if-else
+          title: "是否给了 template_id"
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: cond-has-tid
+                  variable_selector: [start, template_id]
+                  comparison_operator: "not empty"
+                  value: ""
+                  varType: string
+        position: {x: 360, y: 380}
+        positionAbsolute: {x: 360, y: 380}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 100
+      - id: validate_tid
+        type: custom
+        data:
+          type: code
+          title: "校验 template_id（枚举，14 选 1）"
+          code_language: python3
+          code: |
+            def main(template_id: str) -> dict:
+                import json
+                VALID = [
+                    "IMG-01-product-lock", "IMG-02-persona-whitebg", "IMG-03-8grid",
+                    "IMG-04-cover-hook", "IMG-05-before-after", "VID-A-efficacy-stack",
+                    "VID-B-dual-track", "VID-C-before-after", "VID-D-talking-share",
+                    "VID-E-role-pov", "VID-F-dark-humor", "VID-G-immersive-job",
+                    "PART-HOOK", "PART-CTA",
+                ]
+                tid = (template_id or "").strip()
+                if tid in VALID:
+                    r = {"resolved_template_id": tid, "id_error": ""}
+                else:
+                    r = {"resolved_template_id": "", "id_error": "template_id '%s' 不是 templates.json 里的合法 id（14 选 1）" % tid}
+                return {"template_resolution_json": json.dumps(r, ensure_ascii=False)}
+          variables:
+            - value_selector: [start, template_id]
+              variable: template_id
+          outputs:
+            template_resolution_json:
+              type: string
+        position: {x: 680, y: 160}
+        positionAbsolute: {x: 680, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+      - id: classify_tid
+        type: custom
+        data:
+          type: question-classifier
+          title: "按需求描述匹配模板（14 选 1）"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0
+          query_variable_selector: [start, requirement_description]
+          classes:
+            - {id: "IMG-01-product-lock", name: "IMG-01-product-lock"}
+            - {id: "IMG-02-persona-whitebg", name: "IMG-02-persona-whitebg"}
+            - {id: "IMG-03-8grid", name: "IMG-03-8grid"}
+            - {id: "IMG-04-cover-hook", name: "IMG-04-cover-hook"}
+            - {id: "IMG-05-before-after", name: "IMG-05-before-after"}
+            - {id: "VID-A-efficacy-stack", name: "VID-A-efficacy-stack"}
+            - {id: "VID-B-dual-track", name: "VID-B-dual-track"}
+            - {id: "VID-C-before-after", name: "VID-C-before-after"}
+            - {id: "VID-D-talking-share", name: "VID-D-talking-share"}
+            - {id: "VID-E-role-pov", name: "VID-E-role-pov"}
+            - {id: "VID-F-dark-humor", name: "VID-F-dark-humor"}
+            - {id: "VID-G-immersive-job", name: "VID-G-immersive-job"}
+            - {id: "PART-HOOK", name: "PART-HOOK"}
+            - {id: "PART-CTA", name: "PART-CTA"}
+            - {id: "UNCLEAR", name: "UNCLEAR"}
+          instruction: |
+            把用户的需求描述匹配到最贴合的一个模板 id（唯一命中才选那一个；如果同时像好几个模板，或完全不像任何一个，选 UNCLEAR，不要猜）。14 个模板及其 use_when：
+            IMG-01-product-lock：没有产品实拍图、需要先生成一张可复用的产品参考图。
+            IMG-02-persona-whitebg：需要一个固定模特，后续所有视频/图片复用同一张脸。
+            IMG-03-8grid：护肤/美白等渐变改善类，做“使用前→后”8宫格素材。
+            IMG-04-cover-hook：需要一张抓眼的封面/首帧，放大问题。
+            IMG-05-before-after：需要一张“问题→改善”的上下/左右对比图。
+            VID-A-efficacy-stack：去污/清洁/美白/除锈等“一喷见效”类视频，同产品×不同污渍场景重复展示。
+            VID-B-dual-track：害虫/蟑螂/鼠害等强功能、需要恐怖冲击的产品视频（口播+B-roll双轨）。
+            VID-C-before-after：护肤/抗皱/美白等渐变效果类视频（一镜到底渐变消失）。
+            VID-D-talking-share：护肤/宠物用品等需要“真人亲测推荐”口播分享视频。
+            VID-E-role-pov：宠物/医疗等需要专业背书（兽医/美容师/专家视角）的视频。
+            VID-F-dark-humor：清洁喷雾等可做悬疑反转黑色幽默剧情的视频。
+            VID-G-immersive-job：清洁上门服务类第一人称沉浸工作流视频。
+            PART-HOOK：给任意视频拼一个抓注意力的前3秒开头（拼接件，不是完整视频）。
+            PART-CTA：给视频收尾加购买引导（拼接件，不是完整视频）。
+          vision:
+            enabled: false
+        position: {x: 680, y: 480}
+        positionAbsolute: {x: 680, y: 480}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 160
+      - id: map_classify
+        type: custom
+        data:
+          type: code
+          title: "分类结果映射为 template_id"
+          code_language: python3
+          code: |
+            def main(class_name: str) -> dict:
+                import json
+                cid = (class_name or "").strip()
+                if cid and cid != "UNCLEAR":
+                    r = {"resolved_template_id": cid, "id_error": ""}
+                else:
+                    r = {
+                        "resolved_template_id": "",
+                        "id_error": "没识别出该用哪个模板：本 skill 目前有 14 个模板（5 图片/7 视频/2 通用件），可以直接报 id，或说清楚品类+想要的效果（比如清洁喷雾的一喷见效效果）",
+                    }
+                return {"template_resolution_json": json.dumps(r, ensure_ascii=False)}
+          variables:
+            - value_selector: [classify_tid, class_name]
+              variable: class_name
+          outputs:
+            template_resolution_json:
+              type: string
+        position: {x: 1000, y: 480}
+        positionAbsolute: {x: 1000, y: 480}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+      - id: merge_tid
+        type: custom
+        data:
+          type: variable-aggregator
+          title: "合并模板解析结果"
+          output_type: string
+          variables:
+            - [validate_tid, template_resolution_json]
+            - [map_classify, template_resolution_json]
+        position: {x: 1320, y: 320}
+        positionAbsolute: {x: 1320, y: 320}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+      - id: prep_ctx
+        type: custom
+        data:
+          type: code
+          title: "查模板元数据 + 校验必填变量 + 定模型"
+          code_language: python3
+          code: |
+            def main(template_resolution_json: str, variables_used_json: str, existing_refs_input_json: str, model: str) -> dict:
+                import json
+
+                # key: (category, [(variable_key, is_optional), ...], model_hint, establishes_lock, references_lock)
+                TEMPLATES_META = {
+                    "IMG-01-product-lock": {"category": "图片", "vars": [("product_desc", False)], "model_hint": [], "establishes_lock": "产品", "references_lock": []},
+                    "IMG-02-persona-whitebg": {"category": "图片", "vars": [("persona", False), ("problem", True)], "model_hint": [], "establishes_lock": "人物", "references_lock": []},
+                    "IMG-03-8grid": {"category": "图片", "vars": [("persona_ref", False), ("problem", False), ("scenes", False)], "model_hint": [], "establishes_lock": "", "references_lock": ["人物"]},
+                    "IMG-04-cover-hook": {"category": "图片", "vars": [("subject", False), ("problem", False), ("persona", True), ("scene", False)], "model_hint": [], "establishes_lock": "", "references_lock": []},
+                    "IMG-05-before-after": {"category": "图片", "vars": [("layout", False), ("body_part", False), ("problem", False)], "model_hint": [], "establishes_lock": "", "references_lock": []},
+                    "VID-A-efficacy-stack": {"category": "视频", "vars": [("persona", False), ("product_name", False), ("product_lock", False), ("target", False), ("effect_formula", False), ("scene", False)], "model_hint": ["veo", "seedance", "即创"], "establishes_lock": "", "references_lock": ["产品"]},
+                    "VID-B-dual-track": {"category": "视频", "vars": [("persona", False), ("product_name", False), ("line_en", False), ("pest", False), ("place", False)], "model_hint": ["veo", "seedance"], "establishes_lock": "", "references_lock": []},
+                    "VID-C-before-after": {"category": "视频", "vars": [("persona_ref", False), ("body_part", False), ("problem", False), ("serum_color", False)], "model_hint": ["veo", "seedance"], "establishes_lock": "", "references_lock": ["人物"]},
+                    "VID-D-talking-share": {"category": "视频", "vars": [("persona", False), ("body_part", False), ("product_name", False), ("product_lock", False), ("line_open", False), ("line_rec", False)], "model_hint": ["veo", "seedance", "即创"], "establishes_lock": "", "references_lock": ["产品"]},
+                    "VID-E-role-pov": {"category": "视频", "vars": [("role", False), ("role_outfit", False), ("breed", False), ("problem", False), ("product_name", False), ("line_en", False), ("scene", False)], "model_hint": ["veo", "seedance"], "establishes_lock": "", "references_lock": []},
+                    "VID-F-dark-humor": {"category": "视频", "vars": [("suspect_action", False), ("product_name", False), ("stain", False)], "model_hint": ["veo", "seedance"], "establishes_lock": "", "references_lock": []},
+                    "VID-G-immersive-job": {"category": "视频", "vars": [("rooms", False), ("target", False), ("product_name", False)], "model_hint": ["veo", "seedance"], "establishes_lock": "", "references_lock": []},
+                    "PART-HOOK": {"category": "通用件", "vars": [("hook_type", False), ("subject", False), ("detail", False)], "model_hint": [], "establishes_lock": "", "references_lock": []},
+                    "PART-CTA": {"category": "通用件", "vars": [("object", False), ("urgency", True)], "model_hint": [], "establishes_lock": "", "references_lock": []},
+                }
+
+                try:
+                    res = json.loads(template_resolution_json or "{}")
+                except Exception:
+                    res = {}
+                tid = res.get("resolved_template_id") or ""
+                id_error = res.get("id_error") or ""
+
+                try:
+                    raw_vars = json.loads(variables_used_json or "{}")
+                    if not isinstance(raw_vars, dict):
+                        raw_vars = {}
+                        if not id_error:
+                            id_error = "variables_used_json 必须是 JSON 对象"
+                except Exception:
+                    raw_vars = {}
+                    if not id_error:
+                        id_error = "variables_used_json 不是合法 JSON"
+
+                try:
+                    existing = json.loads(existing_refs_input_json) if (existing_refs_input_json or "").strip() else {}
+                    if not isinstance(existing, dict):
+                        existing = {}
+                except Exception:
+                    existing = {}
+                existing.setdefault("产品", [])
+                existing.setdefault("人物", [])
+
+                warnings = []
+                prep_error = id_error
+                category = ""
+                model_hint = []
+                establishes_lock = ""
+                references_lock = []
+                norm_vars = dict(raw_vars)
+
+                if not prep_error:
+                    meta = TEMPLATES_META.get(tid)
+                    if not meta:
+                        prep_error = "template_id %s 不是 templates.json 里的合法 id" % tid
+                    else:
+                        category = meta["category"]
+                        model_hint = meta["model_hint"]
+                        establishes_lock = meta["establishes_lock"]
+                        references_lock = meta["references_lock"]
+                        missing = []
+                        for key, optional in meta["vars"]:
+                            val = raw_vars.get(key)
+                            if optional:
+                                if val is None or val == "":
+                                    norm_vars[key] = ""
+                            else:
+                                if val is None or (isinstance(val, str) and val.strip() == ""):
+                                    missing.append(key)
+                        if missing:
+                            prep_error = "缺少必填变量（不代猜/不编造具体外观或台词内容）：%s" % ", ".join(missing)
+
+                resolved_model = ""
+                model_choice_source = ""
+                if not prep_error and category == "视频":
+                    given = (model or "").strip()
+                    if given:
+                        resolved_model = given
+                        model_choice_source = "user_specified"
+                    else:
+                        resolved_model = model_hint[0] if model_hint else ""
+                        model_choice_source = "default_first_hint"
+                        warnings.append("model 未指定，默认使用 %s" % resolved_model)
+
+                return {
+                    "template_id": tid,
+                    "category": category,
+                    "prep_error": prep_error,
+                    "variables_used_json": json.dumps(norm_vars, ensure_ascii=False),
+                    "existing_refs_input_json": json.dumps(existing, ensure_ascii=False),
+                    "resolved_model": resolved_model,
+                    "model_choice_source": model_choice_source,
+                    "warnings_json": json.dumps(warnings, ensure_ascii=False),
+                    "establishes_lock": establishes_lock,
+                    "references_lock_json": json.dumps(references_lock, ensure_ascii=False),
+                }
+          variables:
+            - value_selector: [merge_tid, output]
+              variable: template_resolution_json
+            - value_selector: [start, variables_used_json]
+              variable: variables_used_json
+            - value_selector: [start, existing_refs_input_json]
+              variable: existing_refs_input_json
+            - value_selector: [start, model]
+              variable: model
+          outputs:
+            template_id:
+              type: string
+            category:
+              type: string
+            prep_error:
+              type: string
+            variables_used_json:
+              type: string
+            existing_refs_input_json:
+              type: string
+            resolved_model:
+              type: string
+            model_choice_source:
+              type: string
+            warnings_json:
+              type: string
+            establishes_lock:
+              type: string
+            references_lock_json:
+              type: string
+        position: {x: 1640, y: 320}
+        positionAbsolute: {x: 1640, y: 320}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 120
+      - id: input_ok
+        type: custom
+        data:
+          type: if-else
+          title: "输入是否齐全"
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: cond-input-ok
+                  variable_selector: [prep_ctx, prep_error]
+                  comparison_operator: empty
+                  value: ""
+                  varType: string
+        position: {x: 1960, y: 320}
+        positionAbsolute: {x: 1960, y: 320}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 100
+      - id: reject_input
+        type: custom
+        data:
+          type: end
+          title: "拒绝：模板/必填变量缺失"
+          outputs:
+            - variable: error
+              value_selector: [prep_ctx, prep_error]
+              value_type: string
+            - variable: template_id
+              value_selector: [prep_ctx, template_id]
+              value_type: string
+        position: {x: 2280, y: 560}
+        positionAbsolute: {x: 2280, y: 560}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 110
+      - id: render_body
+        type: custom
+        data:
+          type: code
+          title: "逐字渲染 body + 方括号展开 + 引用锁记账（公理1构造+公理2构造）"
+          code_language: python3
+          code: |
+            def main(template_id: str, category: str, variables_used_json: str, existing_refs_input_json: str, establishes_lock: str, references_lock_json: str) -> dict:
+                import json
+                import re
+
+                REALISM_SUFFIX = {
+                    "图片通用": "无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实环境。",
+                    "视频自拍": "无补光灯，无美颜，人物面部没有高光，真实皮肤纹理和瑕疵。",
+                    "加强防影棚": "无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实生活环境，轻微手持晃动，不要影棚感。",
+                }
+
+                TEMPLATES = {
+                    "IMG-01-product-lock": {"suffix_key": "图片通用", "body": "生成一张产品白底图。产品外观为：{product_desc}。真实塑料/材质质感，标签印刷清晰，无反光眩光。{realism_suffix}"},
+                    "IMG-02-persona-whitebg": {"suffix_key": "图片通用", "body": "手机后摄视角。生成一个{persona}的白底图片。人物表情平静（无笑容）。{problem_clause}{realism_suffix}"},
+                    "IMG-03-8grid": {"suffix_key": "图片通用", "body": "生成{persona_ref}的8宫格图片。每张图人物的发型、发色不变，衣服款式会改变。8张图背景在{scenes}三个场景随机切换。{problem}从第1张初始状态到第8张完全消失。{realism_suffix}"},
+                    "IMG-04-cover-hook": {"suffix_key": "图片通用", "body": "手机后摄视角，特写{subject}。{persona}双手掰开展示，让其呈现张大露出状态（{problem}）。背景是{scene}。{realism_suffix}"},
+                    "IMG-05-before-after": {"suffix_key": "图片通用", "body": "生成一张{body_part}特写的{layout}对比图（不带任何文字）。{layout_desc}有{problem}，另一侧为{problem}消失、如年轻人一般。{realism_suffix}"},
+                    "VID-A-efficacy-stack": {"suffix_key": "图片通用", "body": "手机后摄，固定机位。{persona}手持{product_name}（{product_lock}）对准{target}。【效果公式：{effect_formula}——按所选公式展开变化描写】。背景是可见的{scene}。{realism_suffix}", "effect_library": {"像素橡皮擦": "抹布缓慢沉重压过污渍，断裂式替换——抹布前是污渍色、抹布后是物品原色，色差为零。", "泡沫爆发": "喷洒瞬间浓稠白色活性泡沫爆发覆盖污渍并翻腾，随后百洁布擦去，显露洁净微湿无瑕表面。", "泡沫变色": "对准喷雾，白泡沫爆发包裹，几秒内由白变深黄，黄沫退去露出洁白锃亮。", "噼啪声": "泡沫严丝合缝包裹结石，变深黄并发出微小噼啪声，黄液滴落，露出如瓷洁白。", "玻璃板实验": "玻璃板左侧一滩污渍液体、右侧碎蛋壳，分别喷洒后左侧变无色、右侧冒泡化成透明水。"}},
+                    "VID-B-dual-track": {"suffix_key": "视频自拍", "body": "【A-roll】iPhone前置自拍。{persona}，手持{product_name}，说话时头部自然转动伴手势。人物说：{line_en}\n【B-roll·恐怖】低画质夜视监控模式，{place}。高ISO噪点，压抑恐怖氛围。起初一片寂静，突然大量{pest}从缝隙中猛地窜出、四散奔逃。画面因恐惧剧烈手持晃动。{realism_suffix}"},
+                    "VID-C-before-after": {"suffix_key": "视频自拍", "body": "手机前置摄像，固定机位。{persona_ref}展示一只手心里的{serum_color}，开始在{body_part}上轻轻涂抹有{problem}的区域。核心：药膏被吸收消失（渐变式），{problem}随之同帧100%渐变消退，露出光滑洁净皮肤。一镜到底，无分镜。人物不说话，仅做动作。{realism_suffix}"},
+                    "VID-D-talking-share": {"suffix_key": "视频自拍", "body": "手机前置自拍。{persona}靠近镜头特写{body_part}，用平静语气说：{line_open}\n随后从下方用一只手拿出{product_name}（{product_lock}）展示，平静地说：{line_rec}{realism_suffix}"},
+                    "VID-E-role-pov": {"suffix_key": "图片通用", "body": "手机后置，固定机位。背景为{scene}。台上有只{breed}趴着，自然张嘴可见{problem}。{role}（{role_outfit}）另一只手持{product_name}，上前安抚并掰开嘴特写展示。人物以专业口吻说：{line_en}{realism_suffix}"},
+                    "VID-F-dark-humor": {"suffix_key": "加强防影棚", "body": "【悬疑开场】门口监控摄像头，低画质夜视，高ISO噪点，压抑氛围。一个穿黑衣戴口罩墨镜的男人正在{suspect_action}，动作鬼鬼祟祟到处张望。\n【反转·清洁】iPhone后置POV，戴黑色医用手套的手手持{product_name}，原来是清洁{stain}——【套效果公式：泡沫爆发或像素橡皮擦】，另一只手比耶。{realism_suffix}", "effect_library": {"泡沫爆发": "喷洒瞬间浓稠白色活性泡沫爆发覆盖污渍并翻腾，随后百洁布擦去，显露洁净微湿无瑕表面。", "像素橡皮擦": "抹布缓慢沉重压过污渍，断裂式替换——抹布前是污渍色、抹布后是物品原色，色差为零。"}},
+                    "VID-G-immersive-job": {"suffix_key": "加强防影棚", "body": "手持手机第一人称POV，0.8倍广角，镜头晃动模拟步行。流程：敲门→屋主开门邀请进入→干脆戴上蓝色医用手套→逐个清洁{rooms}（戴手套的手持{product_name}对准{target}，套效果公式展示洁净）→收工：屋主递20美元+5美元小费，双手接过，POV鞠躬，挥手拜拜走出门。{realism_suffix}"},
+                    "PART-HOOK": {"suffix_key": "图片通用", "body": "【按 hook_type 选骨架】{hook_clause}{realism_suffix}", "hook_library": {"恐怖冲击": "[场景]。安静铺垫，起初一片寂静。突然[大量害虫/震撼物]从缝隙猛地窜出。画面因恐惧剧烈手持晃动。", "问题特写": "POV特写{subject}，完全展开露出[{detail}]。随后一只手从画面入镜触碰/操作。", "情绪反应": "人物准备亲吻/靠近[对象]，随后闻到臭味/发现问题，表情瞬间凝固极度嫌弃，猛地后仰、皱鼻、挥手。", "悬疑": "监控场景，一个神秘穿着的人正在[可疑动作]，动作鬼鬼祟祟到处张望。", "萌宠": "iPhone平放地面低角度，一只[品种]从画面下方入镜，对着产品狂吠/拱入画面。背景天空绿树。"}},
+                    "PART-CTA": {"suffix_key": "视频自拍", "body": "手机前置或后摄。人物自然收尾，平静而有感染力地说英文 CTA，例如：Grab this for {object} at the link below — your {object} will thank you! Don't wait {urgency}. {realism_suffix}"},
+                }
+
+                ESTABLISH_VAR = {"产品": "product_desc", "人物": "persona"}
+                REFERENCE_VAR = {"产品": "product_lock", "人物": "persona_ref"}
+                UNRESOLVED_HOOK_TYPE = "__UNRESOLVED_HOOK_TYPE__"
+                UNRESOLVED_EFFECT_FORMULA = "__UNRESOLVED_EFFECT_FORMULA__"
+                UNRESOLVED_LAYOUT = "__UNRESOLVED_LAYOUT__"
+
+                try:
+                    variables_used = json.loads(variables_used_json or "{}")
+                except Exception:
+                    variables_used = {}
+                try:
+                    existing = json.loads(existing_refs_input_json or "{}")
+                except Exception:
+                    existing = {}
+                existing.setdefault("产品", [])
+                existing.setdefault("人物", [])
+                try:
+                    references_lock = json.loads(references_lock_json or "[]")
+                except Exception:
+                    references_lock = []
+
+                tpl = TEMPLATES.get(template_id)
+                warnings = []
+                if not tpl:
+                    return {
+                        "rendered_body": "",
+                        "reference_locks_json": "[]",
+                        "established_refs_after_json": json.dumps(existing, ensure_ascii=False),
+                        "warnings_json": "[]",
+                        "render_error": "template_id %s 找不到渲染定义" % template_id,
+                    }
+
+                conditional = {}
+                if template_id == "IMG-02-persona-whitebg":
+                    problem = variables_used.get("problem") or ""
+                    conditional["problem_clause"] = ("面部和脖颈处有明显且符合年龄的%s（显老）。" % problem) if problem else ""
+                if template_id == "IMG-05-before-after":
+                    layout = variables_used.get("layout")
+                    if layout == "上下":
+                        conditional["layout_desc"] = "上图/下图"
+                    elif layout == "左右":
+                        conditional["layout_desc"] = "左图/右图"
+                    else:
+                        conditional["layout_desc"] = UNRESOLVED_LAYOUT
+                if template_id == "PART-HOOK":
+                    hook_type = variables_used.get("hook_type")
+                    lib = tpl.get("hook_library") or {}
+                    raw = lib.get(hook_type)
+                    if not raw:
+                        conditional["hook_clause"] = UNRESOLVED_HOOK_TYPE
+                    else:
+                        conditional["hook_clause"] = raw.replace("{subject}", variables_used.get("subject") or "").replace("{detail}", variables_used.get("detail") or "")
+
+                subst = dict(variables_used)
+                subst.update(conditional)
+                subst["realism_suffix"] = REALISM_SUFFIX.get(tpl["suffix_key"], "")
+
+                def sub_fn(m):
+                    key = m.group(1)
+                    return str(subst[key]) if key in subst else m.group(0)
+
+                body = re.sub(r"\{([a-zA-Z0-9_]+)\}", sub_fn, tpl["body"])
+
+                if template_id in ("VID-A-efficacy-stack", "VID-F-dark-humor"):
+                    effect_key = variables_used.get("effect_formula")
+                    lib = tpl.get("effect_library") or {}
+                    replacement = lib.get(effect_key, UNRESOLVED_EFFECT_FORMULA)
+                    body = re.sub(r"【效果公式：[^】]*】", lambda m: replacement, body, count=1)
+                if template_id == "VID-F-dark-humor":
+                    effect_key = variables_used.get("effect_formula")
+                    lib = tpl.get("effect_library") or {}
+                    replacement = lib.get(effect_key, UNRESOLVED_EFFECT_FORMULA)
+                    body = re.sub(r"【套效果公式：[^】]*】", lambda m: replacement, body, count=1)
+                if template_id == "PART-HOOK":
+                    body = body.replace("【按 hook_type 选骨架】", "")
+
+                reference_locks = []
+                new_first = {"产品": [], "人物": []}
+
+                if establishes_lock in ("产品", "人物"):
+                    var_key = ESTABLISH_VAR[establishes_lock]
+                    value = variables_used.get(var_key) or ""
+                    used_nums = set(existing.get(establishes_lock, []))
+                    new_num = 1
+                    while new_num in used_nums:
+                        new_num += 1
+                    reference_locks.append({"entity": establishes_lock, "ref_number": new_num, "status": "first_lock", "value": value})
+                    new_first[establishes_lock].append(new_num)
+
+                for entity in (references_lock or []):
+                    var_key = REFERENCE_VAR.get(entity)
+                    if not var_key:
+                        continue
+                    value = (variables_used.get(var_key) or "").strip()
+                    m = re.match(r"^参考图(\d+)(产品|人物)$", value)
+                    if m:
+                        reference_locks.append({"entity": entity, "ref_number": int(m.group(1)), "status": "reference_reuse", "value": value})
+                    else:
+                        used_nums = set(existing.get(entity, [])) | set(new_first.get(entity, []))
+                        new_num = 1
+                        while new_num in used_nums:
+                            new_num += 1
+                        reference_locks.append({"entity": entity, "ref_number": new_num, "status": "first_lock", "value": value})
+                        new_first[entity].append(new_num)
+                        warnings.append("%s 为首次锁定的文字描述（无参考图），未来同一产品/人物的其他分镜若要复用，须写「参考图%d%s」" % (var_key, new_num, entity))
+
+                established_after = {
+                    "产品": sorted(set(existing.get("产品", [])) | set(new_first["产品"])),
+                    "人物": sorted(set(existing.get("人物", [])) | set(new_first["人物"])),
+                }
+
+                if template_id == "PART-CTA" and "your your" in body:
+                    warnings.append("PART-CTA 模板 body 对 {object} 变量重复拼接了「your」前缀，产生「your your ...」这类双重指示词——这是源模板 templates.json 正文自身的设计问题，不是本 skill 渲染逻辑的 bug，按公理1「逐字替换」照实渲染，未擅自改写模板正文")
+
+                return {
+                    "rendered_body": body,
+                    "reference_locks_json": json.dumps(reference_locks, ensure_ascii=False),
+                    "established_refs_after_json": json.dumps(established_after, ensure_ascii=False),
+                    "warnings_json": json.dumps(warnings, ensure_ascii=False),
+                    "render_error": "",
+                }
+          variables:
+            - value_selector: [prep_ctx, template_id]
+              variable: template_id
+            - value_selector: [prep_ctx, category]
+              variable: category
+            - value_selector: [prep_ctx, variables_used_json]
+              variable: variables_used_json
+            - value_selector: [prep_ctx, existing_refs_input_json]
+              variable: existing_refs_input_json
+            - value_selector: [prep_ctx, establishes_lock]
+              variable: establishes_lock
+            - value_selector: [prep_ctx, references_lock_json]
+              variable: references_lock_json
+          outputs:
+            rendered_body:
+              type: string
+            reference_locks_json:
+              type: string
+            established_refs_after_json:
+              type: string
+            warnings_json:
+              type: string
+            render_error:
+              type: string
+        position: {x: 2280, y: 180}
+        positionAbsolute: {x: 2280, y: 180}
+        sourcePosition: right
+        targetPosition: left
+        width: 280
+        height: 130
+      - id: verify_axiom1
+        type: custom
+        data:
+          type: code
+          title: "公理1独立复核：对照 templates.json 重建 body 逐字比对"
+          code_language: python3
+          code: |
+            def main(template_id: str, category: str, variables_used_json: str, rendered_body: str) -> dict:
+                import json
+                import re
+
+                REALISM_SUFFIX = {
+                    "图片通用": "无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实环境。",
+                    "视频自拍": "无补光灯，无美颜，人物面部没有高光，真实皮肤纹理和瑕疵。",
+                    "加强防影棚": "无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实生活环境，轻微手持晃动，不要影棚感。",
+                }
+
+                TEMPLATES = {
+                    "IMG-01-product-lock": {"category": "图片", "suffix_key": "图片通用", "body": "生成一张产品白底图。产品外观为：{product_desc}。真实塑料/材质质感，标签印刷清晰，无反光眩光。{realism_suffix}"},
+                    "IMG-02-persona-whitebg": {"category": "图片", "suffix_key": "图片通用", "body": "手机后摄视角。生成一个{persona}的白底图片。人物表情平静（无笑容）。{problem_clause}{realism_suffix}"},
+                    "IMG-03-8grid": {"category": "图片", "suffix_key": "图片通用", "body": "生成{persona_ref}的8宫格图片。每张图人物的发型、发色不变，衣服款式会改变。8张图背景在{scenes}三个场景随机切换。{problem}从第1张初始状态到第8张完全消失。{realism_suffix}"},
+                    "IMG-04-cover-hook": {"category": "图片", "suffix_key": "图片通用", "body": "手机后摄视角，特写{subject}。{persona}双手掰开展示，让其呈现张大露出状态（{problem}）。背景是{scene}。{realism_suffix}"},
+                    "IMG-05-before-after": {"category": "图片", "suffix_key": "图片通用", "body": "生成一张{body_part}特写的{layout}对比图（不带任何文字）。{layout_desc}有{problem}，另一侧为{problem}消失、如年轻人一般。{realism_suffix}"},
+                    "VID-A-efficacy-stack": {"category": "视频", "suffix_key": "图片通用", "body": "手机后摄，固定机位。{persona}手持{product_name}（{product_lock}）对准{target}。【效果公式：{effect_formula}——按所选公式展开变化描写】。背景是可见的{scene}。{realism_suffix}", "effect_library": {"像素橡皮擦": "抹布缓慢沉重压过污渍，断裂式替换——抹布前是污渍色、抹布后是物品原色，色差为零。", "泡沫爆发": "喷洒瞬间浓稠白色活性泡沫爆发覆盖污渍并翻腾，随后百洁布擦去，显露洁净微湿无瑕表面。", "泡沫变色": "对准喷雾，白泡沫爆发包裹，几秒内由白变深黄，黄沫退去露出洁白锃亮。", "噼啪声": "泡沫严丝合缝包裹结石，变深黄并发出微小噼啪声，黄液滴落，露出如瓷洁白。", "玻璃板实验": "玻璃板左侧一滩污渍液体、右侧碎蛋壳，分别喷洒后左侧变无色、右侧冒泡化成透明水。"}},
+                    "VID-B-dual-track": {"category": "视频", "suffix_key": "视频自拍", "body": "【A-roll】iPhone前置自拍。{persona}，手持{product_name}，说话时头部自然转动伴手势。人物说：{line_en}\n【B-roll·恐怖】低画质夜视监控模式，{place}。高ISO噪点，压抑恐怖氛围。起初一片寂静，突然大量{pest}从缝隙中猛地窜出、四散奔逃。画面因恐惧剧烈手持晃动。{realism_suffix}"},
+                    "VID-C-before-after": {"category": "视频", "suffix_key": "视频自拍", "body": "手机前置摄像，固定机位。{persona_ref}展示一只手心里的{serum_color}，开始在{body_part}上轻轻涂抹有{problem}的区域。核心：药膏被吸收消失（渐变式），{problem}随之同帧100%渐变消退，露出光滑洁净皮肤。一镜到底，无分镜。人物不说话，仅做动作。{realism_suffix}"},
+                    "VID-D-talking-share": {"category": "视频", "suffix_key": "视频自拍", "body": "手机前置自拍。{persona}靠近镜头特写{body_part}，用平静语气说：{line_open}\n随后从下方用一只手拿出{product_name}（{product_lock}）展示，平静地说：{line_rec}{realism_suffix}"},
+                    "VID-E-role-pov": {"category": "视频", "suffix_key": "图片通用", "body": "手机后置，固定机位。背景为{scene}。台上有只{breed}趴着，自然张嘴可见{problem}。{role}（{role_outfit}）另一只手持{product_name}，上前安抚并掰开嘴特写展示。人物以专业口吻说：{line_en}{realism_suffix}"},
+                    "VID-F-dark-humor": {"category": "视频", "suffix_key": "加强防影棚", "body": "【悬疑开场】门口监控摄像头，低画质夜视，高ISO噪点，压抑氛围。一个穿黑衣戴口罩墨镜的男人正在{suspect_action}，动作鬼鬼祟祟到处张望。\n【反转·清洁】iPhone后置POV，戴黑色医用手套的手手持{product_name}，原来是清洁{stain}——【套效果公式：泡沫爆发或像素橡皮擦】，另一只手比耶。{realism_suffix}", "effect_library": {"泡沫爆发": "喷洒瞬间浓稠白色活性泡沫爆发覆盖污渍并翻腾，随后百洁布擦去，显露洁净微湿无瑕表面。", "像素橡皮擦": "抹布缓慢沉重压过污渍，断裂式替换——抹布前是污渍色、抹布后是物品原色，色差为零。"}},
+                    "VID-G-immersive-job": {"category": "视频", "suffix_key": "加强防影棚", "body": "手持手机第一人称POV，0.8倍广角，镜头晃动模拟步行。流程：敲门→屋主开门邀请进入→干脆戴上蓝色医用手套→逐个清洁{rooms}（戴手套的手持{product_name}对准{target}，套效果公式展示洁净）→收工：屋主递20美元+5美元小费，双手接过，POV鞠躬，挥手拜拜走出门。{realism_suffix}"},
+                    "PART-HOOK": {"category": "通用件", "suffix_key": "图片通用", "body": "【按 hook_type 选骨架】{hook_clause}{realism_suffix}", "hook_library": {"恐怖冲击": "[场景]。安静铺垫，起初一片寂静。突然[大量害虫/震撼物]从缝隙猛地窜出。画面因恐惧剧烈手持晃动。", "问题特写": "POV特写{subject}，完全展开露出[{detail}]。随后一只手从画面入镜触碰/操作。", "情绪反应": "人物准备亲吻/靠近[对象]，随后闻到臭味/发现问题，表情瞬间凝固极度嫌弃，猛地后仰、皱鼻、挥手。", "悬疑": "监控场景，一个神秘穿着的人正在[可疑动作]，动作鬼鬼祟祟到处张望。", "萌宠": "iPhone平放地面低角度，一只[品种]从画面下方入镜，对着产品狂吠/拱入画面。背景天空绿树。"}},
+                    "PART-CTA": {"category": "通用件", "suffix_key": "视频自拍", "body": "手机前置或后摄。人物自然收尾，平静而有感染力地说英文 CTA，例如：Grab this for {object} at the link below — your {object} will thank you! Don't wait {urgency}. {realism_suffix}"},
+                }
+
+                UNRESOLVED_HOOK_TYPE = "__UNRESOLVED_HOOK_TYPE__"
+                UNRESOLVED_EFFECT_FORMULA = "__UNRESOLVED_EFFECT_FORMULA__"
+                UNRESOLVED_LAYOUT = "__UNRESOLVED_LAYOUT__"
+                SENTINELS = [UNRESOLVED_HOOK_TYPE, UNRESOLVED_EFFECT_FORMULA, UNRESOLVED_LAYOUT]
+
+                errors = []
+                try:
+                    variables_used = json.loads(variables_used_json or "{}")
+                except Exception:
+                    variables_used = {}
+
+                tpl = TEMPLATES.get(template_id)
+                if not tpl:
+                    return {"axiom1_pass": "false", "axiom1_errors_json": json.dumps(["[axiom1] template_id %s 在 templates.json 中找不到" % template_id], ensure_ascii=False)}
+
+                if tpl["category"] != category:
+                    errors.append("[axiom1] bundle.category '%s' 与 templates.json 声明的 '%s' 不一致" % (category, tpl["category"]))
+
+                conditional = {}
+                if template_id == "IMG-02-persona-whitebg":
+                    problem = variables_used.get("problem") or ""
+                    conditional["problem_clause"] = ("面部和脖颈处有明显且符合年龄的%s（显老）。" % problem) if problem else ""
+                if template_id == "IMG-05-before-after":
+                    layout = variables_used.get("layout")
+                    if layout == "上下":
+                        conditional["layout_desc"] = "上图/下图"
+                    elif layout == "左右":
+                        conditional["layout_desc"] = "左图/右图"
+                    else:
+                        conditional["layout_desc"] = UNRESOLVED_LAYOUT
+                if template_id == "PART-HOOK":
+                    hook_type = variables_used.get("hook_type")
+                    lib = tpl.get("hook_library") or {}
+                    raw = lib.get(hook_type)
+                    if not raw:
+                        conditional["hook_clause"] = UNRESOLVED_HOOK_TYPE
+                    else:
+                        conditional["hook_clause"] = raw.replace("{subject}", variables_used.get("subject") or "").replace("{detail}", variables_used.get("detail") or "")
+
+                subst = dict(variables_used)
+                subst.update(conditional)
+                subst["realism_suffix"] = REALISM_SUFFIX.get(tpl["suffix_key"], "")
+
+                def sub_fn(m):
+                    key = m.group(1)
+                    return str(subst[key]) if key in subst else m.group(0)
+
+                expected = re.sub(r"\{([a-zA-Z0-9_]+)\}", sub_fn, tpl["body"])
+
+                if template_id in ("VID-A-efficacy-stack", "VID-F-dark-humor"):
+                    effect_key = variables_used.get("effect_formula")
+                    lib = tpl.get("effect_library") or {}
+                    replacement = lib.get(effect_key, UNRESOLVED_EFFECT_FORMULA)
+                    expected = re.sub(r"【效果公式：[^】]*】", lambda m: replacement, expected, count=1)
+                if template_id == "VID-F-dark-humor":
+                    effect_key = variables_used.get("effect_formula")
+                    lib = tpl.get("effect_library") or {}
+                    replacement = lib.get(effect_key, UNRESOLVED_EFFECT_FORMULA)
+                    expected = re.sub(r"【套效果公式：[^】]*】", lambda m: replacement, expected, count=1)
+                if template_id == "PART-HOOK":
+                    expected = expected.replace("【按 hook_type 选骨架】", "")
+
+                actual = rendered_body or ""
+                if expected != actual:
+                    errors.append("[axiom1] rendered_body 不是 templates.json body 逐字 {key} 替换后的期望结果（发现意译/删减/未解析占位符），expected=%r actual=%r" % (expected, actual))
+                if re.search(r"\{[a-zA-Z0-9_]+\}", actual):
+                    errors.append("[axiom1] rendered_body 仍残留未替换的 {占位符}")
+                for s in SENTINELS:
+                    if s in actual:
+                        errors.append("[axiom1] rendered_body 含内部未解析哨兵字符串 %s（hook_type/effect_formula/layout 缺失或非法，未针对 templates.json 对应 library 解析成功）" % s)
+
+                return {
+                    "axiom1_pass": "true" if not errors else "false",
+                    "axiom1_errors_json": json.dumps(errors, ensure_ascii=False),
+                }
+          variables:
+            - value_selector: [prep_ctx, template_id]
+              variable: template_id
+            - value_selector: [prep_ctx, category]
+              variable: category
+            - value_selector: [prep_ctx, variables_used_json]
+              variable: variables_used_json
+            - value_selector: [render_body, rendered_body]
+              variable: rendered_body
+          outputs:
+            axiom1_pass:
+              type: string
+            axiom1_errors_json:
+              type: string
+        position: {x: 2620, y: 180}
+        positionAbsolute: {x: 2620, y: 180}
+        sourcePosition: right
+        targetPosition: left
+        width: 280
+        height: 120
+      - id: verify_axiom2_3
+        type: custom
+        data:
+          type: code
+          title: "公理2引用锁完整性 + 公理3场景光线词扫描"
+          code_language: python3
+          code: |
+            def main(variables_used_json: str, reference_locks_json: str, existing_refs_input_json: str, established_refs_after_json: str) -> dict:
+                import json
+                import re
+
+                LOCK_REF_ENTITY = {"product_lock": "产品", "persona_ref": "人物"}
+                REF_PATTERN = re.compile(r"^参考图(\d+)(产品|人物)$")
+                REF_MENTION = re.compile(r"参考图(\d+)(产品|人物)")
+                LIGHTING_WORDS = [
+                    "明亮阳光", "柔和灯光", "柔光", "暖光", "冷光", "逆光", "顶光", "侧光", "自然光", "摄影棚灯光", "补光灯",
+                    "bright sunlight", "soft light", "soft lighting", "warm light", "warm lighting", "cool lighting",
+                    "natural light", "backlit", "studio light", "studio lighting", "golden hour", "ring light", "softbox",
+                ]
+                SCENE_KEYS = {"scene", "scenes", "place", "rooms"}
+
+                def _load(s, default):
+                    try:
+                        v = json.loads(s) if (s or "").strip() else default
+                        return v
+                    except Exception:
+                        return default
+
+                variables_used = _load(variables_used_json, {})
+                if not isinstance(variables_used, dict):
+                    variables_used = {}
+                locks = _load(reference_locks_json, [])
+                if not isinstance(locks, list):
+                    locks = []
+                existing = _load(existing_refs_input_json, {})
+                if not isinstance(existing, dict):
+                    existing = {}
+                existing.setdefault("产品", [])
+                existing.setdefault("人物", [])
+                established_after = _load(established_refs_after_json, {})
+                if not isinstance(established_after, dict):
+                    established_after = {}
+
+                errs2 = []
+                known = {"产品": set(existing.get("产品", [])), "人物": set(existing.get("人物", []))}
+                new_first = {"产品": [], "人物": []}
+
+                for idx, lock in enumerate(locks):
+                    entity = lock.get("entity")
+                    status = lock.get("status")
+                    value = lock.get("value", "")
+                    ref_number = lock.get("ref_number")
+                    if status == "reference_reuse":
+                        m = REF_PATTERN.match(value or "")
+                        if m:
+                            num = int(m.group(1))
+                            ent_from_value = m.group(2)
+                            if ent_from_value != entity:
+                                errs2.append("[axiom2] reference_locks[%d]: value '%s' 指向实体 '%s' 但 entity 字段是 '%s'（不一致）" % (idx, value, ent_from_value, entity))
+                            if num not in known.get(entity, set()):
+                                errs2.append("[axiom2] reference_locks[%d]: value '%s' 指向编号 %d，不在 meta.existing_refs_input.%s 中（未曾被此前调用建立，referential integrity 失败）" % (idx, value, num, entity))
+                            if ref_number != num:
+                                errs2.append("[axiom2] reference_locks[%d]: ref_number(%s) 与 value 内嵌编号(%d) 不一致" % (idx, ref_number, num))
+                    else:
+                        if ref_number in known.get(entity, set()):
+                            errs2.append("[axiom2] reference_locks[%d]: status 是 first_lock 但 ref_number %s（实体 %s）已存在于 meta.existing_refs_input，会与已建立的锁冲突" % (idx, ref_number, entity))
+                        new_first.setdefault(entity, []).append(ref_number)
+
+                claims = []
+                for key, val in variables_used.items():
+                    if not isinstance(val, str):
+                        continue
+                    m = REF_MENTION.search(val)
+                    if not m:
+                        continue
+                    num = int(m.group(1))
+                    mentioned = m.group(2)
+                    expected_entity = LOCK_REF_ENTITY.get(key, mentioned)
+                    claims.append({"key": key, "entity": expected_entity, "num": num, "mentioned": mentioned, "raw": val})
+
+                for c in claims:
+                    if c["mentioned"] != c["entity"]:
+                        errs2.append("[axiom2] variables_used.%s = '%s' 提及实体 '%s'，但该键按约定应指向 '%s'（不一致）" % (c["key"], c["raw"], c["mentioned"], c["entity"]))
+                    if c["num"] not in known.get(c["entity"], set()):
+                        errs2.append("[axiom2] variables_used.%s = '%s' 声称引用参考图%d%s，但该编号未曾被此前调用建立——即使 reference_locks[] 留空也照样检查" % (c["key"], c["raw"], c["num"], c["entity"]))
+                    declared = False
+                    for l in locks:
+                        if l.get("status") != "reference_reuse" or l.get("entity") != c["entity"]:
+                            continue
+                        lm = REF_PATTERN.match(l.get("value", "") or "")
+                        if lm and int(lm.group(1)) == c["num"]:
+                            declared = True
+                            break
+                    if not declared:
+                        errs2.append("[axiom2] variables_used.%s 声称引用参考图%d%s，但 reference_locks[] 没有对应的 reference_reuse 条目——渲染正文与结构化锁台账已经漂移" % (c["key"], c["num"], c["entity"]))
+
+                if locks:
+                    expected_after = {
+                        "产品": sorted(set(existing.get("产品", [])) | set(new_first.get("产品", []))),
+                        "人物": sorted(set(existing.get("人物", [])) | set(new_first.get("人物", []))),
+                    }
+                    for entity in ("产品", "人物"):
+                        actual_sorted = sorted(set(established_after.get(entity, [])))
+                        if actual_sorted != expected_after[entity]:
+                            errs2.append("[axiom2] meta.established_refs_after.%s 是 %s，期望 %s（existing_refs_input 并上本次新建立的 first_lock 编号）" % (entity, actual_sorted, expected_after[entity]))
+
+                errs3 = []
+                for key, val in variables_used.items():
+                    if key not in SCENE_KEYS or not isinstance(val, str):
+                        continue
+                    for w in LIGHTING_WORDS:
+                        if w in val:
+                            errs3.append("[axiom3] variables_used.%s = '%s' 命中禁用光线词 '%s'（光线交给 realism_suffix 统一控制，场景变量只留地点+可选天气）" % (key, val, w))
+
+                return {
+                    "axiom2_pass": "true" if not errs2 else "false",
+                    "axiom2_errors_json": json.dumps(errs2, ensure_ascii=False),
+                    "axiom3_pass": "true" if not errs3 else "false",
+                    "axiom3_errors_json": json.dumps(errs3, ensure_ascii=False),
+                }
+          variables:
+            - value_selector: [prep_ctx, variables_used_json]
+              variable: variables_used_json
+            - value_selector: [render_body, reference_locks_json]
+              variable: reference_locks_json
+            - value_selector: [prep_ctx, existing_refs_input_json]
+              variable: existing_refs_input_json
+            - value_selector: [render_body, established_refs_after_json]
+              variable: established_refs_after_json
+          outputs:
+            axiom2_pass:
+              type: string
+            axiom2_errors_json:
+              type: string
+            axiom3_pass:
+              type: string
+            axiom3_errors_json:
+              type: string
+        position: {x: 2960, y: 180}
+        positionAbsolute: {x: 2960, y: 180}
+        sourcePosition: right
+        targetPosition: left
+        width: 280
+        height: 120
+      - id: is_video
+        type: custom
+        data:
+          type: if-else
+          title: "是否视频模板"
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: cond-is-video
+                  variable_selector: [prep_ctx, category]
+                  comparison_operator: is
+                  value: "视频"
+                  varType: string
+        position: {x: 3300, y: 180}
+        positionAbsolute: {x: 3300, y: 180}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 100
+      - id: skip_video
+        type: custom
+        data:
+          type: code
+          title: "非视频：跳过模型包装（占位 video_result）"
+          code_language: python3
+          code: |
+            def main() -> dict:
+                import json
+                result = {
+                    "model": None,
+                    "final_prompt_wrapped": None,
+                    "duration_seconds": None,
+                    "narrative_shot_type": None,
+                    "axiom4_pass": True,
+                    "axiom4_errors": [],
+                }
+                return {"video_result_json": json.dumps(result, ensure_ascii=False)}
+          variables: []
+          outputs:
+            video_result_json:
+              type: string
+        position: {x: 3620, y: 460}
+        positionAbsolute: {x: 3620, y: 460}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+      - id: model_branch
+        type: custom
+        data:
+          type: if-else
+          title: "按 model 分支（veo/seedance/即创，各自独立分支）"
+          cases:
+            - id: veo
+              case_id: veo
+              logical_operator: and
+              conditions:
+                - id: cond-model-veo
+                  variable_selector: [prep_ctx, resolved_model]
+                  comparison_operator: is
+                  value: "veo"
+                  varType: string
+            - id: seedance
+              case_id: seedance
+              logical_operator: and
+              conditions:
+                - id: cond-model-seedance
+                  variable_selector: [prep_ctx, resolved_model]
+                  comparison_operator: is
+                  value: "seedance"
+                  varType: string
+            - id: jichuang
+              case_id: jichuang
+              logical_operator: and
+              conditions:
+                - id: cond-model-jichuang
+                  variable_selector: [prep_ctx, resolved_model]
+                  comparison_operator: is
+                  value: "即创"
+                  varType: string
+        position: {x: 3620, y: 20}
+        positionAbsolute: {x: 3620, y: 20}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 170
+      - id: reject_model
+        type: custom
+        data:
+          type: end
+          title: "拒绝：resolved_model 不合法（防御性兜底，正常流程不会走到）"
+          outputs:
+            - variable: attempted_model
+              value_selector: [prep_ctx, resolved_model]
+              value_type: string
+            - variable: template_id
+              value_selector: [prep_ctx, template_id]
+              value_type: string
+        position: {x: 3940, y: 660}
+        positionAbsolute: {x: 3940, y: 660}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 110
+      - id: wrap_veo
+        type: custom
+        data:
+          type: llm
+          title: "Veo 3.1 包装（转译成五段式英文）"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.4
+          prompt_template:
+            - id: veo-sys
+              role: system
+              text: |
+                你是 100x-prompt-compose 的 Veo 3.1 提示词包装器。输入是已经逐字渲染好的中文 UGC 提示词正文（body，已含 realism_suffix）。把它转译改写成英文，并严格按以下五段式组织成一个 8 秒生成单元，只输出最终英文提示词正文本身，不要解释、不要加标题、不要用 markdown 代码块：
+
+                1. 定位段（固定格式）：GU1 (reference range: 0.0-8.0s, generated duration: 8.0s).
+                2. Visual 段：把中文正文转译成 4-6 句连贯英文叙事散文——主体+场景+动作+镜头+氛围，写成散文，不要写成清单或分点。
+                3. Dialogue 段（仅当正文含台词时才写）：
+                   Spoken dialogue (say EXACTLY, word-for-word): {台词英文}
+                   Mouth clearly visible when speaking, lip-sync aligned with the spoken dialogue.
+                   若正文没有台词，这一段写：No spoken dialogue. Keep motion active, natural, and editable.
+                4. Timing 段：Spoken content happens within {x.x-y.y}s. From {tail}s to 8.0s, continue the current motion at the same pace—do not slow down or freeze.
+                5. Style Lock 段（固定句，逐字照抄，一字不得改写）：Keep lighting, color grade, and overall visual feel consistent with the reference frame.
+
+                硬性禁止，一个都不能出现：cinematic、professional、studio、stunning、flawless、perfect、smooth skin、polished、editorial、glamour、pristine、quietly、deeply、fundamentally、remarkably、arguably、delve、utilize、leverage、robust、streamline、harness。不得使用双引号 " （引号会触发 Veo 字幕，对话用冒号+裸文本）。不得使用 markdown 围栏或 emoji。运镜术语如 medium close-up / tracking shot / dolly in 允许（即使含 medium）。
+            - id: veo-user
+              role: user
+              text: "{{#render_body.rendered_body#}}"
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+        position: {x: 3940, y: -220}
+        positionAbsolute: {x: 3940, y: -220}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 100
+      - id: check_veo
+        type: custom
+        data:
+          type: code
+          title: "公理4校验：veo 时长/禁词/双引号/结尾固定句"
+          code_language: python3
+          code: |
+            def main(wrapped_text: str) -> dict:
+                import json
+                import re
+
+                BANNED = [
+                    "cinematic", "professional", "studio", "stunning", "flawless", "perfect",
+                    "smooth skin", "polished", "editorial", "glamour", "pristine",
+                    "quietly", "deeply", "fundamentally", "remarkably", "arguably",
+                    "delve", "utilize", "leverage", "robust", "streamline", "harness",
+                ]
+                TRAILING = "Keep lighting, color grade, and overall visual feel consistent with the reference frame."
+
+                text = (wrapped_text or "").strip()
+                errors = []
+
+                def esc(w):
+                    return re.escape(w)
+
+                hits = [w for w in BANNED if re.search(r"\b%s\b" % esc(w), text, re.IGNORECASE)]
+                if hits:
+                    errors.append("[axiom4] final_prompt_wrapped(veo) 命中禁词: %s" % ", ".join(hits))
+                if '"' in text:
+                    errors.append("[axiom4] final_prompt_wrapped(veo) 含双引号（会触发 Veo 字幕）")
+                if TRAILING not in text:
+                    errors.append("[axiom4] final_prompt_wrapped(veo) 缺少一字不差的结尾固定句: %s" % TRAILING)
+
+                result = {
+                    "model": "veo",
+                    "final_prompt_wrapped": text,
+                    "duration_seconds": 8.0,
+                    "narrative_shot_type": None,
+                    "axiom4_pass": len(errors) == 0,
+                    "axiom4_errors": errors,
+                }
+                return {"video_result_json": json.dumps(result, ensure_ascii=False)}
+          variables:
+            - value_selector: [wrap_veo, text]
+              variable: wrapped_text
+          outputs:
+            video_result_json:
+              type: string
+        position: {x: 4260, y: -220}
+        positionAbsolute: {x: 4260, y: -220}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 100
+      - id: wrap_seedance
+        type: custom
+        data:
+          type: llm
+          title: "Seedance 2.0 包装（转译成连贯英文散文）"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.4
+          prompt_template:
+            - id: seedance-sys
+              role: system
+              text: |
+                你是 100x-prompt-compose 的 Seedance 2.0 / Dreamina 提示词包装器。输入是已经逐字渲染好的中文 UGC 提示词正文（body，已含 realism_suffix）。把它转译改写成一段连贯的英文散文（不显式分段打标签），对应一个 10 秒生成单元，只输出最终英文提示词正文本身，不要解释、不要加标题、不要用 markdown 代码块。
+
+                组织顺序（融合成连贯段落，不要用①②③这类标签）：景别+机位 -> 主体外观+动作+场景+光线的UGC真实感 -> 台词（如有）-> 节拍描述 -> 设备质感。
+
+                台词：中文台词写成 "In Mandarin Chinese: {台词}"；英文台词直接给出（Seedance 对双引号没有"触发字幕"的已知问题，可以使用双引号或冒号）。
+
+                段落最后必须逐字追加（不得省略、不得用 (no subtitles) 这类缩写代替）：
+                no text, no subtitles, no watermarks
+
+                硬性禁止，一个都不能出现（除了上面那句固定收尾短语本身之外，其余正文任何位置都不能出现）：cinematic、professional、studio、beautiful、stunning、smooth skin、perfect、flawless、polished、editorial、glamour、text、subtitle、caption、watermark、logo、title、font、letter、word、overlay。
+            - id: seedance-user
+              role: user
+              text: "{{#render_body.rendered_body#}}"
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+        position: {x: 3940, y: 20}
+        positionAbsolute: {x: 3940, y: 20}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 100
+      - id: check_seedance
+        type: custom
+        data:
+          type: code
+          title: "公理4校验：seedance 时长/禁词（排除结尾固定句）/结尾固定句"
+          code_language: python3
+          code: |
+            def main(wrapped_text: str) -> dict:
+                import json
+                import re
+
+                BANNED = [
+                    "cinematic", "professional", "studio", "beautiful", "stunning", "smooth skin",
+                    "perfect", "flawless", "polished", "editorial", "glamour",
+                    "text", "subtitle", "caption", "watermark", "logo", "title", "font", "letter", "word", "overlay",
+                ]
+                TRAILING = "no text, no subtitles, no watermarks"
+
+                text = (wrapped_text or "").strip()
+                errors = []
+
+                if TRAILING not in text:
+                    errors.append("[axiom4] final_prompt_wrapped(seedance) 缺少一字不差的结尾固定句: %s" % TRAILING)
+
+                # 已知必要适配（见 profiles/seedance.md、axioms.md 公理4）：结尾固定句本身含
+                # text/subtitle/watermark 3 个禁词，扫描前先排除这段固定句文本本身，
+                # 再扫描剩余正文，避免"结尾硬规"和"零禁词"两条规则字面互相打架。
+                scan_text = text.replace(TRAILING, "")
+
+                def esc(w):
+                    return re.escape(w)
+
+                hits = [w for w in BANNED if re.search(r"\b%s\b" % esc(w), scan_text, re.IGNORECASE)]
+                if hits:
+                    errors.append("[axiom4] final_prompt_wrapped(seedance) 在结尾固定句之外命中禁词: %s" % ", ".join(hits))
+
+                result = {
+                    "model": "seedance",
+                    "final_prompt_wrapped": text,
+                    "duration_seconds": 10.0,
+                    "narrative_shot_type": None,
+                    "axiom4_pass": len(errors) == 0,
+                    "axiom4_errors": errors,
+                }
+                return {"video_result_json": json.dumps(result, ensure_ascii=False)}
+          variables:
+            - value_selector: [wrap_seedance, text]
+              variable: wrapped_text
+          outputs:
+            video_result_json:
+              type: string
+        position: {x: 4260, y: 20}
+        positionAbsolute: {x: 4260, y: 20}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 100
+      - id: classify_shot
+        type: custom
+        data:
+          type: question-classifier
+          title: "即创：叙事镜头分类（7选1，仅有的校验项）"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0
+          query_variable_selector: [render_body, rendered_body]
+          classes:
+            - {id: emotion, name: "情绪"}
+            - {id: pain, name: "痛点"}
+            - {id: product, name: "产品"}
+            - {id: scene, name: "场景"}
+            - {id: contrast, name: "对比"}
+            - {id: twist, name: "转折"}
+            - {id: cta, name: "CTA"}
+          instruction: |
+            这是一段即创（中文图生视频模型）要用的中文 UGC 提示词正文。把它归到最贴合的一个叙事镜头类别：情绪（情绪反应/感受）、痛点（问题展示）、产品（产品展示/操作）、场景（环境铺陈）、对比（前后对比）、转折（剧情反转）、CTA（购买引导收尾）。只选一个最贴切的。
+          vision:
+            enabled: false
+        position: {x: 3940, y: 300}
+        positionAbsolute: {x: 3940, y: 300}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 140
+      - id: assemble_jichuang
+        type: custom
+        data:
+          type: code
+          title: "即创：保留中文原文 + 装配 video_result（无来源材料，不做时长/禁词硬校验）"
+          code_language: python3
+          code: |
+            def main(rendered_body: str, narrative_shot_type: str) -> dict:
+                import json
+                ENUM = ["情绪", "痛点", "产品", "场景", "对比", "转折", "CTA"]
+                shot = narrative_shot_type if narrative_shot_type in ENUM else None
+                errors = [] if shot else ["[axiom4] narrative_shot_type 缺失或不在 7 个叙事镜头闭集枚举内（即创）"]
+                result = {
+                    "model": "即创",
+                    "final_prompt_wrapped": rendered_body or "",
+                    "duration_seconds": None,
+                    "narrative_shot_type": shot,
+                    "axiom4_pass": len(errors) == 0,
+                    "axiom4_errors": errors,
+                }
+                return {"video_result_json": json.dumps(result, ensure_ascii=False)}
+          variables:
+            - value_selector: [render_body, rendered_body]
+              variable: rendered_body
+            - value_selector: [classify_shot, class_name]
+              variable: narrative_shot_type
+          outputs:
+            video_result_json:
+              type: string
+        position: {x: 4260, y: 300}
+        positionAbsolute: {x: 4260, y: 300}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 110
+      - id: merge_video
+        type: custom
+        data:
+          type: variable-aggregator
+          title: "合并视频分支结果（veo/seedance/即创/非视频，互斥）"
+          output_type: string
+          variables:
+            - [check_veo, video_result_json]
+            - [check_seedance, video_result_json]
+            - [assemble_jichuang, video_result_json]
+            - [skip_video, video_result_json]
+        position: {x: 4580, y: 180}
+        positionAbsolute: {x: 4580, y: 180}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 100
+      - id: assemble_final
+        type: custom
+        data:
+          type: code
+          title: "装配最终 ComposedPromptBundle + 汇总四条公理判定"
+          code_language: python3
+          code: |
+            def main(
+                template_id: str,
+                category: str,
+                variables_used_json: str,
+                rendered_body: str,
+                reference_locks_json: str,
+                established_refs_after_json: str,
+                existing_refs_input_json: str,
+                prep_warnings_json: str,
+                render_warnings_json: str,
+                model_choice_source: str,
+                axiom1_pass: str,
+                axiom1_errors_json: str,
+                axiom2_pass: str,
+                axiom2_errors_json: str,
+                axiom3_pass: str,
+                axiom3_errors_json: str,
+                video_result_json: str,
+            ) -> dict:
+                import json
+
+                TEMPLATE_NAMES = {
+                    "IMG-01-product-lock": "① 产品外观锁定图（建产品参考图）",
+                    "IMG-02-persona-whitebg": "② 模特白底图（建人物参考图）",
+                    "IMG-03-8grid": "③ 8宫格渐变图（前后对比素材）",
+                    "IMG-04-cover-hook": "④ 首图/封面图（问题特写·Hook图）",
+                    "IMG-05-before-after": "⑤ 前后对比图（上下/左右）",
+                    "VID-A-efficacy-stack": "⑥ 功效堆叠（一喷见效·视频）",
+                    "VID-B-dual-track": "⑦ 双轨叙事（口播+震撼B-roll·视频）",
+                    "VID-C-before-after": "⑧ 前后对比（护肤渐变·视频）",
+                    "VID-D-talking-share": "⑨ 口播分享（真人推荐·视频）",
+                    "VID-E-role-pov": "⑩ 角色视角（兽医/美容师/专家·视频）",
+                    "VID-F-dark-humor": "⑪ 黑色幽默/反转（清洁·视频）",
+                    "VID-G-immersive-job": "⑫ 沉浸工作流（上门清洁POV·视频）",
+                    "PART-HOOK": "⑬ Hook 开头（前3秒·拼接件）",
+                    "PART-CTA": "⑭ CTA 结尾（购买引导·拼接件）",
+                }
+
+                def _l(s):
+                    try:
+                        v = json.loads(s or "[]")
+                        return v if isinstance(v, list) else []
+                    except Exception:
+                        return []
+
+                def _d(s):
+                    try:
+                        v = json.loads(s or "{}")
+                        return v if isinstance(v, dict) else {}
+                    except Exception:
+                        return {}
+
+                variables_used = _d(variables_used_json)
+                reference_locks = _l(reference_locks_json)
+                established_after = _d(established_refs_after_json)
+                existing = _d(existing_refs_input_json)
+                warnings = _l(prep_warnings_json) + _l(render_warnings_json)
+                video_result = _d(video_result_json)
+
+                errors = _l(axiom1_errors_json) + _l(axiom2_errors_json) + _l(axiom3_errors_json) + (video_result.get("axiom4_errors") or [])
+                ok = (axiom1_pass == "true") and (axiom2_pass == "true") and (axiom3_pass == "true") and bool(video_result.get("axiom4_pass", True))
+
+                model = video_result.get("model")
+                video_unit = None
+                if category == "视频":
+                    video_unit = {
+                        "duration_seconds": video_result.get("duration_seconds"),
+                        "final_prompt_wrapped": video_result.get("final_prompt_wrapped") or "",
+                    }
+                    if model == "即创":
+                        video_unit["narrative_shot_type"] = video_result.get("narrative_shot_type")
+
+                bundle = {
+                    "template_id": template_id,
+                    "template_name": TEMPLATE_NAMES.get(template_id, ""),
+                    "category": category,
+                    "variables_used": variables_used,
+                    "rendered_body": rendered_body or "",
+                    "reference_locks": reference_locks,
+                    "model": model,
+                    "video_unit": video_unit,
+                    "meta": {
+                        "generated_by": "100x-prompt-compose",
+                        "existing_refs_input": existing,
+                        "established_refs_after": established_after,
+                        "model_choice_source": model_choice_source or None,
+                        "warnings": warnings,
+                    },
+                }
+
+                summary_lines = [
+                    "模板：%s（%s）" % (template_id, TEMPLATE_NAMES.get(template_id, "")),
+                    "",
+                    "最终提示词：",
+                    rendered_body or "",
+                ]
+                if video_unit:
+                    summary_lines += [
+                        "",
+                        "模型：%s，时长：%ss" % (model, video_unit.get("duration_seconds")),
+                        "包装后提示词：",
+                        video_unit.get("final_prompt_wrapped") or "",
+                    ]
+                if errors:
+                    summary_lines += ["", "未通过校验："] + ["- " + e for e in errors]
+
+                return {
+                    "ok": "true" if ok else "false",
+                    "bundle_json": json.dumps(bundle, ensure_ascii=False),
+                    "errors_json": json.dumps(errors, ensure_ascii=False),
+                    "summary": "\n".join(summary_lines),
+                }
+          variables:
+            - value_selector: [prep_ctx, template_id]
+              variable: template_id
+            - value_selector: [prep_ctx, category]
+              variable: category
+            - value_selector: [prep_ctx, variables_used_json]
+              variable: variables_used_json
+            - value_selector: [render_body, rendered_body]
+              variable: rendered_body
+            - value_selector: [render_body, reference_locks_json]
+              variable: reference_locks_json
+            - value_selector: [render_body, established_refs_after_json]
+              variable: established_refs_after_json
+            - value_selector: [prep_ctx, existing_refs_input_json]
+              variable: existing_refs_input_json
+            - value_selector: [prep_ctx, warnings_json]
+              variable: prep_warnings_json
+            - value_selector: [render_body, warnings_json]
+              variable: render_warnings_json
+            - value_selector: [prep_ctx, model_choice_source]
+              variable: model_choice_source
+            - value_selector: [verify_axiom1, axiom1_pass]
+              variable: axiom1_pass
+            - value_selector: [verify_axiom1, axiom1_errors_json]
+              variable: axiom1_errors_json
+            - value_selector: [verify_axiom2_3, axiom2_pass]
+              variable: axiom2_pass
+            - value_selector: [verify_axiom2_3, axiom2_errors_json]
+              variable: axiom2_errors_json
+            - value_selector: [verify_axiom2_3, axiom3_pass]
+              variable: axiom3_pass
+            - value_selector: [verify_axiom2_3, axiom3_errors_json]
+              variable: axiom3_errors_json
+            - value_selector: [merge_video, output]
+              variable: video_result_json
+          outputs:
+            ok:
+              type: string
+            bundle_json:
+              type: string
+            errors_json:
+              type: string
+            summary:
+              type: string
+        position: {x: 4900, y: 180}
+        positionAbsolute: {x: 4900, y: 180}
+        sourcePosition: right
+        targetPosition: left
+        width: 280
+        height: 140
+      - id: overall_pass
+        type: custom
+        data:
+          type: if-else
+          title: "四条公理是否全部通过"
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: cond-overall-pass
+                  variable_selector: [assemble_final, ok]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+        position: {x: 5220, y: 180}
+        positionAbsolute: {x: 5220, y: 180}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 100
+      - id: end_success
+        type: custom
+        data:
+          type: end
+          title: "输出：ComposedPromptBundle"
+          outputs:
+            - variable: bundle
+              value_selector: [assemble_final, bundle_json]
+              value_type: string
+            - variable: summary
+              value_selector: [assemble_final, summary]
+              value_type: string
+            - variable: ok
+              value_selector: [assemble_final, ok]
+              value_type: string
+        position: {x: 5540, y: 60}
+        positionAbsolute: {x: 5540, y: 60}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 110
+      - id: end_fail
+        type: custom
+        data:
+          type: end
+          title: "输出：未通过校验（具体失败项）"
+          outputs:
+            - variable: errors
+              value_selector: [assemble_final, errors_json]
+              value_type: string
+            - variable: bundle_partial
+              value_selector: [assemble_final, bundle_json]
+              value_type: string
+            - variable: ok
+              value_selector: [assemble_final, ok]
+              value_type: string
+        position: {x: 5540, y: 320}
+        positionAbsolute: {x: 5540, y: 320}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 110
+      - data:
+          author: ""
+          desc: ""
+          height: 160
+          selected: false
+          showAuthor: false
+          text: "简化披露：源 skill workflow.md Phase 1 步骤1 要求“命中多个候选时列出候选让用户选，不代选”。question-classifier 节点结构上只能输出单一 class_name，这里退化为“选择单一最佳猜测（或 UNCLEAR）”，不能真正表达“列出多个候选”这一步。这是本次 Dify 移植的已知简化，不是原样照搬，已在 notes.md 中说明。"
+          theme: blue
+          title: "设计说明"
+          type: ""
+          width: 280
+        id: note-classify
+        position: {x: 680, y: 660}
+        positionAbsolute: {x: 680, y: 660}
+        selected: false
+        type: custom-note
+      - data:
+          author: ""
+          desc: ""
+          height: 200
+          selected: false
+          showAuthor: false
+          text: "设计说明：workflow.md Phase 2 失败处理写“模型禁词/时长不符 -> 重写该 video_unit，单条重写上限3次，仍不过则保留最佳版”。本 DSL 不实现自动 3 次重试循环——每次运行只生成一次 wrap_veo/wrap_seedance，未通过校验时直接在 assemble_final/overall_pass 路由到 end_fail 并回报具体失败项，由调用方决定是否重新触发整个 workflow。即创没有时长/禁词来源材料，走独立分支（classify_shot + assemble_jichuang），不复用 veo/seedance 更严格的 check_veo/check_seedance 逻辑。"
+          theme: yellow
+          title: "设计说明"
+          type: ""
+          width: 300
+        id: note-video
+        position: {x: 3620, y: -280}
+        positionAbsolute: {x: 3620, y: -280}
+        selected: false
+        type: custom-note
+    edges:
+      - id: start-source-has_tid-target
+        source: start
+        sourceHandle: source
+        target: has_tid
+        targetHandle: target
+        type: custom
+        data: {sourceType: start, targetType: if-else, isInIteration: false, isInLoop: false}
+      - id: has_tid-true-validate_tid-target
+        source: has_tid
+        sourceHandle: "true"
+        target: validate_tid
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: code, isInIteration: false, isInLoop: false}
+      - id: has_tid-false-classify_tid-target
+        source: has_tid
+        sourceHandle: "false"
+        target: classify_tid
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: question-classifier, isInIteration: false, isInLoop: false}
+      - id: validate_tid-source-merge_tid-target
+        source: validate_tid
+        sourceHandle: source
+        target: merge_tid
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: variable-aggregator, isInIteration: false, isInLoop: false}
+      - id: classify_tid-UNCLEAR-map_classify-target
+        source: classify_tid
+        sourceHandle: "UNCLEAR"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-IMG-01-product-lock-map_classify-target
+        source: classify_tid
+        sourceHandle: "IMG-01-product-lock"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-IMG-02-persona-whitebg-map_classify-target
+        source: classify_tid
+        sourceHandle: "IMG-02-persona-whitebg"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-IMG-03-8grid-map_classify-target
+        source: classify_tid
+        sourceHandle: "IMG-03-8grid"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-IMG-04-cover-hook-map_classify-target
+        source: classify_tid
+        sourceHandle: "IMG-04-cover-hook"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-IMG-05-before-after-map_classify-target
+        source: classify_tid
+        sourceHandle: "IMG-05-before-after"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-VID-A-efficacy-stack-map_classify-target
+        source: classify_tid
+        sourceHandle: "VID-A-efficacy-stack"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-VID-B-dual-track-map_classify-target
+        source: classify_tid
+        sourceHandle: "VID-B-dual-track"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-VID-C-before-after-map_classify-target
+        source: classify_tid
+        sourceHandle: "VID-C-before-after"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-VID-D-talking-share-map_classify-target
+        source: classify_tid
+        sourceHandle: "VID-D-talking-share"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-VID-E-role-pov-map_classify-target
+        source: classify_tid
+        sourceHandle: "VID-E-role-pov"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-VID-F-dark-humor-map_classify-target
+        source: classify_tid
+        sourceHandle: "VID-F-dark-humor"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-VID-G-immersive-job-map_classify-target
+        source: classify_tid
+        sourceHandle: "VID-G-immersive-job"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-PART-HOOK-map_classify-target
+        source: classify_tid
+        sourceHandle: "PART-HOOK"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_tid-PART-CTA-map_classify-target
+        source: classify_tid
+        sourceHandle: "PART-CTA"
+        target: map_classify
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: map_classify-source-merge_tid-target
+        source: map_classify
+        sourceHandle: source
+        target: merge_tid
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: variable-aggregator, isInIteration: false, isInLoop: false}
+      - id: merge_tid-source-prep_ctx-target
+        source: merge_tid
+        sourceHandle: source
+        target: prep_ctx
+        targetHandle: target
+        type: custom
+        data: {sourceType: variable-aggregator, targetType: code, isInIteration: false, isInLoop: false}
+      - id: prep_ctx-source-input_ok-target
+        source: prep_ctx
+        sourceHandle: source
+        target: input_ok
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false}
+      - id: input_ok-true-render_body-target
+        source: input_ok
+        sourceHandle: "true"
+        target: render_body
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: code, isInIteration: false, isInLoop: false}
+      - id: input_ok-false-reject_input-target
+        source: input_ok
+        sourceHandle: "false"
+        target: reject_input
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false}
+      - id: render_body-source-verify_axiom1-target
+        source: render_body
+        sourceHandle: source
+        target: verify_axiom1
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: code, isInIteration: false, isInLoop: false}
+      - id: verify_axiom1-source-verify_axiom2_3-target
+        source: verify_axiom1
+        sourceHandle: source
+        target: verify_axiom2_3
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: code, isInIteration: false, isInLoop: false}
+      - id: verify_axiom2_3-source-is_video-target
+        source: verify_axiom2_3
+        sourceHandle: source
+        target: is_video
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false}
+      - id: is_video-true-model_branch-target
+        source: is_video
+        sourceHandle: "true"
+        target: model_branch
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: if-else, isInIteration: false, isInLoop: false}
+      - id: is_video-false-skip_video-target
+        source: is_video
+        sourceHandle: "false"
+        target: skip_video
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: code, isInIteration: false, isInLoop: false}
+      - id: model_branch-veo-wrap_veo-target
+        source: model_branch
+        sourceHandle: veo
+        target: wrap_veo
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: llm, isInIteration: false, isInLoop: false}
+      - id: model_branch-seedance-wrap_seedance-target
+        source: model_branch
+        sourceHandle: seedance
+        target: wrap_seedance
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: llm, isInIteration: false, isInLoop: false}
+      - id: model_branch-jichuang-classify_shot-target
+        source: model_branch
+        sourceHandle: jichuang
+        target: classify_shot
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: question-classifier, isInIteration: false, isInLoop: false}
+      - id: model_branch-false-reject_model-target
+        source: model_branch
+        sourceHandle: "false"
+        target: reject_model
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false}
+      - id: wrap_veo-source-check_veo-target
+        source: wrap_veo
+        sourceHandle: source
+        target: check_veo
+        targetHandle: target
+        type: custom
+        data: {sourceType: llm, targetType: code, isInIteration: false, isInLoop: false}
+      - id: wrap_seedance-source-check_seedance-target
+        source: wrap_seedance
+        sourceHandle: source
+        target: check_seedance
+        targetHandle: target
+        type: custom
+        data: {sourceType: llm, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_shot-emotion-assemble_jichuang-target
+        source: classify_shot
+        sourceHandle: emotion
+        target: assemble_jichuang
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_shot-pain-assemble_jichuang-target
+        source: classify_shot
+        sourceHandle: pain
+        target: assemble_jichuang
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_shot-product-assemble_jichuang-target
+        source: classify_shot
+        sourceHandle: product
+        target: assemble_jichuang
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_shot-scene-assemble_jichuang-target
+        source: classify_shot
+        sourceHandle: scene
+        target: assemble_jichuang
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_shot-contrast-assemble_jichuang-target
+        source: classify_shot
+        sourceHandle: contrast
+        target: assemble_jichuang
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_shot-twist-assemble_jichuang-target
+        source: classify_shot
+        sourceHandle: twist
+        target: assemble_jichuang
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: classify_shot-cta-assemble_jichuang-target
+        source: classify_shot
+        sourceHandle: cta
+        target: assemble_jichuang
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: code, isInIteration: false, isInLoop: false}
+      - id: check_veo-source-merge_video-target
+        source: check_veo
+        sourceHandle: source
+        target: merge_video
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: variable-aggregator, isInIteration: false, isInLoop: false}
+      - id: check_seedance-source-merge_video-target
+        source: check_seedance
+        sourceHandle: source
+        target: merge_video
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: variable-aggregator, isInIteration: false, isInLoop: false}
+      - id: assemble_jichuang-source-merge_video-target
+        source: assemble_jichuang
+        sourceHandle: source
+        target: merge_video
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: variable-aggregator, isInIteration: false, isInLoop: false}
+      - id: skip_video-source-merge_video-target
+        source: skip_video
+        sourceHandle: source
+        target: merge_video
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: variable-aggregator, isInIteration: false, isInLoop: false}
+      - id: merge_video-source-assemble_final-target
+        source: merge_video
+        sourceHandle: source
+        target: assemble_final
+        targetHandle: target
+        type: custom
+        data: {sourceType: variable-aggregator, targetType: code, isInIteration: false, isInLoop: false}
+      - id: assemble_final-source-overall_pass-target
+        source: assemble_final
+        sourceHandle: source
+        target: overall_pass
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false}
+      - id: overall_pass-true-end_success-target
+        source: overall_pass
+        sourceHandle: "true"
+        target: end_success
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false}
+      - id: overall_pass-false-end_fail-target
+        source: overall_pass
+        sourceHandle: "false"
+        target: end_fail
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false}
+    viewport: {x: 0, y: 0, zoom: 0.45}

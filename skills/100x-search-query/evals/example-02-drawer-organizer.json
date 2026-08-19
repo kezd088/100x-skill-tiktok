@@ -1,0 +1,63 @@
+{
+  "product_name": "expandable drawer organizer set (synthetic example, not a real product)",
+  "category": "家居",
+  "queries": {
+    "pinterest": [
+      {"q":"small drawer organization aesthetic","intent_cn":"视觉参考:小抽屉收纳画面","stage":"Appeal"},
+      {"q":"apartment storage hacks ideas","intent_cn":"场景灵感:公寓收纳技巧参考","stage":"Appeal"},
+      {"q":"minimal drawer styling ideas","intent_cn":"视觉参考:极简抽屉陈列画面","stage":"Appeal"},
+      {"q":"renter friendly organization aesthetic","intent_cn":"身份认同:租房友好收纳画面","stage":"Appeal"},
+      {"q":"closet declutter routine ideas","intent_cn":"场景灵感:衣柜断舍离流程","stage":"Appeal"},
+      {"q":"kitchen drawer organization aesthetic","intent_cn":"视觉参考:厨房抽屉收纳画面","stage":"Act"},
+      {"q":"small space living mood board","intent_cn":"情绪认同:小户型生活状态画面","stage":"Appeal"},
+      {"q":"aesthetic drawer organizer flatlay","intent_cn":"视觉参考:收纳盒拍摄构图","stage":"Act"},
+      {"q":"tidy home self care routine","intent_cn":"情绪认同:整洁居家生活方式","stage":"Appeal"},
+      {"q":"organized bathroom drawer ideas","intent_cn":"场景灵感:浴室抽屉收纳参考","stage":"Aware"},
+      {"q":"small apartment decor ideas","intent_cn":"场景灵感:小公寓装饰画面","stage":"Appeal"},
+      {"q":"declutter routine inspo","intent_cn":"情绪认同:断舍离生活灵感图","stage":"Appeal"},
+      {"q":"minimalist home aesthetic vibe","intent_cn":"身份认同:极简居家生活氛围","stage":"Advocate"},
+      {"q":"organized desk drawer styling","intent_cn":"视觉参考:书桌抽屉陈列画面","stage":"Act"},
+      {"q":"spring cleaning routine mood","intent_cn":"场景灵感:春季大扫除流程","stage":"Aware"}
+    ],
+    "tiktok": [
+      {"q":"#drawerorganization","intent_cn":"泛用:抽屉收纳话题聚合","stage":"Aware"},
+      {"q":"#smallspacehacks","intent_cn":"泛用:小空间收纳话题聚合","stage":"Ask"},
+      {"q":"#declutterwithme","intent_cn":"泛用:断舍离话题聚合","stage":"Appeal"},
+      {"q":"#apartmenthacks","intent_cn":"泛用:公寓收纳话题聚合","stage":"Appeal"},
+      {"q":"#organizationtiktok","intent_cn":"泛用:收纳整理话题聚合","stage":"Advocate"},
+      {"q":"#renterfriendly","intent_cn":"泛用:租房友好话题聚合","stage":"Aware"},
+      {"q":"#tidyhometiktok","intent_cn":"泛用:整洁居家话题聚合","stage":"Appeal"},
+      {"q":"#homeorganization","intent_cn":"陈列:居家收纳展示热门","stage":"Act"},
+      {"q":"#drawerhack","intent_cn":"情绪:抽屉收纳技巧梗","stage":"Appeal"},
+      {"q":"honest review drawer organizer","intent_cn":"购买前:找真实使用测评","stage":"Ask"},
+      {"q":"does this drawer organizer actually work","intent_cn":"购买前:效果真实性验证","stage":"Ask"},
+      {"q":"tiktok made me buy this organizer","intent_cn":"种草:被种草购买链路","stage":"Advocate"},
+      {"q":"drawer organization routine grwm","intent_cn":"场景:收纳整理流程展示","stage":"Act"},
+      {"q":"small space storage storytime","intent_cn":"叙事:小空间收纳故事内容","stage":"Ask"},
+      {"q":"dayinmylife organizing my apartment","intent_cn":"生活方式:公寓整理日常记录","stage":"Appeal"}
+    ],
+    "reddit": [
+      {"q":"why is my drawer always a mess","intent_cn":"共鸣:抽屉杂乱求认同","stage":"Aware"},
+      {"q":"how to organize a small kitchen drawer","intent_cn":"方法求解:厨房抽屉收纳方案","stage":"Ask"},
+      {"q":"anyone else struggle with tiny apartment storage","intent_cn":"共鸣:小公寓收纳困扰求解","stage":"Aware"},
+      {"q":"best drawer organizer reddit","intent_cn":"决策前:靠谱收纳盒求证","stage":"Ask"},
+      {"q":"drawer organizer vs diy dividers","intent_cn":"对比:收纳盒与自制隔板选择","stage":"Ask"},
+      {"q":"is an expandable organizer worth it","intent_cn":"决策:可拓展款是否值得","stage":"Ask"},
+      {"q":"help organizing a small junk drawer","intent_cn":"求助:杂物抽屉整理困惑","stage":"Ask"},
+      {"q":"recommend a good drawer organizer","intent_cn":"求推荐:靠谱抽屉收纳盒","stage":"Ask"},
+      {"q":"does it work expandable drawer organizer","intent_cn":"验证:收纳盒效果真实性讨论","stage":"Ask"},
+      {"q":"should i buy a drawer organizer set","intent_cn":"决策前:是否值得购买套装","stage":"Ask"},
+      {"q":"why do my drawers never stay organized","intent_cn":"共鸣:抽屉总乱求解","stage":"Aware"},
+      {"q":"how long does drawer organization actually last","intent_cn":"预期管理:收纳效果持久性求解","stage":"Ask"},
+      {"q":"anyone else obsessed with organizing drawers","intent_cn":"共鸣:收纳爱好者经验分享","stage":"Advocate"},
+      {"q":"drawer organizer durability experience","intent_cn":"风险确认:耐用性讨论","stage":"Ask"},
+      {"q":"small apartment storage struggle daily","intent_cn":"痛点:小公寓收纳日常困扰","stage":"Aware"}
+    ]
+  },
+  "meta": {
+    "based_on_5a": "Ask+Appeal",
+    "generated_by": "100x-search-query",
+    "topic_angle": "aesthetic",
+    "warnings": []
+  }
+}

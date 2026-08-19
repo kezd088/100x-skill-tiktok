@@ -1,0 +1,12 @@
+{
+  "source_script": "Feeling wiped out by 3pm every single day? It's not just you being lazy. Your body's energy pathways are running on empty and coffee only masks it for an hour. This powder is packed with B12, ginseng root, and electrolytes that go to work in about fifteen minutes. Mix one scoop with water, no crash, no jitters, just steady focus for hours. Thousands of people already switched from their afternoon coffee to this scoop. Tap the orange cart before the discount ends tonight.",
+  "source_language_note": "source copy: en (synthetic example, not a real ad script)",
+  "target_region": "mx",
+  "register_profile": "default",
+  "localized_script": "¿Te sientes sin energía todos los días como a las 3 de la tarde? No es flojera. Tu cuerpo se está quedando sin combustible y el café solo lo tapa por una hora. Este polvo trae B12, ginseng y electrolitos que empiezan a actuar en quince minutos. Mezclas un sobre con agua, sin bajón, sin nervios, solo enfoque estable por horas. Miles de personas ya cambiaron su café de la tarde por este sobre. Dale click al carrito naranja antes de que se acabe el descuento esta noche.",
+  "meta": {
+    "generated_by": "100x-localize",
+    "compression_ratio": 0.992,
+    "warnings": []
+  }
+}

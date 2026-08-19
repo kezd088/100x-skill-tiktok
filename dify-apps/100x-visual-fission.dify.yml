@@ -1,0 +1,2120 @@
+app:
+  name: "100x-visual-fission · 媒介裂变提示词矩阵"
+  description: "锁定人物/场景/产品三锚点，把≥2条同系列参考+产品文案裂变成媒介结构×VTP机位预设的提示词矩阵（single_frame/head_tail/head_mid_tail/multi_day × A/B/C camera presets），附固定负面词常量。移植自 100x-skill-tiktok 仓库 skills/100x-visual-fission。"
+  icon: "🎬"
+  icon_type: emoji
+  icon_background: "#FDE7C8"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.2.6@e2665624a156f52160927bceac9e169bd7e5ae6b936ae82575e14c90af390e6e
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods: [local_file, remote_url]
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: [local_file, remote_url]
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.4}
+    nodes:
+      - id: start
+        type: custom
+        data:
+          title: "输入 / Start"
+          type: start
+          variables:
+            - label: "参考材料 references[]（≥2条，JSON数组或每行一条文字描述）"
+              variable: references_input
+              type: paragraph
+              required: true
+              max_length: 20000
+            - label: "产品文案 product_brief（产品名+品类+效果卖点叙事）"
+              variable: product_brief
+              type: paragraph
+              required: true
+              max_length: 8000
+            - label: "品类 product_category（可选，默认：通用）"
+              variable: product_category
+              type: text-input
+              required: false
+              max_length: 100
+            - label: "目标画幅 aspect_ratios_wanted（可选，逗号分隔，取值 9:16/4:5/1:1，默认 9:16）"
+              variable: aspect_ratios_wanted
+              type: text-input
+              required: false
+              max_length: 50
+            - label: "变体组数 variant_count（可选，默认 2，VTP 04 步用户自定参数，非结构性判据）"
+              variable: variant_count
+              type: number
+              required: false
+            - label: "上游 100x-persona PersonaSceneBundle JSON（可选，类别C，缺失静默跳过）"
+              variable: persona_bundle_json
+              type: paragraph
+              required: false
+              max_length: 20000
+        position: {x: 40, y: 340}
+        positionAbsolute: {x: 40, y: 340}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 168
+
+      - id: intake_check
+        type: custom
+        data:
+          title: "Phase1 接收+校验（类别A/B + 不可视化宣称预检测）"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            # Ported verbatim from skills/100x-visual-fission/scripts/validate.js
+            # UNVISUALIZABLE_CLAIM_WORDS (axiom 4). Known limitation preserved from
+            # the source skill: only validated against supplement-category EN+ES
+            # real corpus so far -- see notes.md / axioms.md axiom 4 TODO.
+            UNVISUALIZABLE_CLAIM_WORDS = [
+                'cellular health', 'mitochondrial', 'anti-aging', 'anti aging',
+                'clinically proven', 'clinically tested', 'third party tested', 'third-party tested',
+                'fda', 'nsf approved', 'doctor recommended', 'physician recommended',
+                'harvard lab', 'harvard-lab', 'money back guarantee', 'money-back guarantee',
+                'guarantee', 'guaranteed', 'cure', 'reverse aging', 'no side effects',
+                'sin efectos secundarios', 'clínicamente probado', 'clínicamente comprobado',
+                'aprobado por la fda', 'garantía de devolución', 'garantizado',
+                'laboratorio de harvard', 'sin hormonas', '% off', '% de descuento',
+            ]
+
+
+            def word_match(haystack_lower, phrase_lower):
+                # \b-bounded whole word/phrase match -- same fix validate.js's v1.1
+                # applied after bare substring .includes() false-positived on
+                # 'cure' inside 'secure'/'manicure'.
+                pattern = r'\b' + re.escape(phrase_lower) + r'\b'
+                return re.search(pattern, haystack_lower) is not None
+
+
+            def main(references_input: str, product_brief: str, product_category: str,
+                     aspect_ratios_wanted: str, variant_count: float, persona_bundle_json: str) -> dict:
+                warnings = []
+
+                # ---- class A: references[] (>=2) -------------------------------
+                # Distinguishes workflow.md Phase 1's two input forms: (a) already-
+                # reversed JSON objects (vtp_prompts_01/02 schema) vs (b) plain-text
+                # description degrade (no real reference image) -- (a) only when the
+                # WHOLE list parses as JSON objects, not merely as a JSON-parseable
+                # string; anything else (parse failure, plain strings, mixed) counts
+                # as the degraded path, which must be disclosed honestly downstream
+                # (source_material_note, assembled in assemble_bundle).
+                raw = (references_input or '').strip()
+                refs = []
+                all_structured = False
+                if raw:
+                    try:
+                        parsed = json.loads(raw)
+                        if isinstance(parsed, list) and len(parsed) > 0 and all(isinstance(item, dict) for item in parsed):
+                            refs = [json.dumps(item, ensure_ascii=False) for item in parsed]
+                            all_structured = True
+                        elif isinstance(parsed, list):
+                            refs = [
+                                json.dumps(item, ensure_ascii=False) if isinstance(item, (dict, list)) else str(item)
+                                for item in parsed
+                            ]
+                        else:
+                            refs = [line.strip() for line in raw.splitlines() if line.strip()]
+                    except Exception:
+                        refs = [line.strip() for line in raw.splitlines() if line.strip()]
+                references_count = len(refs)
+                references_degraded = 'false' if all_structured else 'true'
+                brief = (product_brief or '').strip()
+
+                valid = references_count >= 2 and len(brief) > 0
+                reject_reason = ''
+                if references_count < 2:
+                    reject_reason = (
+                        '媒介裂变至少需要 2 条同系列参考材料（反推 JSON 或文字描述都可以）才能分离定量和'
+                        '变量，只有 1 条没法比较哪些在变、哪些不变。'
+                    )
+                elif not brief:
+                    reject_reason = '产品是什么、期望看到什么变化，还没有拿到 product_brief，无法继续。'
+
+                # ---- class B: soft defaults -------------------------------------
+                allowed_ratios = {'9:16', '4:5', '1:1'}
+                ratios = [r.strip() for r in (aspect_ratios_wanted or '').split(',') if r.strip()]
+                ratios = [r for r in ratios if r in allowed_ratios]
+                if not ratios:
+                    ratios = ['9:16']
+                    warnings.append('aspect_ratios_wanted 未指定或无有效取值，已用默认值 9:16')
+
+                vcount = int(variant_count) if variant_count else 0
+                if vcount < 2:
+                    warnings.append('variant_count 未指定或小于 2，已用默认值 2')
+                    vcount = 2
+                if vcount > 8:
+                    warnings.append(
+                        f'variant_count={vcount} 超出工程安全上限，已截断为 8'
+                        '（VTP 原设计本身不设上限，这是本次 Dify 移植新增的保护措施，非 schema.json 判据）'
+                    )
+                    vcount = 8
+
+                # ---- Phase 1 step 5: unvisualizable-claim prescan (informational,
+                # feeds Phase 2 rewrite instructions -- does not block generation) --
+                brief_lower = brief.lower()
+                hits = [w for w in UNVISUALIZABLE_CLAIM_WORDS if word_match(brief_lower, w.lower())]
+
+                category = (product_category or '').strip() or '通用'
+                kb_query = f'{category} | {brief[:300]}'
+
+                return {
+                    'valid': 'true' if valid else 'false',
+                    'reject_reason': reject_reason,
+                    'references_json': json.dumps(refs, ensure_ascii=False),
+                    'references_count': references_count,
+                    'references_degraded': references_degraded,
+                    'product_brief_echo': brief,
+                    'aspect_ratios_csv': ','.join(ratios),
+                    'variant_count': vcount,
+                    'unvisualizable_hits_csv': '; '.join(hits),
+                    'category': category,
+                    'kb_query': kb_query,
+                    'warnings': warnings,
+                }
+          variables:
+            - variable: references_input
+              value_selector: [start, references_input]
+            - variable: product_brief
+              value_selector: [start, product_brief]
+            - variable: product_category
+              value_selector: [start, product_category]
+            - variable: aspect_ratios_wanted
+              value_selector: [start, aspect_ratios_wanted]
+            - variable: variant_count
+              value_selector: [start, variant_count]
+            - variable: persona_bundle_json
+              value_selector: [start, persona_bundle_json]
+          outputs:
+            valid:
+              type: string
+            reject_reason:
+              type: string
+            references_json:
+              type: string
+            references_count:
+              type: number
+            references_degraded:
+              type: string
+            product_brief_echo:
+              type: string
+            aspect_ratios_csv:
+              type: string
+            variant_count:
+              type: number
+            unvisualizable_hits_csv:
+              type: string
+            category:
+              type: string
+            kb_query:
+              type: string
+            warnings:
+              type: array[string]
+          selected: false
+        position: {x: 320, y: 340}
+        positionAbsolute: {x: 320, y: 340}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: gate_class_a
+        type: custom
+        data:
+          title: "类别A 齐全？"
+          type: if-else
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: cond-class-a-valid
+                  variable_selector: [intake_check, valid]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+          desc: ""
+        position: {x: 620, y: 340}
+        positionAbsolute: {x: 620, y: 340}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 126
+
+      - id: end_rejected
+        type: custom
+        data:
+          title: "结束（类别A缺失，拒绝+追问）"
+          type: end
+          outputs:
+            - variable: reject_reason
+              value_selector: [intake_check, reject_reason]
+            - variable: references_count
+              value_selector: [intake_check, references_count]
+        position: {x: 920, y: 560}
+        positionAbsolute: {x: 920, y: 560}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 90
+
+      - id: kb_retrieve
+        type: custom
+        data:
+          title: "知识检索：同品类历史 prompt_sets（占位 dataset_id）"
+          type: knowledge-retrieval
+          dataset_ids:
+            - "REPLACE_WITH_DATASET_ID"
+          query_variable_selector: [intake_check, kb_query]
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            top_k: 4
+            reranking_enable: false
+            score_threshold_enabled: false
+            score_threshold: 0
+          metadata_filtering_mode: disabled
+          selected: false
+        position: {x: 920, y: 160}
+        positionAbsolute: {x: 920, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 88
+
+      - id: extract_common
+        type: custom
+        data:
+          title: "03 extract-common（constants/variables）"
+          type: llm
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.2
+          prompt_template:
+            - id: extract-common-sys
+              role: system
+              text: |
+                You are the VTP step-03 "extract-common" engine (100x-visual-fission Phase 2B).
+                Given >=2 person/scene references (either vision-reversed JSON or text-description
+                degrades) and a product_brief, separate:
+
+                - constants: fields identical or semantically equivalent across ALL references ->
+                  person_identity_anchor (specific, non-vague description of the person),
+                  scene_identity_anchor (specific, non-vague description of the location),
+                  product_identity_anchor (specific description of the product's appearance,
+                  derived from product_brief). Each anchor must be a concrete, specific sentence
+                  fragment of at least a few words -- never a vague placeholder like "someone",
+                  "somewhere", "a generic person", "TBD", "unspecified", "placeholder".
+                - variables: fields that DIFFER across references, at LEAF-FIELD granularity (do
+                  not write "clothing differs" -- write "top style differs (hoodie vs t-shirt)
+                  while bottoms stay constant (black joggers)"), grouped by dimension: camera /
+                  pose / composition, each with >=2 observed_values and a range_description.
+
+                If a PersonaSceneBundle is supplied below (persona_bundle_json) and non-empty, its
+                identity fields are already human-verified -- reuse them directly for
+                person_identity_anchor/scene_identity_anchor instead of re-deriving from
+                references (this is the class-C shortcut, skip re-analysis). If it is empty,
+                derive anchors from references[] yourself.
+
+                You may also see prior similar prompt-set patterns retrieved from a knowledge base
+                for the same product category, given as background context -- use them ONLY as
+                style inspiration for phrasing, never as a source of facts about THIS
+                product/person/scene.
+
+                Do not invent facts not present in references/product_brief. Do not use banned
+                aesthetic filler words: attractive, beautiful, stunning, serene, pristine, elegant,
+                cinematic, professional, studio, flawless.
+
+                Output STRICT JSON ONLY, no prose, no markdown fences, matching exactly:
+                {"constants": {"person_identity_anchor": "...", "scene_identity_anchor": "...",
+                "product_identity_anchor": "..."}, "variables": [{"dimension":
+                "camera|pose|composition", "name": "...", "observed_values": ["...", "..."],
+                "range_description": "..."}]}
+            - id: extract-common-user
+              role: user
+              text: |
+                references (>=2, JSON objects or text-description degrades):
+                {{#intake_check.references_json#}}
+
+                product_brief:
+                {{#intake_check.product_brief_echo#}}
+
+                persona_bundle_json (class C, optional, empty if not supplied):
+                {{#start.persona_bundle_json#}}
+          context:
+            enabled: true
+            variable_selector: [kb_retrieve, result]
+          variables: []
+          vision:
+            enabled: false
+          selected: false
+        position: {x: 1200, y: 160}
+        positionAbsolute: {x: 1200, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 98
+
+      - id: classify_structure
+        type: custom
+        data:
+          title: "媒介结构判定（本skill新增，四选一）"
+          type: question-classifier
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0
+          query_variable_selector: [intake_check, product_brief_echo]
+          classes:
+            - id: single_frame
+              name: single_frame
+            - id: head_tail
+              name: head_tail
+            - id: head_mid_tail
+              name: head_mid_tail
+            - id: multi_day
+              name: multi_day
+          instruction: |
+            Classify the product_brief's effect narrative into EXACTLY one of four fixed
+            media-fission structures (this skill's original "媒介裂变" axis, layered on top of
+            VTP's camera/lighting/color axis -- see 功效堆叠与多帧结构.md):
+            - "single_frame": no before/after or stacking, a pure single product/selling-point
+              shot.
+            - "head_tail": only a before-vs-after two-point contrast, no middle transition, no
+              explicit day markers.
+            - "head_mid_tail": one continuous single-session process (apply -> absorb -> visible
+              change), NOT spanning multiple days.
+            - "multi_day": the narrative cites 3 or more explicit time-point markers (e.g. "day
+              1", "第 3 天", "a week later", "within 24 hours").
+            Choose the single best-fitting class name exactly as given (single_frame / head_tail /
+            head_mid_tail / multi_day). When in doubt between head_tail and head_mid_tail, prefer
+            head_tail unless a distinct middle transition moment is explicitly narrated.
+          vision:
+            enabled: false
+          selected: false
+        position: {x: 1500, y: 160}
+        positionAbsolute: {x: 1500, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 166
+
+      - id: plan_frames
+        type: custom
+        data:
+          title: "2C 媒介结构判定内容填充（帧计划+justification）"
+          type: llm
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.3
+          prompt_template:
+            - id: plan-frames-sys
+              role: system
+              text: |
+                You are the VTP "media-structure frame planner" (100x-visual-fission Phase 2 step
+                2C). You are given: (1) which media_structure was already classified (one of
+                single_frame/head_tail/head_mid_tail/multi_day -- DO NOT re-decide it, just apply
+                its FIXED rule below), (2) the locked constants/variables from step 03, (3) the
+                raw product_brief.
+
+                Apply EXACTLY the fixed rule for the given structure (this is a closed
+                deterministic table, not a judgment call -- axiom 2):
+                - single_frame: EXACTLY 1 frame, role="head", day_index=null,
+                  uses_first_frame_as_reference=false.
+                - head_tail: EXACTLY 2 frames, roles in this exact order ["head","tail"],
+                  day_index=null for both, uses_first_frame_as_reference=false for head / true for
+                  tail.
+                - head_mid_tail: EXACTLY 3 frames, roles in this exact order
+                  ["head","mid","tail"], day_index=null for all, uses_first_frame_as_reference=
+                  false for head / true for mid and tail.
+                - multi_day: 4 to 8 frames, ALL role="day", day_index = the REAL day numbers
+                  explicitly cited in product_brief (e.g. if the brief only ever says day
+                  3/7/14/30, day_index must literally be 3,7,14,30 -- never renumber to 1,2,3,4),
+                  strictly ascending, distinct. The frame with the SMALLEST day_index gets
+                  uses_first_frame_as_reference=false; every other day frame gets true and its
+                  visual_action must literally say it uses frame 1 as reference with the rest
+                  unchanged. If the brief cites fewer than 4 explicit time points, you may
+                  interpolate one additional plausible intermediate day frame to reach the 4-frame
+                  minimum, but you MUST say so honestly in structure_justification (e.g. "day X is
+                  interpolated, not directly asserted by the source brief") -- never silently
+                  invent a time point.
+
+                For EVERY frame's visual_action: describe a genuinely photographable action/pose/
+                texture change. If product_brief contains an unvisualizable or exaggerated
+                marketing claim (pre-flagged hits: {{#intake_check.unvisualizable_hits_csv#}}),
+                you MUST NOT copy that claim sentence into visual_action -- rewrite it as a
+                concrete, camera-visible action or texture change instead (e.g. "melts fat
+                overnight" -> "waistline looking visibly more toned").
+
+                structure_justification must name the specific timeline/narrative cue from
+                product_brief that drove the structure choice; if structure=multi_day it MUST cite
+                at least one digit.
+
+                Do not invent facts absent from constants/variables/product_brief. Do not use
+                banned aesthetic filler words: attractive, beautiful, stunning, serene, pristine,
+                elegant, cinematic, professional, studio, flawless.
+
+                Output STRICT JSON ONLY, no prose, no markdown fences, matching exactly:
+                {"structure": "<echo the given structure>", "frame_count": <int>, "frames":
+                [{"role": "...", "day_index": <int or null>, "visual_action": "...",
+                "uses_first_frame_as_reference": <bool>}, ...], "structure_justification": "..."}
+            - id: plan-frames-user
+              role: user
+              text: |
+                media_structure (already classified): {{#classify_structure.class_name#}}
+
+                constants + variables (from step 03):
+                {{#extract_common.text#}}
+
+                product_brief:
+                {{#intake_check.product_brief_echo#}}
+          context:
+            enabled: false
+            variable_selector: []
+          variables: []
+          vision:
+            enabled: false
+          selected: false
+        position: {x: 1800, y: 160}
+        positionAbsolute: {x: 1800, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 98
+
+      - id: parse_media_plan
+        type: custom
+        data:
+          title: "解析 media_plan JSON（轻量解析，不做公理判定）"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+
+            def extract_json(text):
+                text = (text or '').strip()
+                m = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+                if m:
+                    text = m.group(1)
+                else:
+                    start = text.find('{')
+                    end = text.rfind('}')
+                    if start != -1 and end != -1 and end > start:
+                        text = text[start:end + 1]
+                return text
+
+
+            def main(raw_text: str) -> dict:
+                candidate = extract_json(raw_text)
+                try:
+                    obj = json.loads(candidate)
+                    ok = True
+                    err = ''
+                except Exception as e:
+                    obj = {'structure': 'head_tail', 'frame_count': 0, 'frames': [], 'structure_justification': ''}
+                    ok = False
+                    err = f'plan_frames output was not valid JSON: {e}'
+                frames = obj.get('frames') if isinstance(obj.get('frames'), list) else []
+                return {
+                    'media_plan_json': json.dumps(obj, ensure_ascii=False),
+                    'structure_name': obj.get('structure', ''),
+                    'frame_count_declared': obj.get('frame_count', 0) or 0,
+                    'frames_actual_count': len(frames),
+                    'parse_ok': 'true' if ok else 'false',
+                    'parse_error': err,
+                }
+          variables:
+            - variable: raw_text
+              value_selector: [plan_frames, text]
+          outputs:
+            media_plan_json:
+              type: string
+            structure_name:
+              type: string
+            frame_count_declared:
+              type: number
+            frames_actual_count:
+              type: number
+            parse_ok:
+              type: string
+            parse_error:
+              type: string
+          selected: false
+        position: {x: 2100, y: 160}
+        positionAbsolute: {x: 2100, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: build_variant_hints
+        type: custom
+        data:
+          title: "04 生成前置：N组variant轴分配（保证两两可区分）"
+          type: code
+          code_language: python3
+          code: |
+            import json
+
+            # Deterministic camera/pose/composition axis palette so that each of the
+            # N prompt_sets is GUARANTEED (by construction, not by hoping the LLM
+            # self-coordinates across independent iteration runs) to vary on >=2
+            # axes and start from a different concrete value -- operationalizes VTP
+            # 04's "each prompt_set must vary on >=2 axes" rule and sets up
+            # promptSetsDistinctCheck to actually find real differences downstream.
+            AXIS_PALETTE = [
+                {'axis_tags': ['camera', 'pose'], 'camera_value': 'medium full-body establishing shot', 'pose_value': 'side-on stance', 'composition_value': None},
+                {'axis_tags': ['camera', 'composition'], 'camera_value': 'tight close-up', 'pose_value': None, 'composition_value': 'front-on, product-hero composition'},
+                {'axis_tags': ['pose', 'composition'], 'camera_value': None, 'pose_value': 'three-quarter turn stance', 'composition_value': 'off-center rule-of-thirds composition'},
+                {'axis_tags': ['camera', 'pose', 'composition'], 'camera_value': 'wide establishing shot', 'pose_value': 'walking mid-motion', 'composition_value': 'environmental wide composition'},
+                {'axis_tags': ['camera', 'composition'], 'camera_value': 'low-angle medium shot', 'pose_value': None, 'composition_value': 'flat-lay product composition'},
+                {'axis_tags': ['camera', 'pose'], 'camera_value': 'high-angle close-up', 'pose_value': 'seated relaxed stance', 'composition_value': None},
+            ]
+
+
+            def main(variant_count: float) -> dict:
+                n = int(variant_count) if variant_count else 2
+                n = max(2, min(n, 8))
+                hints = []
+                for i in range(n):
+                    base = AXIS_PALETTE[i % len(AXIS_PALETTE)]
+                    hint = {
+                        'index': i + 1,
+                        'axis_tags': base['axis_tags'],
+                        'camera_value': base['camera_value'],
+                        'pose_value': base['pose_value'],
+                        'composition_value': base['composition_value'],
+                    }
+                    hints.append(json.dumps(hint, ensure_ascii=False))
+                return {'variant_hints': hints, 'variant_target_count': n}
+          variables:
+            - variable: variant_count
+              value_selector: [intake_check, variant_count]
+          outputs:
+            variant_hints:
+              type: array[string]
+            variant_target_count:
+              type: number
+          selected: false
+        position: {x: 2400, y: 160}
+        positionAbsolute: {x: 2400, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: prompt_sets_iter
+        type: custom
+        data:
+          title: "04 generate-variants（逐组迭代生成 prompt_sets）"
+          type: iteration
+          iterator_selector: [build_variant_hints, variant_hints]
+          iterator_input_type: array[string]
+          output_selector: [generate_prompt_set, text]
+          output_type: array[string]
+          is_parallel: false
+          parallel_nums: 10
+          error_handle_mode: terminated
+          start_node_id: prompt_sets_iter_start
+          width: 460
+          height: 200
+          selected: false
+        position: {x: 2700, y: 140}
+        positionAbsolute: {x: 2700, y: 140}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 460
+        height: 200
+        zIndex: 1
+
+      - id: prompt_sets_iter_start
+        parentId: prompt_sets_iter
+        type: custom-iteration-start
+        draggable: false
+        selectable: false
+        data:
+          type: iteration-start
+          title: ""
+          isInIteration: true
+        position: {x: 24, y: 72}
+        positionAbsolute: {x: 2724, y: 212}
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+
+      - id: generate_prompt_set
+        parentId: prompt_sets_iter
+        type: custom
+        data:
+          title: "写单组 prompt_set"
+          type: llm
+          isInIteration: true
+          isInLoop: false
+          iteration_id: prompt_sets_iter
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.5
+          prompt_template:
+            - id: gen-prompt-set-sys
+              role: system
+              text: |
+                You are the VTP step-04 "generate-variants" engine. You are writing ONE
+                prompt_set (one of several distinct variants). You are given a variant hint JSON
+                specifying which 2-3 axes (camera/pose/composition) THIS prompt_set must
+                deliberately vary on and a suggested value for each given axis -- follow it.
+
+                Rules (VTP 04 self-check, non-negotiable):
+                - combined_prompt MUST contain the constants.person_identity_anchor,
+                  constants.scene_identity_anchor, and constants.product_identity_anchor text
+                  VERBATIM (literal substrings, case-insensitive) -- this is axiom 1's identity
+                  lock, checked by machine later, so do not paraphrase the anchors.
+                - Do not fabricate facts not present in constants/variables/product_brief.
+                - Do not use banned aesthetic filler words: attractive, beautiful, stunning,
+                  serene, pristine, elegant, cinematic, professional, studio, flawless.
+                - axis_tags in your output must exactly equal the hint's axis_tags.
+                - id in your output must exactly equal the hint's index (integer).
+
+                Output STRICT JSON ONLY, no prose, no markdown fences, matching exactly:
+                {"id": <int, from hint.index>, "variant_label": "...", "character_prompt": "...",
+                "scene_prompt": "...", "action_prompt": "...", "combined_prompt": "<character_
+                prompt + scene_prompt + action_prompt concatenated into one coherent
+                comma-separated prompt, containing all 3 identity anchors verbatim>", "axis_tags":
+                [...same as hint.axis_tags...]}
+            - id: gen-prompt-set-user
+              role: user
+              text: |
+                variant hint (this prompt_set's assigned axes/values):
+                {{#prompt_sets_iter.item#}}
+
+                constants + variables (from step 03):
+                {{#extract_common.text#}}
+
+                product_brief:
+                {{#intake_check.product_brief_echo#}}
+          context:
+            enabled: false
+            variable_selector: []
+          variables: []
+          vision:
+            enabled: false
+          selected: false
+        position: {x: 140, y: 64}
+        positionAbsolute: {x: 2840, y: 204}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 98
+        zIndex: 1002
+
+      - id: assemble_prompt_sets
+        type: custom
+        data:
+          title: "解析 prompt_sets 迭代产出（轻量解析）"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+
+            def extract_json(text):
+                text = (text or '').strip()
+                m = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+                if m:
+                    text = m.group(1)
+                else:
+                    start = text.find('{')
+                    end = text.rfind('}')
+                    if start != -1 and end != -1 and end > start:
+                        text = text[start:end + 1]
+                return text
+
+
+            def main(items: list) -> dict:
+                sets = []
+                errors = []
+                for i, raw in enumerate(items or []):
+                    candidate = extract_json(raw)
+                    try:
+                        obj = json.loads(candidate)
+                        sets.append(obj)
+                    except Exception as e:
+                        errors.append(f'prompt_sets_iter item {i} was not valid JSON: {e}')
+                return {
+                    'prompt_sets_json': json.dumps(sets, ensure_ascii=False),
+                    'prompt_sets_count': len(sets),
+                    'parse_errors_csv': '; '.join(errors),
+                }
+          variables:
+            - variable: items
+              value_selector: [prompt_sets_iter, output]
+          outputs:
+            prompt_sets_json:
+              type: string
+            prompt_sets_count:
+              type: number
+            parse_errors_csv:
+              type: string
+          selected: false
+        position: {x: 3220, y: 160}
+        positionAbsolute: {x: 3220, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: build_fission_tasks
+        type: custom
+        data:
+          title: "06 裂变前置：每帧×机位×画幅 任务列表（零孤儿由构造保证）"
+          type: code
+          code_language: python3
+          code: |
+            import json
+
+            # VTP 06 fixed lookup tables (vtp_prompts_06-meta-prompt.md), same
+            # constants as schema.json's if/then blocks and scripts/validate.js.
+            ASPECT_RES = {'9:16': '1080x1920', '4:5': '1080x1350', '1:1': '1080x1080'}
+            CAMERA_TABLE = {
+                'A': ('natural-window', 'warm'),
+                'B': ('ring-light', 'neutral'),
+                'C': ('overcast-natural', 'muted'),
+            }
+            CAMERA_ORDER = ['A', 'B', 'C']
+
+
+            def main(media_plan_json: str, prompt_sets_json: str, aspect_ratios_csv: str) -> dict:
+                try:
+                    media_plan = json.loads(media_plan_json)
+                except Exception:
+                    media_plan = {}
+                try:
+                    prompt_sets = json.loads(prompt_sets_json)
+                except Exception:
+                    prompt_sets = []
+                frames = media_plan.get('frames') if isinstance(media_plan.get('frames'), list) else []
+                ratios = [r.strip() for r in (aspect_ratios_csv or '9:16').split(',') if r.strip()] or ['9:16']
+                prompt_set_ids = [ps.get('id') for ps in prompt_sets if isinstance(ps, dict) and 'id' in ps]
+                if not prompt_set_ids:
+                    prompt_set_ids = [1]
+
+                # By CONSTRUCTION every frame gets exactly one task (axiom-3 zero-orphan
+                # is guaranteed structurally here, not merely hoped for), cycling
+                # through the fixed A/B/C camera table and the requested aspect
+                # ratios so >=1 fission_variant covers every planned frame.
+                tasks = []
+                for i, frame in enumerate(frames):
+                    camera_variant = CAMERA_ORDER[i % 3]
+                    lighting_kw, color_kw = CAMERA_TABLE[camera_variant]
+                    aspect_ratio = ratios[i % len(ratios)]
+                    resolution = ASPECT_RES.get(aspect_ratio, '1080x1920')
+                    source_id = prompt_set_ids[i % len(prompt_set_ids)]
+                    source_ps = next((ps for ps in prompt_sets if isinstance(ps, dict) and ps.get('id') == source_id), {})
+                    task = {
+                        'id': i + 1,
+                        'source_prompt_set_id': source_id,
+                        'source_combined_prompt': source_ps.get('combined_prompt', ''),
+                        'frame_role': frame.get('role'),
+                        'day_index': frame.get('day_index'),
+                        'visual_action': frame.get('visual_action', ''),
+                        'camera_variant': camera_variant,
+                        'lighting_keyword': lighting_kw,
+                        'color_keyword': color_kw,
+                        'aspect_ratio': aspect_ratio,
+                        'resolution': resolution,
+                    }
+                    tasks.append(json.dumps(task, ensure_ascii=False))
+                return {'fission_tasks': tasks, 'fission_tasks_count': len(tasks)}
+          variables:
+            - variable: media_plan_json
+              value_selector: [parse_media_plan, media_plan_json]
+            - variable: prompt_sets_json
+              value_selector: [assemble_prompt_sets, prompt_sets_json]
+            - variable: aspect_ratios_csv
+              value_selector: [intake_check, aspect_ratios_csv]
+          outputs:
+            fission_tasks:
+              type: array[string]
+            fission_tasks_count:
+              type: number
+          selected: false
+        position: {x: 3520, y: 160}
+        positionAbsolute: {x: 3520, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: fission_iter
+        type: custom
+        data:
+          title: "06 机位裂变（逐帧任务迭代：写prompt→拼固定负面词+真实感缀）"
+          type: iteration
+          iterator_selector: [build_fission_tasks, fission_tasks]
+          iterator_input_type: array[string]
+          output_selector: [finalize_fission_item, fission_variant_json]
+          output_type: array[string]
+          is_parallel: false
+          parallel_nums: 10
+          error_handle_mode: terminated
+          start_node_id: fission_iter_start
+          width: 560
+          height: 220
+          selected: false
+        position: {x: 3820, y: 130}
+        positionAbsolute: {x: 3820, y: 130}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 560
+        height: 220
+        zIndex: 1
+
+      - id: fission_iter_start
+        parentId: fission_iter
+        type: custom-iteration-start
+        draggable: false
+        selectable: false
+        data:
+          type: iteration-start
+          title: ""
+          isInIteration: true
+        position: {x: 24, y: 76}
+        positionAbsolute: {x: 3844, y: 206}
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+
+      - id: render_fission_prompt
+        parentId: fission_iter
+        type: custom
+        data:
+          title: "写单条裂变 prompt 正文（不含负面词/真实感缀）"
+          type: llm
+          isInIteration: true
+          isInLoop: false
+          iteration_id: fission_iter
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.4
+          prompt_template:
+            - id: render-fission-sys
+              role: system
+              text: |
+                You are the VTP step-06 "meta-prompt" engine, media-fission extension. You are
+                given ONE fission task: a locked frame (role/day_index/visual_action), a source
+                prompt_set's combined_prompt, and ONE fixed camera_variant (A/B/C) with its
+                REQUIRED lighting keyword and REQUIRED color-grading keyword (from VTP's original
+                fixed A/B/C table -- axiom 2: this table is fixed, you may not invent a 4th camera
+                preset or change the keywords).
+
+                Write ONE single-paragraph, comma-separated image-generation prompt that:
+                1. Keeps the source_combined_prompt's person/scene/product content (which already
+                   contains the 3 locked identity anchors verbatim) -- do not drop or paraphrase
+                   away the identity anchors.
+                2. Layers in this frame's specific visual_action (the media-fission axis, on top
+                   of the camera axis -- both must be present, this layering is axiom 2's core
+                   point: media structure adds a new axis, it does not replace the camera axis).
+                3. Includes the given lighting_keyword and color_keyword as their own whole
+                   word/phrase (not buried inside a longer unrelated word, e.g. "natural-window"
+                   must appear as itself, not only as part of "natural-windowsill").
+                4. Does NOT include the realism suffix or negative prompt (a later fixed step
+                   appends those automatically).
+                5. Does NOT copy any unvisualizable/exaggerated marketing claim into the prompt --
+                   describe only camera-visible actions/textures.
+                6. Does NOT use banned aesthetic filler words: attractive, beautiful, stunning,
+                   serene, pristine, elegant, cinematic, professional, studio, flawless.
+
+                Output PLAIN TEXT ONLY -- one comma-separated prompt paragraph, no JSON, no
+                markdown, no explanation.
+            - id: render-fission-user
+              role: user
+              text: |
+                fission task:
+                {{#fission_iter.item#}}
+
+                locked constants (for reference, already embedded in source_combined_prompt
+                above):
+                {{#extract_common.text#}}
+          context:
+            enabled: false
+            variable_selector: []
+          variables: []
+          vision:
+            enabled: false
+          selected: false
+        position: {x: 140, y: 40}
+        positionAbsolute: {x: 3960, y: 170}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 98
+        zIndex: 1002
+
+      - id: finalize_fission_item
+        parentId: fission_iter
+        type: custom
+        data:
+          title: "07 固定负面词+真实感缀拼入（常量，不留给LLM）"
+          type: code
+          isInIteration: true
+          isInLoop: false
+          iteration_id: fission_iter
+          code_language: python3
+          code: |
+            import json
+
+            # VTP 07 fixed negative-prompt constant (reproduced verbatim from the
+            # framework doc's "negative prompt怎么写" section, same string as
+            # schema.json's `negative_prompt` const) and VTP 06's fixed realism
+            # suffix -- both are constants the LLM never sees/edits, appended here
+            # in code so they can never drift or be silently dropped (axiom 4).
+            NEGATIVE_PROMPT_CONST = (
+                'blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, '
+                'illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock '
+                'image feel, ring light, studio lighting, flash, artificial lighting, neon'
+            )
+            REALISM_SUFFIX = 'shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic'
+
+
+            def main(raw_prompt: str, task_json: str) -> dict:
+                try:
+                    task = json.loads(task_json)
+                except Exception:
+                    task = {}
+                prompt_text = (raw_prompt or '').strip().rstrip(',').strip()
+                final_prompt = f'{prompt_text}, {REALISM_SUFFIX}' if prompt_text else REALISM_SUFFIX
+                variant = {
+                    'id': task.get('id'),
+                    'source_prompt_set_id': task.get('source_prompt_set_id'),
+                    'frame_role': task.get('frame_role'),
+                    'day_index': task.get('day_index'),
+                    'camera_variant': task.get('camera_variant'),
+                    'aspect_ratio': task.get('aspect_ratio'),
+                    'prompt_json': {
+                        'prompt': final_prompt,
+                        'negative_prompt': NEGATIVE_PROMPT_CONST,
+                        'resolution': task.get('resolution'),
+                    },
+                }
+                return {'fission_variant_json': json.dumps(variant, ensure_ascii=False)}
+          variables:
+            - variable: raw_prompt
+              value_selector: [render_fission_prompt, text]
+            - variable: task_json
+              value_selector: [fission_iter, item]
+          outputs:
+            fission_variant_json:
+              type: string
+          selected: false
+        position: {x: 400, y: 40}
+        positionAbsolute: {x: 4220, y: 170}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+        zIndex: 1002
+
+      - id: assemble_bundle
+        type: custom
+        data:
+          title: "组装完整 VisualFissionBundle JSON"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            NEGATIVE_PROMPT_CONST = (
+                'blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, '
+                'illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock '
+                'image feel, ring light, studio lighting, flash, artificial lighting, neon'
+            )
+
+
+            def extract_json(text):
+                text = (text or '').strip()
+                m = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+                if m:
+                    text = m.group(1)
+                else:
+                    start = text.find('{')
+                    end = text.rfind('}')
+                    if start != -1 and end != -1 and end > start:
+                        text = text[start:end + 1]
+                return text
+
+
+            def main(category: str, product_brief_echo: str, constants_variables_text: str,
+                     media_plan_json: str, prompt_sets_json: str, fission_variants: list,
+                     warnings: list, references_degraded: str) -> dict:
+                try:
+                    cv = json.loads(extract_json(constants_variables_text))
+                except Exception:
+                    cv = {}
+                try:
+                    media_plan = json.loads(media_plan_json)
+                except Exception:
+                    media_plan = {}
+                try:
+                    prompt_sets = json.loads(prompt_sets_json)
+                except Exception:
+                    prompt_sets = []
+
+                fv_list = []
+                for raw in (fission_variants or []):
+                    try:
+                        fv_list.append(json.loads(raw))
+                    except Exception:
+                        pass
+
+                product_name_guess = (product_brief_echo or '').split('.')[0][:80].strip() or 'untitled product'
+
+                # workflow.md Phase 1 step 1 requires an HONEST, data-driven disclosure
+                # of which input form references[] actually took -- not a generic note.
+                if references_degraded == 'true':
+                    source_material_note = (
+                        'text-only degraded path (workflow.md Phase 1 class-A form (b)): references[] '
+                        'were plain-text descriptions, not vision-reversed JSON -- no real reference '
+                        'image existed for this run. constants.* below are derived from those text '
+                        'descriptions, not reversed from any real photo.'
+                    )
+                else:
+                    source_material_note = (
+                        'structured reversed-JSON path (workflow.md Phase 1 class-A form (a)): '
+                        'references[] parsed as vision-reversed JSON objects (vtp_prompts_01/02 shape) '
+                        '-- constants.* below are derived from that structured data.'
+                    )
+
+                bundle = {
+                    'product_name': product_name_guess,
+                    'category': category or '通用',
+                    'source_material_note': source_material_note,
+                    'constants': cv.get('constants', {}),
+                    'variables': cv.get('variables', []),
+                    'media_plan': media_plan,
+                    'prompt_sets': prompt_sets,
+                    'fission_variants': fv_list,
+                    'negative_prompt': NEGATIVE_PROMPT_CONST,
+                    'meta': {
+                        'based_on_media_structure': media_plan.get('structure', ''),
+                        'generated_by': '100x-visual-fission',
+                        'warnings': warnings or [],
+                    },
+                }
+                return {'bundle_json': json.dumps(bundle, ensure_ascii=False)}
+          variables:
+            - variable: category
+              value_selector: [intake_check, category]
+            - variable: product_brief_echo
+              value_selector: [intake_check, product_brief_echo]
+            - variable: constants_variables_text
+              value_selector: [extract_common, text]
+            - variable: media_plan_json
+              value_selector: [parse_media_plan, media_plan_json]
+            - variable: prompt_sets_json
+              value_selector: [assemble_prompt_sets, prompt_sets_json]
+            - variable: fission_variants
+              value_selector: [fission_iter, output]
+            - variable: warnings
+              value_selector: [intake_check, warnings]
+            - variable: references_degraded
+              value_selector: [intake_check, references_degraded]
+          outputs:
+            bundle_json:
+              type: string
+          selected: false
+        position: {x: 4460, y: 160}
+        positionAbsolute: {x: 4460, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: structural_check
+        type: custom
+        data:
+          title: "结构层校验（plain Python 复刻 schema.json，非 ajv）"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            # Dify's sandboxed code node cannot `import jsonschema` or run ajv, so
+            # this hand-rolls schema.json's required/enum/pattern/if-then rules in
+            # plain Python stdlib. This is the "structural layer" -- the repo's own
+            # AGENTS.md calls this split out explicitly (ajv-equivalent vs.
+            # cross-field aggregate). See 100x-visual-fission.dify.notes.md.
+
+            IDENTITY_ANCHOR_BANNED = [
+                '某处', '某人', '某个地方', '随便', '待定', '不确定',
+                'TBD', 'tbd', 'somewhere', 'Somewhere', 'SOMEWHERE',
+                'anywhere', 'Anywhere', 'ANYWHERE',
+                'unspecified', 'Unspecified', 'UNSPECIFIED',
+                'placeholder', 'Placeholder', 'PLACEHOLDER',
+                'generic', 'Generic', 'GENERIC',
+            ]
+            CAMERA_TABLE = {
+                'A': ('natural-window', 'warm'),
+                'B': ('ring-light', 'neutral'),
+                'C': ('overcast-natural', 'muted'),
+            }
+            ASPECT_RES = {'9:16': '1080x1920', '4:5': '1080x1350', '1:1': '1080x1080'}
+            STRUCTURE_FRAME_COUNT = {
+                'single_frame': (1, 1),
+                'head_tail': (2, 2),
+                'head_mid_tail': (3, 3),
+                'multi_day': (4, 8),
+            }
+            REALISM_SUBSTRINGS = ['shot on iPhone', 'visible pores', 'natural skin texture', 'minor imperfections', 'photorealistic']
+            NEGATIVE_PROMPT_CONST = (
+                'blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, '
+                'illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock '
+                'image feel, ring light, studio lighting, flash, artificial lighting, neon'
+            )
+
+
+            def is_identity_anchor(value, errors, path):
+                if not isinstance(value, str) or len(value) < 3:
+                    errors.append(f'[structural] {path} must be a string of at least 3 characters')
+                    return
+                for word in IDENTITY_ANCHOR_BANNED:
+                    if word in value:
+                        errors.append(f"[structural] {path} contains banned vague placeholder '{word}'")
+
+
+            def check_constants(bundle, errors):
+                c = bundle.get('constants')
+                if not isinstance(c, dict):
+                    errors.append('[structural] constants must be an object')
+                    return
+                for key in ('person_identity_anchor', 'scene_identity_anchor', 'product_identity_anchor'):
+                    if key not in c:
+                        errors.append(f'[structural] constants.{key} is required')
+                    else:
+                        is_identity_anchor(c[key], errors, f'constants.{key}')
+
+
+            def check_variables(bundle, errors):
+                v = bundle.get('variables')
+                if not isinstance(v, list) or len(v) < 1:
+                    errors.append('[structural] variables must be a non-empty array')
+                    return
+                for i, item in enumerate(v):
+                    if not isinstance(item, dict):
+                        errors.append(f'[structural] variables[{i}] must be an object')
+                        continue
+                    if item.get('dimension') not in ('camera', 'pose', 'composition'):
+                        errors.append(f'[structural] variables[{i}].dimension must be one of camera/pose/composition')
+                    if not isinstance(item.get('name'), str) or not item.get('name'):
+                        errors.append(f'[structural] variables[{i}].name is required')
+                    ov = item.get('observed_values')
+                    if not isinstance(ov, list) or len(ov) < 2:
+                        errors.append(f'[structural] variables[{i}].observed_values needs at least 2 items')
+                    if not isinstance(item.get('range_description'), str) or not item.get('range_description'):
+                        errors.append(f'[structural] variables[{i}].range_description is required')
+
+
+            def check_frame_item(frame, i, errors):
+                role = frame.get('role')
+                if role not in ('head', 'mid', 'tail', 'day'):
+                    errors.append(f'[structural] media_plan.frames[{i}].role must be one of head/mid/tail/day')
+                    return
+                day_index = frame.get('day_index')
+                if role == 'day':
+                    if not isinstance(day_index, int) or isinstance(day_index, bool) or day_index < 1:
+                        errors.append(f'[structural] media_plan.frames[{i}].day_index must be an integer >=1 when role=day')
+                else:
+                    if day_index is not None:
+                        errors.append(f'[structural] media_plan.frames[{i}].day_index must be null when role={role}')
+                if not isinstance(frame.get('visual_action'), str) or not frame.get('visual_action'):
+                    errors.append(f'[structural] media_plan.frames[{i}].visual_action is required')
+                uses_ref = frame.get('uses_first_frame_as_reference')
+                if role == 'head' and uses_ref is not False:
+                    errors.append(f'[structural] media_plan.frames[{i}].uses_first_frame_as_reference must be false when role=head')
+                if role in ('mid', 'tail') and uses_ref is not True:
+                    errors.append(f'[structural] media_plan.frames[{i}].uses_first_frame_as_reference must be true when role={role}')
+
+
+            def check_media_plan(bundle, errors):
+                mp = bundle.get('media_plan')
+                if not isinstance(mp, dict):
+                    errors.append('[structural] media_plan must be an object')
+                    return
+                structure = mp.get('structure')
+                if structure not in STRUCTURE_FRAME_COUNT:
+                    errors.append('[structural] media_plan.structure must be one of single_frame/head_tail/head_mid_tail/multi_day')
+                    return
+                lo, hi = STRUCTURE_FRAME_COUNT[structure]
+                frame_count = mp.get('frame_count')
+                if not isinstance(frame_count, int) or isinstance(frame_count, bool) or not (lo <= frame_count <= hi):
+                    errors.append(f'[structural] media_plan.frame_count must be in range [{lo},{hi}] for structure={structure}')
+                frames = mp.get('frames')
+                if not isinstance(frames, list) or not (1 <= len(frames) <= 8):
+                    errors.append('[structural] media_plan.frames must be an array of 1 to 8 items')
+                    frames = []
+                for i, frame in enumerate(frames):
+                    if isinstance(frame, dict):
+                        check_frame_item(frame, i, errors)
+                    else:
+                        errors.append(f'[structural] media_plan.frames[{i}] must be an object')
+                just = mp.get('structure_justification')
+                if not isinstance(just, str) or not just:
+                    errors.append('[structural] media_plan.structure_justification is required')
+                elif structure == 'multi_day' and not re.search(r'[0-9]', just):
+                    errors.append(
+                        '[structural] media_plan.structure_justification must cite a digit when '
+                        'structure=multi_day (known limitation: cannot verify the digit is faithful '
+                        'to the source narrative -- see axioms.md axiom 2 TODO)'
+                    )
+
+
+            def check_prompt_sets(bundle, errors):
+                ps = bundle.get('prompt_sets')
+                if not isinstance(ps, list) or len(ps) < 2:
+                    errors.append('[structural] prompt_sets must be an array of at least 2 items')
+                    return
+                for i, item in enumerate(ps):
+                    if not isinstance(item, dict):
+                        errors.append(f'[structural] prompt_sets[{i}] must be an object')
+                        continue
+                    for key in ('id', 'variant_label', 'character_prompt', 'scene_prompt', 'action_prompt', 'combined_prompt', 'axis_tags'):
+                        if key not in item:
+                            errors.append(f'[structural] prompt_sets[{i}].{key} is required')
+                    tags = item.get('axis_tags')
+                    if (not isinstance(tags, list) or not (2 <= len(tags) <= 3)
+                            or len(set(tags)) != len(tags)
+                            or any(t not in ('camera', 'pose', 'composition') for t in tags)):
+                        errors.append(f'[structural] prompt_sets[{i}].axis_tags must be 2-3 unique values from camera/pose/composition')
+
+
+            def check_fission_variant(fv, i, errors):
+                for key in ('id', 'source_prompt_set_id', 'frame_role', 'day_index', 'camera_variant', 'aspect_ratio', 'prompt_json'):
+                    if key not in fv:
+                        errors.append(f'[structural] fission_variants[{i}].{key} is required')
+                role = fv.get('frame_role')
+                day_index = fv.get('day_index')
+                if role == 'day':
+                    if not isinstance(day_index, int) or isinstance(day_index, bool) or day_index < 1:
+                        errors.append(f'[structural] fission_variants[{i}].day_index must be an integer >=1 when frame_role=day')
+                elif role in ('head', 'mid', 'tail') and day_index is not None:
+                    errors.append(f'[structural] fission_variants[{i}].day_index must be null when frame_role={role}')
+                camera_variant = fv.get('camera_variant')
+                if camera_variant not in CAMERA_TABLE:
+                    errors.append(f'[structural] fission_variants[{i}].camera_variant must be one of A/B/C')
+                aspect_ratio = fv.get('aspect_ratio')
+                if aspect_ratio not in ASPECT_RES:
+                    errors.append(f'[structural] fission_variants[{i}].aspect_ratio must be one of 9:16/4:5/1:1')
+                pj = fv.get('prompt_json')
+                if not isinstance(pj, dict):
+                    errors.append(f'[structural] fission_variants[{i}].prompt_json must be an object')
+                    return
+                prompt_text = pj.get('prompt', '')
+                if not isinstance(prompt_text, str) or not prompt_text:
+                    errors.append(f'[structural] fission_variants[{i}].prompt_json.prompt is required')
+                else:
+                    for sub in REALISM_SUBSTRINGS:
+                        if sub not in prompt_text:
+                            errors.append(f"[structural] fission_variants[{i}].prompt_json.prompt is missing the fixed realism suffix phrase '{sub}'")
+                    if camera_variant in CAMERA_TABLE:
+                        lighting_kw, color_kw = CAMERA_TABLE[camera_variant]
+                        low = prompt_text.lower()
+                        for kw in (lighting_kw, color_kw):
+                            if not re.search(r'\b' + re.escape(kw.lower()) + r'\b', low):
+                                errors.append(f"[structural] fission_variants[{i}].prompt_json.prompt does not contain the required camera_variant={camera_variant} keyword '{kw}' as a whole word/phrase")
+                if aspect_ratio in ASPECT_RES and pj.get('resolution') != ASPECT_RES[aspect_ratio]:
+                    errors.append(f"[structural] fission_variants[{i}].prompt_json.resolution must be {ASPECT_RES.get(aspect_ratio)} for aspect_ratio={aspect_ratio}")
+
+
+            def check_fission_variants(bundle, errors):
+                fv = bundle.get('fission_variants')
+                if not isinstance(fv, list) or len(fv) < 1:
+                    errors.append('[structural] fission_variants must be a non-empty array')
+                    return
+                for i, item in enumerate(fv):
+                    if isinstance(item, dict):
+                        check_fission_variant(item, i, errors)
+                    else:
+                        errors.append(f'[structural] fission_variants[{i}] must be an object')
+
+
+            def check_negative_prompt(bundle, errors):
+                if bundle.get('negative_prompt') != NEGATIVE_PROMPT_CONST:
+                    errors.append('[structural] negative_prompt must byte-equal the fixed VTP constant (user/LLM cannot edit it)')
+
+
+            def check_meta(bundle, errors):
+                meta = bundle.get('meta')
+                if not isinstance(meta, dict):
+                    errors.append('[structural] meta must be an object')
+                    return
+                if meta.get('based_on_media_structure') not in STRUCTURE_FRAME_COUNT:
+                    errors.append('[structural] meta.based_on_media_structure must be one of single_frame/head_tail/head_mid_tail/multi_day')
+                if meta.get('generated_by') != '100x-visual-fission':
+                    errors.append("[structural] meta.generated_by must be the const '100x-visual-fission'")
+
+
+            def main(bundle_json: str) -> dict:
+                errors = []
+                try:
+                    bundle = json.loads(bundle_json)
+                except Exception as e:
+                    return {'structural_valid': 'false', 'structural_errors': [f'[structural] bundle_json is not valid JSON: {e}']}
+
+                required_top = ['product_name', 'category', 'constants', 'variables', 'media_plan', 'prompt_sets', 'fission_variants', 'negative_prompt', 'meta']
+                for key in required_top:
+                    if key not in bundle:
+                        errors.append(f'[structural] top-level field {key} is required')
+
+                check_constants(bundle, errors)
+                check_variables(bundle, errors)
+                check_media_plan(bundle, errors)
+                check_prompt_sets(bundle, errors)
+                check_fission_variants(bundle, errors)
+                check_negative_prompt(bundle, errors)
+                check_meta(bundle, errors)
+
+                return {
+                    'structural_valid': 'true' if not errors else 'false',
+                    'structural_errors': errors,
+                }
+          variables:
+            - variable: bundle_json
+              value_selector: [assemble_bundle, bundle_json]
+          outputs:
+            structural_valid:
+              type: string
+            structural_errors:
+              type: array[string]
+          selected: false
+        position: {x: 4760, y: 160}
+        positionAbsolute: {x: 4760, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: aggregate_check
+        type: custom
+        data:
+          title: "跨条目聚合校验（plain Python 复刻 scripts/validate.js）"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            # Faithful port of skills/100x-visual-fission/scripts/validate.js's
+            # aggregateChecks() -- the cross-item/cross-field rules vanilla JSON
+            # Schema (and therefore the structural_check node) cannot express:
+            # array-length-vs-sibling-field, ordering/sequence, referential
+            # integrity, zero-orphan coverage, cross-branch byte-equality, and the
+            # curated unvisualizable-claim word scan.
+
+            UNVISUALIZABLE_CLAIM_WORDS = [
+                'cellular health', 'mitochondrial', 'anti-aging', 'anti aging',
+                'clinically proven', 'clinically tested', 'third party tested', 'third-party tested',
+                'fda', 'nsf approved', 'doctor recommended', 'physician recommended',
+                'harvard lab', 'harvard-lab', 'money back guarantee', 'money-back guarantee',
+                'guarantee', 'guaranteed', 'cure', 'reverse aging', 'no side effects',
+                'sin efectos secundarios', 'clínicamente probado', 'clínicamente comprobado',
+                'aprobado por la fda', 'garantía de devolución', 'garantizado',
+                'laboratorio de harvard', 'sin hormonas', '% off', '% de descuento',
+            ]
+            EXPECTED_ROLE_SEQUENCE = {
+                'single_frame': ['head'],
+                'head_tail': ['head', 'tail'],
+                'head_mid_tail': ['head', 'mid', 'tail'],
+            }
+            NEGATIVE_PROMPT_CONST = (
+                'blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, '
+                'illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock '
+                'image feel, ring light, studio lighting, flash, artificial lighting, neon'
+            )
+
+
+            def word_match(haystack_lower, phrase_lower):
+                return re.search(r'\b' + re.escape(phrase_lower) + r'\b', haystack_lower) is not None
+
+
+            def frame_key(f):
+                day = f.get('day_index')
+                return f"{f.get('role')}:{'null' if day is None else day}"
+
+
+            def frame_count_matches_array_length(bundle, errors):
+                mp = bundle.get('media_plan', {}) or {}
+                declared = mp.get('frame_count')
+                frames = mp.get('frames', []) or []
+                actual = len(frames)
+                if declared != actual:
+                    errors.append(f'[axiom2] media_plan.frame_count={declared} but media_plan.frames actually has {actual} item(s)')
+
+
+            def frame_sequence_check(bundle, errors):
+                mp = bundle.get('media_plan', {}) or {}
+                structure = mp.get('structure')
+                frames = mp.get('frames', []) or []
+                if structure == 'multi_day':
+                    if not all(f.get('role') == 'day' for f in frames):
+                        errors.append('[axiom2] media_plan.structure=multi_day but not every frame has role="day"')
+                    day_indexes = [f.get('day_index') for f in frames]
+                    for i in range(1, len(day_indexes)):
+                        a, b = day_indexes[i - 1], day_indexes[i]
+                        if not (isinstance(a, int) and isinstance(b, int) and b > a):
+                            errors.append(f'[axiom2] media_plan.frames day_index is not strictly ascending at position {i} ({a} -> {b})')
+                    if len(set(day_indexes)) != len(day_indexes):
+                        errors.append('[axiom2] media_plan.frames has duplicate day_index values (must be distinct)')
+                else:
+                    expected = EXPECTED_ROLE_SEQUENCE.get(structure, [])
+                    actual = [f.get('role') for f in frames]
+                    if actual != expected:
+                        errors.append(f'[axiom2] media_plan.structure={structure} requires frame roles in order {expected} but got {actual}')
+
+
+            def day_frame_first_reference_check(bundle, errors):
+                mp = bundle.get('media_plan', {}) or {}
+                frames = mp.get('frames', []) or []
+                day_frames = [f for f in frames if f.get('role') == 'day' and isinstance(f.get('day_index'), int)]
+                if not day_frames:
+                    return
+                min_day_index = min(f['day_index'] for f in day_frames)
+                for f in day_frames:
+                    expected = f['day_index'] != min_day_index
+                    if f.get('uses_first_frame_as_reference') != expected:
+                        errors.append(
+                            f"[axiom2] media_plan.frames day_index={f['day_index']} (minimum is {min_day_index}) "
+                            f"has uses_first_frame_as_reference={f.get('uses_first_frame_as_reference')}, expected {expected}"
+                        )
+
+
+            def identity_lock_check(bundle, errors):
+                constants = bundle.get('constants', {}) or {}
+                anchors = [
+                    ('person_identity_anchor', (constants.get('person_identity_anchor') or '').lower()),
+                    ('scene_identity_anchor', (constants.get('scene_identity_anchor') or '').lower()),
+                    ('product_identity_anchor', (constants.get('product_identity_anchor') or '').lower()),
+                ]
+                for i, ps in enumerate(bundle.get('prompt_sets', []) or []):
+                    text = (ps.get('combined_prompt') or '').lower()
+                    for label, anchor in anchors:
+                        if anchor and anchor not in text:
+                            errors.append(f'[axiom1] prompt_sets[{i}].combined_prompt does not contain constants.{label} verbatim (identity lock broken)')
+                for i, fv in enumerate(bundle.get('fission_variants', []) or []):
+                    text = ((fv.get('prompt_json') or {}).get('prompt') or '').lower()
+                    for label, anchor in anchors:
+                        if anchor and anchor not in text:
+                            errors.append(f'[axiom1] fission_variants[{i}].prompt_json.prompt does not contain constants.{label} verbatim (identity lock broken)')
+
+
+            def prompt_sets_distinct_check(bundle, errors):
+                seen = {}
+                for i, ps in enumerate(bundle.get('prompt_sets', []) or []):
+                    key = (ps.get('combined_prompt') or '').strip().lower()
+                    if key in seen:
+                        errors.append(f'[axiom1] prompt_sets[{i}].combined_prompt is byte-identical to prompt_sets[{seen[key]}] (must be pairwise distinct)')
+                    else:
+                        seen[key] = i
+
+
+            def fission_referential_integrity_check(bundle, errors):
+                prompt_set_ids = {ps.get('id') for ps in (bundle.get('prompt_sets', []) or [])}
+                frame_keys = {frame_key(f) for f in (bundle.get('media_plan', {}).get('frames', []) or [])}
+                for i, fv in enumerate(bundle.get('fission_variants', []) or []):
+                    if fv.get('source_prompt_set_id') not in prompt_set_ids:
+                        errors.append(f"[axiom3] fission_variants[{i}].source_prompt_set_id={fv.get('source_prompt_set_id')} does not match any prompt_sets[].id")
+                    key = frame_key({'role': fv.get('frame_role'), 'day_index': fv.get('day_index')})
+                    if key not in frame_keys:
+                        errors.append(f"[axiom3] fission_variants[{i}] (frame_role={fv.get('frame_role')}, day_index={fv.get('day_index')}) does not match any media_plan.frames[] entry")
+
+
+            def frame_coverage_check(bundle, errors):
+                referenced = {frame_key({'role': fv.get('frame_role'), 'day_index': fv.get('day_index')}) for fv in (bundle.get('fission_variants', []) or [])}
+                for i, f in enumerate(bundle.get('media_plan', {}).get('frames', []) or []):
+                    if frame_key(f) not in referenced:
+                        errors.append(f"[axiom3] media_plan.frames[{i}] (role={f.get('role')}, day_index={f.get('day_index')}) is never referenced by any fission_variants[] entry (orphan frame)")
+
+
+            def negative_prompt_consistency_check(bundle, errors):
+                top = bundle.get('negative_prompt')
+                for i, fv in enumerate(bundle.get('fission_variants', []) or []):
+                    np_val = (fv.get('prompt_json') or {}).get('negative_prompt')
+                    if np_val != top:
+                        errors.append(f'[axiom4] fission_variants[{i}].prompt_json.negative_prompt does not byte-equal the top-level negative_prompt constant')
+
+
+            def meta_consistency_check(bundle, errors):
+                meta = bundle.get('meta', {}) or {}
+                mp = bundle.get('media_plan', {}) or {}
+                if meta.get('based_on_media_structure') != mp.get('structure'):
+                    errors.append(f"[axiom2] meta.based_on_media_structure=\"{meta.get('based_on_media_structure')}\" does not equal media_plan.structure=\"{mp.get('structure')}\"")
+
+
+            def unvisualizable_claim_check(bundle, errors):
+                surfaces = []
+                for f in bundle.get('media_plan', {}).get('frames', []) or []:
+                    surfaces.append(f.get('visual_action'))
+                for ps in bundle.get('prompt_sets', []) or []:
+                    surfaces += [ps.get('character_prompt'), ps.get('scene_prompt'), ps.get('action_prompt'), ps.get('combined_prompt')]
+                for fv in bundle.get('fission_variants', []) or []:
+                    surfaces.append((fv.get('prompt_json') or {}).get('prompt'))
+                full_text = ' \n '.join([s for s in surfaces if s]).lower()
+                hits = [w for w in UNVISUALIZABLE_CLAIM_WORDS if word_match(full_text, w.lower())]
+                if hits:
+                    errors.append(f"[axiom4] found {len(hits)} unvisualizable/exaggerated-claim phrase(s) copied literally into visual prompt text: {'; '.join(hits)}")
+
+
+            def main(bundle_json: str) -> dict:
+                errors = []
+                try:
+                    bundle = json.loads(bundle_json)
+                except Exception as e:
+                    return {'aggregate_valid': 'false', 'aggregate_errors': [f'[aggregate] bundle_json is not valid JSON: {e}']}
+
+                frame_count_matches_array_length(bundle, errors)
+                frame_sequence_check(bundle, errors)
+                day_frame_first_reference_check(bundle, errors)
+                identity_lock_check(bundle, errors)
+                prompt_sets_distinct_check(bundle, errors)
+                fission_referential_integrity_check(bundle, errors)
+                frame_coverage_check(bundle, errors)
+                negative_prompt_consistency_check(bundle, errors)
+                meta_consistency_check(bundle, errors)
+                unvisualizable_claim_check(bundle, errors)
+
+                return {
+                    'aggregate_valid': 'true' if not errors else 'false',
+                    'aggregate_errors': errors,
+                }
+          variables:
+            - variable: bundle_json
+              value_selector: [assemble_bundle, bundle_json]
+          outputs:
+            aggregate_valid:
+              type: string
+            aggregate_errors:
+              type: array[string]
+          selected: false
+        position: {x: 5060, y: 160}
+        positionAbsolute: {x: 5060, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: gate_valid
+        type: custom
+        data:
+          title: "结构层+聚合层 全过？"
+          type: if-else
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: cond-struct-valid
+                  variable_selector: [structural_check, structural_valid]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+                - id: cond-aggr-valid
+                  variable_selector: [aggregate_check, aggregate_valid]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+          desc: ""
+        position: {x: 5360, y: 160}
+        positionAbsolute: {x: 5360, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 150
+
+      - id: format_failure_report
+        type: custom
+        data:
+          title: "定点失败报告（哪一帧/哪一条/哪条公理，不是笼统重查）"
+          type: template-transform
+          variables:
+            - variable: structural_errors
+              value_selector: [structural_check, structural_errors]
+            - variable: aggregate_errors
+              value_selector: [aggregate_check, aggregate_errors]
+          template: |
+            媒介裂变校验未通过 / Visual fission validation FAILED.
+
+            结构层（复刻 schema.json 的 required/enum/pattern/if-then，plain Python 执行）：
+            {% if structural_errors %}
+            {% for e in structural_errors %}
+            - {{ e }}
+            {% endfor %}
+            {% else %}
+            （无）
+            {% endif %}
+
+            跨条目聚合层（复刻 scripts/validate.js 的 aggregate 检查）：
+            {% if aggregate_errors %}
+            {% for e in aggregate_errors %}
+            - {{ e }}
+            {% endfor %}
+            {% else %}
+            （无）
+            {% endif %}
+
+            请针对上面列出的具体帧 / 具体条目 / 具体公理编号定点重写（Phase 3 L1/L2 返工粒度），
+            不要整份推倒重来。
+          selected: false
+        position: {x: 5660, y: 420}
+        positionAbsolute: {x: 5660, y: 420}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: end_failed
+        type: custom
+        data:
+          title: "结束（校验未通过）"
+          type: end
+          outputs:
+            - variable: failure_report
+              value_selector: [format_failure_report, output]
+            - variable: structural_errors
+              value_selector: [structural_check, structural_errors]
+            - variable: aggregate_errors
+              value_selector: [aggregate_check, aggregate_errors]
+        position: {x: 5960, y: 420}
+        positionAbsolute: {x: 5960, y: 420}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 110
+
+      - id: render_summary
+        type: custom
+        data:
+          title: "可选：人类可读 Markdown 摘要"
+          type: template-transform
+          variables:
+            - variable: structure_name
+              value_selector: [parse_media_plan, structure_name]
+            - variable: frame_count
+              value_selector: [parse_media_plan, frames_actual_count]
+            - variable: prompt_sets_count
+              value_selector: [assemble_prompt_sets, prompt_sets_count]
+            - variable: fission_variants
+              value_selector: [fission_iter, output]
+            - variable: category
+              value_selector: [intake_check, category]
+            - variable: product_brief
+              value_selector: [intake_check, product_brief_echo]
+            - variable: warnings
+              value_selector: [intake_check, warnings]
+          template: |
+            # 100x-visual-fission 产出摘要 / Media Fission Summary
+
+            - 品类 / Category: {{ category }}
+            - 媒介结构 / Media structure: {{ structure_name }}
+            - 帧数 / Frame count: {{ frame_count }}
+            - Prompt sets: {{ prompt_sets_count }}
+            - Fission variants rendered: {{ fission_variants | length }}
+
+            {% if warnings %}
+            ## Warnings
+            {% for w in warnings %}
+            - {{ w }}
+            {% endfor %}
+            {% endif %}
+
+            产品简述 / Product brief (echo): {{ product_brief }}
+
+            完整结构化产出见 bundle_json 字段（schema.json: VisualFissionBundle）。
+          selected: false
+        position: {x: 5660, y: 160}
+        positionAbsolute: {x: 5660, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: kb_writeback_doc
+        type: custom
+        data:
+          title: "组装知识库写回文本（finalized prompt_sets）"
+          type: template-transform
+          variables:
+            - variable: category
+              value_selector: [intake_check, category]
+            - variable: product_brief
+              value_selector: [intake_check, product_brief_echo]
+            - variable: structure_name
+              value_selector: [parse_media_plan, structure_name]
+            - variable: prompt_sets_json
+              value_selector: [assemble_prompt_sets, prompt_sets_json]
+          template: |
+            category: {{ category }}
+            media_structure: {{ structure_name }}
+            product_brief: {{ product_brief }}
+            prompt_sets_json: {{ prompt_sets_json }}
+          selected: false
+        position: {x: 5960, y: 160}
+        positionAbsolute: {x: 5960, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: kb_index_write
+        type: custom
+        data:
+          title: "知识库写回（占位 dataset_id，需人工重连）"
+          type: knowledge-index
+          dataset_id: "REPLACE_WITH_DATASET_ID"
+          index_chunk_variable_selector: [kb_writeback_doc, output]
+          keyword_number: 10
+          retrieval_model:
+            top_k: 3
+            score_threshold_enabled: false
+            score_threshold: 0.5
+          selected: false
+        position: {x: 6260, y: 160}
+        positionAbsolute: {x: 6260, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 86
+
+      - id: end_success
+        type: custom
+        data:
+          title: "结束（校验通过，产出 bundle）"
+          type: end
+          outputs:
+            - variable: bundle_json
+              value_selector: [assemble_bundle, bundle_json]
+            - variable: human_summary
+              value_selector: [render_summary, output]
+            - variable: warnings
+              value_selector: [intake_check, warnings]
+        position: {x: 6560, y: 160}
+        positionAbsolute: {x: 6560, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 110
+
+    edges:
+      - id: start-source-intake_check-target
+        source: start
+        sourceHandle: source
+        target: intake_check
+        targetHandle: target
+        type: custom
+        data: {sourceType: start, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: intake_check-source-gate_class_a-target
+        source: intake_check
+        sourceHandle: source
+        target: gate_class_a
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false}
+
+      - id: gate_class_a-false-end_rejected-target
+        source: gate_class_a
+        sourceHandle: "false"
+        target: end_rejected
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false}
+
+      - id: gate_class_a-true-kb_retrieve-target
+        source: gate_class_a
+        sourceHandle: "true"
+        target: kb_retrieve
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: knowledge-retrieval, isInIteration: false, isInLoop: false}
+
+      - id: kb_retrieve-source-extract_common-target
+        source: kb_retrieve
+        sourceHandle: source
+        target: extract_common
+        targetHandle: target
+        type: custom
+        data: {sourceType: knowledge-retrieval, targetType: llm, isInIteration: false, isInLoop: false}
+
+      - id: extract_common-source-classify_structure-target
+        source: extract_common
+        sourceHandle: source
+        target: classify_structure
+        targetHandle: target
+        type: custom
+        data: {sourceType: llm, targetType: question-classifier, isInIteration: false, isInLoop: false}
+
+      - id: classify_structure-single_frame-plan_frames-target
+        source: classify_structure
+        sourceHandle: single_frame
+        target: plan_frames
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: llm, isInIteration: false, isInLoop: false}
+
+      - id: classify_structure-head_tail-plan_frames-target
+        source: classify_structure
+        sourceHandle: head_tail
+        target: plan_frames
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: llm, isInIteration: false, isInLoop: false}
+
+      - id: classify_structure-head_mid_tail-plan_frames-target
+        source: classify_structure
+        sourceHandle: head_mid_tail
+        target: plan_frames
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: llm, isInIteration: false, isInLoop: false}
+
+      - id: classify_structure-multi_day-plan_frames-target
+        source: classify_structure
+        sourceHandle: multi_day
+        target: plan_frames
+        targetHandle: target
+        type: custom
+        data: {sourceType: question-classifier, targetType: llm, isInIteration: false, isInLoop: false}
+
+      - id: plan_frames-source-parse_media_plan-target
+        source: plan_frames
+        sourceHandle: source
+        target: parse_media_plan
+        targetHandle: target
+        type: custom
+        data: {sourceType: llm, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: parse_media_plan-source-build_variant_hints-target
+        source: parse_media_plan
+        sourceHandle: source
+        target: build_variant_hints
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: build_variant_hints-source-prompt_sets_iter-target
+        source: build_variant_hints
+        sourceHandle: source
+        target: prompt_sets_iter
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: iteration, isInIteration: false, isInLoop: false}
+
+      - id: prompt_sets_iter_start-source-generate_prompt_set-target
+        source: prompt_sets_iter_start
+        sourceHandle: source
+        target: generate_prompt_set
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data: {sourceType: iteration-start, targetType: llm, isInIteration: true, isInLoop: false, iteration_id: prompt_sets_iter}
+
+      - id: prompt_sets_iter-source-assemble_prompt_sets-target
+        source: prompt_sets_iter
+        sourceHandle: source
+        target: assemble_prompt_sets
+        targetHandle: target
+        type: custom
+        data: {sourceType: iteration, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: assemble_prompt_sets-source-build_fission_tasks-target
+        source: assemble_prompt_sets
+        sourceHandle: source
+        target: build_fission_tasks
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: build_fission_tasks-source-fission_iter-target
+        source: build_fission_tasks
+        sourceHandle: source
+        target: fission_iter
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: iteration, isInIteration: false, isInLoop: false}
+
+      - id: fission_iter_start-source-render_fission_prompt-target
+        source: fission_iter_start
+        sourceHandle: source
+        target: render_fission_prompt
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data: {sourceType: iteration-start, targetType: llm, isInIteration: true, isInLoop: false, iteration_id: fission_iter}
+
+      - id: render_fission_prompt-source-finalize_fission_item-target
+        source: render_fission_prompt
+        sourceHandle: source
+        target: finalize_fission_item
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data: {sourceType: llm, targetType: code, isInIteration: true, isInLoop: false, iteration_id: fission_iter}
+
+      - id: fission_iter-source-assemble_bundle-target
+        source: fission_iter
+        sourceHandle: source
+        target: assemble_bundle
+        targetHandle: target
+        type: custom
+        data: {sourceType: iteration, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: assemble_bundle-source-structural_check-target
+        source: assemble_bundle
+        sourceHandle: source
+        target: structural_check
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: structural_check-source-aggregate_check-target
+        source: structural_check
+        sourceHandle: source
+        target: aggregate_check
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: aggregate_check-source-gate_valid-target
+        source: aggregate_check
+        sourceHandle: source
+        target: gate_valid
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false}
+
+      - id: gate_valid-false-format_failure_report-target
+        source: gate_valid
+        sourceHandle: "false"
+        target: format_failure_report
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false}
+
+      - id: format_failure_report-source-end_failed-target
+        source: format_failure_report
+        sourceHandle: source
+        target: end_failed
+        targetHandle: target
+        type: custom
+        data: {sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false}
+
+      - id: gate_valid-true-render_summary-target
+        source: gate_valid
+        sourceHandle: "true"
+        target: render_summary
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false}
+
+      - id: render_summary-source-kb_writeback_doc-target
+        source: render_summary
+        sourceHandle: source
+        target: kb_writeback_doc
+        targetHandle: target
+        type: custom
+        data: {sourceType: template-transform, targetType: template-transform, isInIteration: false, isInLoop: false}
+
+      - id: kb_writeback_doc-source-kb_index_write-target
+        source: kb_writeback_doc
+        sourceHandle: source
+        target: kb_index_write
+        targetHandle: target
+        type: custom
+        data: {sourceType: template-transform, targetType: knowledge-index, isInIteration: false, isInLoop: false}
+
+      - id: kb_index_write-source-end_success-target
+        source: kb_index_write
+        sourceHandle: source
+        target: end_success
+        targetHandle: target
+        type: custom
+        data: {sourceType: knowledge-index, targetType: end, isInIteration: false, isInLoop: false}

@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-exaggerate/ExaggerationContrastBundle.json",
+  "title": "ExaggerationContrastBundle",
+  "description": "Output contract for 100x-exaggerate. Self-contained in this skill (this repo has no shared cross-skill schemas/ yet). One script draft in -> exaggeration-technique beats (creative_beat.L1-style, closed enum, see axioms.md #1) + contrast-pairing beats (also closed enum) out, each anchored to a literal quote in source_script. NOTE (structural limits of vanilla JSON Schema draft-07, same class of gap documented in 100x-search-query's and 100x-persona's schema.json): this file can enforce PER-ITEM shape (required fields, enum membership of technique/contrast_type/intensity, ID-format patterns, additionalProperties) but CANNOT enforce: (a) that script_span_quote/anchor_quote_a/anchor_quote_b are literal substrings of source_script (cross-field string-containment, axiom 2) -- a quote that is a paraphrase or outright invention passes this schema cleanly as long as it is a non-empty string; (b) that anchor_quote_a and anchor_quote_b in the same contrast_beat_item are not the same sentence doing double duty as both ends of the contrast (axiom 4) -- JSON Schema draft-07 cannot compare two sibling string properties against each other; (c) that an item's intensity does not exceed the calibration ceiling implied by meta.market + meta.hat_level (axiom 3) -- this is a lookup-table function of two sibling string fields, not expressible as a schema keyword. All three are enforced by the real, runnable scripts/validate.js, which loads this file at runtime and reuses its technique/contrast_type/intensity enums so the two files can't silently drift. See axioms.md for the split.",
+  "type": "object",
+  "required": ["source_script", "meta", "exaggeration_beats", "contrast_beats"],
+  "additionalProperties": false,
+  "properties": {
+    "source_script": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The exact script/copy text this bundle was derived from, verbatim. This is the ground truth every script_span_quote / anchor_quote_a / anchor_quote_b is checked against (literal substring, case-sensitive) by scripts/validate.js. Must not contain real customer/brand identifiers when used in this repo's evals/ (synthetic only)."
+    },
+    "meta": {
+      "type": "object",
+      "required": ["generated_by", "hat_level", "warnings"],
+      "additionalProperties": true,
+      "properties": {
+        "generated_by": { "const": "100x-exaggerate" },
+        "hat_level": {
+          "type": "string",
+          "enum": ["blackhat", "grayhat", "whitehat"],
+          "description": "Drives the base calibration ceiling in axiom 3 (whitehat=mild / grayhat=moderate / blackhat=aggressive, see axioms.md #3 and workflow.md Phase 1 class-B degrade). If the user never supplied this, workflow.md Phase 1 defaults it to 'grayhat' (documented default, not silently guessed) and records that default in warnings."
+        },
+        "market": {
+          "type": "string",
+          "description": "Optional free-text market/region note (e.g. '美区', 'US', '西语区', '通用'). Used by axiom 3's calibration check specifically for the emotion_reaction_hyperbole technique -- see axioms.md #3 for the US-market cap and why market absence defaults to the conservative (capped) branch rather than the permissive one."
+        },
+        "calibration_note": {
+          "type": "string",
+          "description": "Optional. One-line echo of which calibration ceiling branch was applied (e.g. 'blackhat base ceiling=aggressive; US-market cap on emotion_reaction_hyperbole=moderate'). Human-readable, not itself validated -- scripts/validate.js recomputes the ceiling independently from hat_level/market rather than trusting this string."
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Non-fatal flags, e.g. 'hat_level not supplied by user, defaulted to grayhat' or 'market not supplied, applied conservative US-market cap to emotion_reaction_hyperbole by default' (workflow.md Phase 1 class-B degrade rules)."
+        }
+      }
+    },
+    "exaggeration_beats": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/exaggeration_beat_item" },
+      "description": "At least one exaggeration-technique beat, each anchored to a literal script_span_quote. If source_script genuinely has no viable anchor for any technique, workflow.md Phase 2's failure handling applies (refuse and explain, do not fabricate an anchor) rather than forcing an empty array through this minItems:1 floor."
+    },
+    "contrast_beats": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/contrast_beat_item" },
+      "description": "At least one contrast-pairing beat, each with two anchored quotes that must have a real gap between them (axiom 4). Same no-fabrication failure-handling note as exaggeration_beats applies."
+    }
+  },
+  "definitions": {
+    "exaggeration_beat_item": {
+      "type": "object",
+      "required": ["beat_id", "script_span_quote", "technique", "label_cn", "intensity", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "beat_id": {
+          "type": "string",
+          "pattern": "^EXG_[A-Za-z0-9_]+$",
+          "description": "Unique id for this exaggeration beat, e.g. 'EXG_01'."
+        },
+        "script_span_quote": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Literal quote from source_script this technique is applied to/anchored on. Must be an exact substring of source_script (axiom 2, checked by scripts/validate.js -- not expressible in schema.json alone)."
+        },
+        "technique": {
+          "type": "string",
+          "enum": [
+            "numeric_hyperbole",
+            "time_compression_hyperbole",
+            "analogy_scale_hyperbole",
+            "emotion_reaction_hyperbole",
+            "authority_absolutism_hyperbole"
+          ],
+          "description": "Closed-set exaggeration technique (axiom 1). Grounded in 词典06 L1 creative-beat categories + real hat-graded corpus matched_scenes frequency, not invented -- see axioms.md #1 for the derivation of each of the 5 values."
+        },
+        "label_cn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10,
+          "description": "Free Chinese short label for this specific beat (词典06's 'L2' layer convention: closed L1 category + free-form Chinese display name, 2-6 characters ideal, never a long sentence -- e.g. '基数放大' for a numeric_hyperbole beat). Not machine-validated for semantic accuracy, only for length -- see axioms.md #1 'label_cn 已知局限'."
+        },
+        "intensity": {
+          "type": "string",
+          "enum": ["mild", "moderate", "aggressive"],
+          "description": "3-tier intensity, the same categorical convention the private hat-graded corpus itself uses in its blackhat_intensity column (real data values: aggressive/moderate/[blank]) -- see axioms.md #3. Must not exceed the calibration ceiling implied by meta.hat_level + meta.market (axiom 3) -- schema.json can only check enum membership, not the ceiling itself; scripts/validate.js does the ceiling check."
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line on why this technique fits this script span at this intensity."
+        }
+      }
+    },
+    "contrast_beat_item": {
+      "type": "object",
+      "required": ["beat_id", "contrast_type", "label_cn", "anchor_quote_a", "anchor_quote_b", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "beat_id": {
+          "type": "string",
+          "pattern": "^CTR_[A-Za-z0-9_]+$",
+          "description": "Unique id for this contrast beat, e.g. 'CTR_01'."
+        },
+        "contrast_type": {
+          "type": "string",
+          "enum": ["state_before_after", "tone_register", "value_price", "warning_vs_promotion"],
+          "description": "Closed-set contrast type (axiom 1). Grounded in 词典06 before_after_comparison/instructional_warning L1 beats + Type-D visual-type spec + 脚本结构公式库 B/F structure types -- see axioms.md #1 for the derivation of each of the 4 values."
+        },
+        "label_cn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10,
+          "description": "Free Chinese short label for this specific contrast beat (same L1+L2 convention as exaggeration_beat_item.label_cn)."
+        },
+        "anchor_quote_a": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Literal quote from source_script anchoring one side of the contrast (meaning of 'side A' depends on contrast_type -- e.g. the 'before' state for state_before_after, the warning phrase for warning_vs_promotion). Must be an exact substring of source_script (axiom 2)."
+        },
+        "anchor_quote_b": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Literal quote from source_script anchoring the other side of the contrast. Must be an exact substring of source_script (axiom 2), AND must not be the same quote as anchor_quote_a doing double duty as both ends (axiom 4) -- schema.json cannot compare two sibling string properties against each other, scripts/validate.js does this check."
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line on why this contrast pairing fits this script and what gap it is meant to create."
+        }
+      }
+    }
+  }
+}

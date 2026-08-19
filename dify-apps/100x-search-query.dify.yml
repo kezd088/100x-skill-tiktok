@@ -1,0 +1,1089 @@
+app:
+  name: "100x-search-query · Pinterest/TikTok/Reddit 搜索词生成"
+  description: "产品/人设卡片 -> Pinterest/TikTok/Reddit 各 15 条英文搜索词 + 中文搜索意图注释，用于人工查找视觉参考图和对标内容。范围到生成搜索词字符串为止：不执行搜索、不抓取或生成图片，也不调用任何搜索类工具。"
+  icon: "🔍"
+  icon_type: emoji
+  icon_background: "#E0F2FE"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.2.6@e2665624a156f52160927bceac9e169bd7e5ae6b936ae82575e14c90af390e6e
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        data:
+          type: start
+          title: "输入产品/人设信息"
+          variables:
+            - label: "品类（硬性必填，例如：保健品/家居/美妆个护/3C/通用，禁止套用任何客户专属品类词典）"
+              variable: category
+              type: paragraph
+              required: true
+              max_length: 200
+            - label: "产品名（可选——没有具体品牌/产品名也能跑，会用品类占位继续）"
+              variable: product_name
+              type: text-input
+              required: false
+              max_length: 200
+            - label: "核心卖点（可选，缺失时模型会自行推断一句）"
+              variable: core_benefit
+              type: paragraph
+              required: false
+              max_length: 500
+            - label: "目标受众（可选）"
+              variable: target_audience
+              type: paragraph
+              required: false
+              max_length: 300
+            - label: "品牌语气（可选）"
+              variable: brand_tone
+              type: text-input
+              required: false
+              max_length: 200
+            - label: "选题角度 topic_angle（可选，不选则按默认 5A 权重生成）"
+              variable: topic_angle
+              type: select
+              required: false
+              options: [default, aesthetic, pain-driven, sales-push]
+            - label: "原始产品文案/补充说明（可选，纯文本；本 skill 只吃产品/文案信息，不接受视频或图片文件）"
+              variable: raw_input_text
+              type: paragraph
+              required: false
+              max_length: 8000
+        position: { x: 40, y: 360 }
+        positionAbsolute: { x: 40, y: 360 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 280
+        height: 300
+      - id: phase1_gate
+        type: custom
+        data:
+          type: code
+          title: "Phase1：类别A/B校验 + 敏感品类预扫描"
+          code_language: python3
+          code: |
+            # 100x-search-query :: phase1_gate
+            # Ports workflow.md Phase 1 steps 2 (class-A category gate), 3 (class-B
+            # core_benefit soft degrade), and 6 (sensitive-category pre-scan, the FIRST
+            # line of defense -- sees raw_input_text, which never reaches the output
+            # bundle and therefore can't be re-checked post-hoc). Also computes the
+            # topic_angle-driven 5A quota table from workflow.md 2A (verified to sum to
+            # 45 for every branch).
+
+            SENSITIVE_CATEGORY_WORDS = [
+                '两性', '两性健康', '成人用品', '性功能', '男性表现', '男性增大', '情趣', '私密护理', '私处护理', '女性私密',
+                '壮阳', '持久力', '持久度', '硬度提升', '房事', '夫妻生活', '性生活', '男性雄风', '增大增粗', '私处', '生理需求',
+                'adult', 'intimate', 'sexual', 'sexual health', 'sexual wellness', 'libido', 'erectile', 'enhancement gel', 'male performance', 'feminine intimate', 'vaginal',
+                'stamina boost', 'boost stamina', 'bedroom performance', 'manhood', 'last longer in bed', 'harder and longer', 'girth', 'virility', 'potency boost',
+            ]
+            AUTHORITY_CLAIM_WORDS = [
+                '认证', '医生推荐', '医生背书', '泌尿科', '妇科医生', '临床验证', '权威认证',
+                '专家推荐', '权威专家', '三甲医院', '药监局', '国家认证', '医学验证', '科学验证',
+                'fda', 'certified', 'certification', 'approved by', 'doctor recommended', 'physician recommended', 'urologist', 'gynecologist', 'clinically proven', 'clinical trial',
+                'doctor approved', 'medically reviewed', 'medically endorsed', 'clinically tested', 'scientifically proven', 'board certified',
+            ]
+            REQUIRED_WARNING_TEXT = '该品类涉及平台内容政策敏感区，Pinterest/TikTok搜索词生成前建议人工过一遍平台规则'
+            ALLOWED_TOPIC_ANGLES = {'default', 'aesthetic', 'pain-driven', 'sales-push'}
+
+            QUOTA_TABLE = {
+                'default': {'Aware': 9, 'Appeal': 12, 'Ask': 12, 'Act': 9, 'Advocate': 3},
+                'aesthetic': {'Aware': 6, 'Appeal': 18, 'Ask': 6, 'Act': 9, 'Advocate': 6},
+                'pain-driven': {'Aware': 12, 'Appeal': 6, 'Ask': 18, 'Act': 6, 'Advocate': 3},
+                'sales-push': {'Aware': 6, 'Appeal': 9, 'Ask': 9, 'Act': 15, 'Advocate': 6},
+            }
+
+
+            def main(category: str, product_name: str, core_benefit: str, target_audience: str,
+                     brand_tone: str, topic_angle: str, raw_input_text: str) -> dict:
+                category = (category or '').strip()
+                product_name = (product_name or '').strip()
+                core_benefit = (core_benefit or '').strip()
+                target_audience = (target_audience or '').strip()
+                brand_tone = (brand_tone or '').strip()
+                topic_angle = (topic_angle or '').strip()
+                raw_input_text = (raw_input_text or '').strip()
+
+                # --- Class A gate (workflow.md Phase1 step 2): category is the ONLY hard
+                # required USER input. product_name missing is NOT a class-A failure --
+                # it degrades to a "[品类锚点] <category>" placeholder instead.
+                reject = not bool(category)
+                rejection_message = (
+                    "至少需要说清楚品类是什么才能开始，例如：'3C/家居/保健品'（有具体产品名更好，没有也能跑）"
+                    if reject else ""
+                )
+
+                product_name_final = product_name if product_name else f"[品类锚点] {category}" if category else "[品类锚点] 通用"
+                category_final = category if category else "通用"
+
+                # --- Class B soft degrade (step 3): core_benefit missing -> LLM infers
+                # inline, meta.warnings gets a note. Not a reject.
+                core_benefit_missing = not bool(core_benefit)
+
+                topic_angle_final = topic_angle if topic_angle in ALLOWED_TOPIC_ANGLES else 'default'
+                quota = QUOTA_TABLE[topic_angle_final]
+                quota_text = ", ".join(f"{stage}:{count}" for stage, count in quota.items())
+
+                # --- Sensitive-category pre-scan (step 6). This is Phase 1's OWN scan --
+                # it sees the raw input text the user pasted, which is strictly MORE than
+                # what scripts/validate.js's post-hoc bundle scan can see (schema.json
+                # doesn't retain a raw-input-copy field). Deliberately broad/first line of
+                # defense: category + product_name + core_benefit + target_audience +
+                # brand_tone + raw_input_text, all lowercased.
+                scan_text = " ".join([
+                    category, product_name, core_benefit, target_audience, brand_tone, raw_input_text,
+                ]).lower()
+                hit_category_signal = any(w.lower() in scan_text for w in SENSITIVE_CATEGORY_WORDS)
+                hit_authority_signal = any(w.lower() in scan_text for w in AUTHORITY_CLAIM_WORDS)
+                sensitive_hit_phase1 = hit_category_signal and hit_authority_signal
+
+                return {
+                    "reject": "true" if reject else "false",
+                    "rejection_message": rejection_message,
+                    "product_name_final": product_name_final,
+                    "category_final": category_final,
+                    "core_benefit_final": core_benefit,
+                    "core_benefit_missing": "true" if core_benefit_missing else "false",
+                    "target_audience_final": target_audience,
+                    "brand_tone_final": brand_tone,
+                    "topic_angle_final": topic_angle_final,
+                    "quota_text": quota_text,
+                    "sensitive_hit_phase1": "true" if sensitive_hit_phase1 else "false",
+                    "sensitive_warning_text": REQUIRED_WARNING_TEXT if sensitive_hit_phase1 else "",
+                }
+          variables:
+            - variable: category
+              value_selector: [start, category]
+            - variable: product_name
+              value_selector: [start, product_name]
+            - variable: core_benefit
+              value_selector: [start, core_benefit]
+            - variable: target_audience
+              value_selector: [start, target_audience]
+            - variable: brand_tone
+              value_selector: [start, brand_tone]
+            - variable: topic_angle
+              value_selector: [start, topic_angle]
+            - variable: raw_input_text
+              value_selector: [start, raw_input_text]
+          outputs:
+            reject:
+              type: string
+            rejection_message:
+              type: string
+            product_name_final:
+              type: string
+            category_final:
+              type: string
+            core_benefit_final:
+              type: string
+            core_benefit_missing:
+              type: string
+            target_audience_final:
+              type: string
+            brand_tone_final:
+              type: string
+            topic_angle_final:
+              type: string
+            quota_text:
+              type: string
+            sensitive_hit_phase1:
+              type: string
+            sensitive_warning_text:
+              type: string
+          selected: false
+        position: { x: 400, y: 360 }
+        positionAbsolute: { x: 400, y: 360 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 100
+      - id: class_a_gate
+        type: custom
+        data:
+          type: if-else
+          title: "类别A校验：品类是否已定"
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: category-missing
+                  variable_selector: [phase1_gate, reject]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+          selected: false
+        position: { x: 700, y: 360 }
+        positionAbsolute: { x: 700, y: 360 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 126
+      - id: reject_end
+        type: custom
+        data:
+          type: end
+          title: "拒绝：品类未定，固定话术追问"
+          outputs:
+            - variable: message
+              value_selector: [phase1_gate, rejection_message]
+              value_type: string
+        position: { x: 1000, y: 560 }
+        positionAbsolute: { x: 1000, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 90
+      - id: kb_retrieval
+        type: custom
+        data:
+          type: knowledge-retrieval
+          title: "检索同品类历史搜索词模式（可选增强，非阻塞）"
+          dataset_ids: ["REPLACE_WITH_DATASET_ID"]
+          query_variable_selector: [phase1_gate, category_final]
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            top_k: 4
+            reranking_enable: false
+            score_threshold_enabled: false
+            score_threshold: 0
+          metadata_filtering_mode: disabled
+          selected: false
+        position: { x: 1000, y: 360 }
+        positionAbsolute: { x: 1000, y: 360 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 100
+      - id: pinterest_llm
+        type: custom
+        data:
+          type: llm
+          title: "生成 Pinterest 15 条"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.7
+          prompt_template:
+            - id: pinterest-system
+              role: system
+              text: |
+                你是 100x-search-query 的 Pinterest 搜索词生成子模块。任务范围到此为止：只生成搜索短语字符串，不执行搜索、不调用任何图片/网页工具、不产出图片本身——找参考图是下游人工或另一个 skill 的事。
+
+                请为给定产品/品类生成恰好 15 条 Pinterest 英文搜索短语，用于人工去 Pinterest 搜索视觉参考图/灵感图。
+
+                硬性规则（生成后会被脚本逐条校验，不满足会被打回重写，请第一次就尽量满足）：
+                1. 恰好 15 条；每条 q 必须是纯 ASCII 英文（可以含数字和 #，禁止出现任何中文字符）。
+                2. 15 条里至少 10 条命中下面这份 Pinterest 美学词库中的至少一个（子串匹配，不分大小写）：
+                   aesthetic / inspo / mood / cozy / minimal / styling / outfit / decor / ideas / routine / self-care / self care
+                   如果这个品类天然没有"家居美学"落点（例如保健品），改走 routine / self-care 这类生活方式落点，不要为了凑数硬造品类不支持的美学描述，也不要编造效果或认证。
+                3. 每条必须带 intent_cn 字段：闭集标签 + 冒号 + 纯中文说明（冒号后不能出现任何英文字母），整个字符串不超过 20 个字符。标签只能是下面 25 个之一，不能自造新标签：
+                   共鸣 决策前 决策 叙事 场景灵感 场景 对比 情绪认同 情绪 方法求解 求助 求推荐 泛用 生活方式 痛点 种草 视觉参考 购买前 购买后 身份认同 陈列 预期管理 风险确认 验证 质疑
+                4. 每条必须带 stage 字段，取值只能是 Aware / Appeal / Ask / Act / Advocate 之一。
+                5. Pinterest 不使用 hashtag 格式（不要以 # 开头），那是 TikTok 的写法。
+                6. 15 条内，"前两个词完全相同"的条目不要超过 3 条，避免大量近似重复。
+                7. 禁止出现这些空洞形容词：attractive / beautiful / stunning / serene / pristine / elegant / cinematic / professional / studio / flawless。禁止出现 AI 客服腔（as an AI / I'd be happy to / feel free to）和"让我/或许/大概/可能/也许"这类中文口水词。不编造效果、认证、用户见证，也不编造品牌/产品名。
+
+                只输出一个 JSON 数组，不要 markdown 代码块，不要任何解释性文字，不要在数组前后添加任何说明。每个元素形如：
+                {"q": "...", "intent_cn": "标签:说明", "stage": "Aware|Appeal|Ask|Act|Advocate"}
+            - id: pinterest-user
+              role: user
+              text: |
+                产品名称：{{#phase1_gate.product_name_final#}}
+                品类：{{#phase1_gate.category_final#}}
+                核心卖点（如果为空，请你先用一句话合理推断出核心卖点，再据此生成）：{{#phase1_gate.core_benefit_final#}}
+                目标受众（可为空，为空则不强行限定受众）：{{#phase1_gate.target_audience_final#}}
+                品牌语气（可为空）：{{#phase1_gate.brand_tone_final#}}
+                本次选题角度 topic_angle：{{#phase1_gate.topic_angle_final#}}
+                本次 45 条整体 5A 配额参考（用于把握整体倾向，不是本平台桶各阶段的硬性配额，你在 15 条内自行按比例分配到各阶段，覆盖尽量不少于 3 个阶段）：{{#phase1_gate.quota_text#}}
+                用户提供的原始产品文案/补充说明（可为空）：{{#start.raw_input_text#}}
+
+                请只生成 Pinterest 平台的 15 条，按系统消息里的规则输出 JSON 数组。
+          context:
+            enabled: true
+            variable_selector: [kb_retrieval, result]
+          vision:
+            enabled: false
+          selected: false
+        position: { x: 1300, y: 120 }
+        positionAbsolute: { x: 1300, y: 120 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 140
+      - id: tiktok_llm
+        type: custom
+        data:
+          type: llm
+          title: "生成 TikTok 15 条"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.7
+          prompt_template:
+            - id: tiktok-system
+              role: system
+              text: |
+                你是 100x-search-query 的 TikTok 搜索词生成子模块。任务范围到此为止：只生成搜索短语字符串，不执行搜索、不调用任何视频/网页工具——找参考视频是下游人工或另一个 skill 的事。
+
+                请为给定产品/品类生成恰好 15 条 TikTok 英文搜索短语，用于人工去 TikTok 搜索对标视频/内容灵感。
+
+                硬性规则（生成后会被脚本逐条校验，不满足会被打回重写，请第一次就尽量满足）：
+                1. 恰好 15 条；每条 q 必须是纯 ASCII 英文（可以含数字和 #，禁止出现任何中文字符）。
+                2. hashtag 形式和短句形式混合，不强制固定条数比例，只需要满足下面两条中的至少一条（不是必须≥8条hashtag这一条硬指标）：
+                   - 15 条里至少 8 条以 # 开头；或者
+                   - 15 条里至少 10 条命中这份格式词库中的至少一个（子串匹配，不分大小写）：pov / routine / haul / grwm / review / tiktokmademebuyit / storytime
+                   实践上建议尽量多用 hashtag（TikTok 是找 vibe 不是找产品本身），但不是硬性 8-10 条的固定切分。
+                3. 每条必须带 intent_cn 字段：闭集标签 + 冒号 + 纯中文说明（冒号后不能出现任何英文字母），整个字符串不超过 20 个字符。标签只能是下面 25 个之一，不能自造新标签：
+                   共鸣 决策前 决策 叙事 场景灵感 场景 对比 情绪认同 情绪 方法求解 求助 求推荐 泛用 生活方式 痛点 种草 视觉参考 购买前 购买后 身份认同 陈列 预期管理 风险确认 验证 质疑
+                4. 每条必须带 stage 字段，取值只能是 Aware / Appeal / Ask / Act / Advocate 之一。
+                5. 15 条内，"前两个词完全相同"的条目不要超过 3 条，避免大量近似重复。
+                6. 禁止出现这些空洞形容词：attractive / beautiful / stunning / serene / pristine / elegant / cinematic / professional / studio / flawless。禁止出现 AI 客服腔（as an AI / I'd be happy to / feel free to）和"让我/或许/大概/可能/也许"这类中文口水词。不编造效果、认证、用户见证，也不编造品牌/产品名。
+
+                只输出一个 JSON 数组，不要 markdown 代码块，不要任何解释性文字，不要在数组前后添加任何说明。每个元素形如：
+                {"q": "...", "intent_cn": "标签:说明", "stage": "Aware|Appeal|Ask|Act|Advocate"}
+            - id: tiktok-user
+              role: user
+              text: |
+                产品名称：{{#phase1_gate.product_name_final#}}
+                品类：{{#phase1_gate.category_final#}}
+                核心卖点（如果为空，请你先用一句话合理推断出核心卖点，再据此生成）：{{#phase1_gate.core_benefit_final#}}
+                目标受众（可为空，为空则不强行限定受众）：{{#phase1_gate.target_audience_final#}}
+                品牌语气（可为空）：{{#phase1_gate.brand_tone_final#}}
+                本次选题角度 topic_angle：{{#phase1_gate.topic_angle_final#}}
+                本次 45 条整体 5A 配额参考（用于把握整体倾向，不是本平台桶各阶段的硬性配额，你在 15 条内自行按比例分配到各阶段，覆盖尽量不少于 3 个阶段）：{{#phase1_gate.quota_text#}}
+                用户提供的原始产品文案/补充说明（可为空）：{{#start.raw_input_text#}}
+
+                请只生成 TikTok 平台的 15 条，按系统消息里的规则输出 JSON 数组。
+          context:
+            enabled: true
+            variable_selector: [kb_retrieval, result]
+          vision:
+            enabled: false
+          selected: false
+        position: { x: 1300, y: 360 }
+        positionAbsolute: { x: 1300, y: 360 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 140
+      - id: reddit_llm
+        type: custom
+        data:
+          type: llm
+          title: "生成 Reddit 15 条"
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.7
+          prompt_template:
+            - id: reddit-system
+              role: system
+              text: |
+                你是 100x-search-query 的 Reddit 搜索词生成子模块。任务范围到此为止：只生成搜索短语字符串，不执行搜索、不调用任何网页工具——找对标讨论是下游人工或另一个 skill 的事。
+
+                请为给定产品/品类生成恰好 15 条 Reddit 英文搜索短语，用于人工去 Reddit 搜索痛点讨论/对比评价/真实反馈。
+
+                硬性规则（生成后会被脚本逐条校验，不满足会被打回重写，请第一次就尽量满足）：
+                1. 恰好 15 条；每条 q 必须是纯 ASCII 英文（可以含数字和 #，禁止出现任何中文字符）。
+                2. 以痛点/对比/求解问句为主。15 条里至少 10 条命中下面这份问句词库中的至少一个（子串匹配，不分大小写），或者以问号结尾：
+                   why / how / anyone else / best / vs / worth it / help / recommend / does it work / should i
+                3. 15 条里必须 0 条包含 aesthetic 或 inspo（Reddit 不是靠美学词驱动的平台，那是 Pinterest 的写法；注意 mood 这个词本身是允许的，例如"does magnesium help with mood swings"是正常的健康类问句，不要因为出现 mood 就回避）。
+                4. 默认不要在任何一条前面加 r/ 加具体子版名（例如不要写 r/skincare），因为无法确认该子版当前是否真实存在，避免编造。
+                5. 每条必须带 intent_cn 字段：闭集标签 + 冒号 + 纯中文说明（冒号后不能出现任何英文字母），整个字符串不超过 20 个字符。标签只能是下面 25 个之一，不能自造新标签：
+                   共鸣 决策前 决策 叙事 场景灵感 场景 对比 情绪认同 情绪 方法求解 求助 求推荐 泛用 生活方式 痛点 种草 视觉参考 购买前 购买后 身份认同 陈列 预期管理 风险确认 验证 质疑
+                6. 每条必须带 stage 字段，取值只能是 Aware / Appeal / Ask / Act / Advocate 之一。
+                7. 15 条内，"前两个词完全相同"的条目不要超过 3 条，避免大量近似重复。
+                8. 禁止出现这些空洞形容词：attractive / beautiful / stunning / serene / pristine / elegant / cinematic / professional / studio / flawless。禁止出现 AI 客服腔（as an AI / I'd be happy to / feel free to）和"让我/或许/大概/可能/也许"这类中文口水词。不编造效果、认证、用户见证，也不编造品牌/产品名。
+
+                只输出一个 JSON 数组，不要 markdown 代码块，不要任何解释性文字，不要在数组前后添加任何说明。每个元素形如：
+                {"q": "...", "intent_cn": "标签:说明", "stage": "Aware|Appeal|Ask|Act|Advocate"}
+            - id: reddit-user
+              role: user
+              text: |
+                产品名称：{{#phase1_gate.product_name_final#}}
+                品类：{{#phase1_gate.category_final#}}
+                核心卖点（如果为空，请你先用一句话合理推断出核心卖点，再据此生成）：{{#phase1_gate.core_benefit_final#}}
+                目标受众（可为空，为空则不强行限定受众）：{{#phase1_gate.target_audience_final#}}
+                品牌语气（可为空）：{{#phase1_gate.brand_tone_final#}}
+                本次选题角度 topic_angle：{{#phase1_gate.topic_angle_final#}}
+                本次 45 条整体 5A 配额参考（用于把握整体倾向，不是本平台桶各阶段的硬性配额，你在 15 条内自行按比例分配到各阶段，覆盖尽量不少于 3 个阶段）：{{#phase1_gate.quota_text#}}
+                用户提供的原始产品文案/补充说明（可为空）：{{#start.raw_input_text#}}
+
+                请只生成 Reddit 平台的 15 条，按系统消息里的规则输出 JSON 数组。
+          context:
+            enabled: true
+            variable_selector: [kb_retrieval, result]
+          vision:
+            enabled: false
+          selected: false
+        position: { x: 1300, y: 600 }
+        positionAbsolute: { x: 1300, y: 600 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 140
+      - id: assemble_and_validate
+        type: custom
+        data:
+          type: code
+          title: "组装 bundle + 结构/公理/护栏全量校验"
+          code_language: python3
+          code: |
+            # 100x-search-query :: assemble_and_validate
+            # Parses the 3 platform LLM outputs, assembles the SearchQueryBundle, and
+            # hand-checks EVERYTHING schema.json (ajv) + scripts/validate.js would check --
+            # Dify's sandboxed code node cannot import ajv or jsonschema, so this is a
+            # faithful hand-rolled port: required/additionalProperties/enum/pattern/
+            # minLength/maxLength/minItems/maxItems (the ajv-equivalent structural layer)
+            # PLUS axiom2 density, axiom3 coverage, near-dup, and the sensitive-category
+            # post-hoc scan (the cross-item aggregate layer schema.json/ajv can't express
+            # either). Word lists and regex copied byte-for-byte from scripts/validate.js
+            # / schema.json so the two can't silently drift.
+
+            import json
+            import re
+
+            PINTEREST_WORDS = ['aesthetic', 'inspo', 'mood', 'cozy', 'minimal', 'styling', 'outfit', 'decor', 'ideas', 'routine', 'self-care', 'self care']
+            TIKTOK_FORMAT_WORDS = ['pov', 'routine', 'haul', 'grwm', 'review', 'tiktokmademebuyit', 'storytime']
+            REDDIT_QWORDS = ['why', 'how', 'anyone else', 'best', 'vs', 'worth it', 'help', 'recommend', 'does it work', 'should i']
+            REDDIT_BANNED_WORDS = ['aesthetic', 'inspo']  # 'mood' intentionally excluded -- axioms.md 公理2 "mood 假阳性说明"
+
+            SENSITIVE_CATEGORY_WORDS = [
+                '两性', '两性健康', '成人用品', '性功能', '男性表现', '男性增大', '情趣', '私密护理', '私处护理', '女性私密',
+                '壮阳', '持久力', '持久度', '硬度提升', '房事', '夫妻生活', '性生活', '男性雄风', '增大增粗', '私处', '生理需求',
+                'adult', 'intimate', 'sexual', 'sexual health', 'sexual wellness', 'libido', 'erectile', 'enhancement gel', 'male performance', 'feminine intimate', 'vaginal',
+                'stamina boost', 'boost stamina', 'bedroom performance', 'manhood', 'last longer in bed', 'harder and longer', 'girth', 'virility', 'potency boost',
+            ]
+            AUTHORITY_CLAIM_WORDS = [
+                '认证', '医生推荐', '医生背书', '泌尿科', '妇科医生', '临床验证', '权威认证',
+                '专家推荐', '权威专家', '三甲医院', '药监局', '国家认证', '医学验证', '科学验证',
+                'fda', 'certified', 'certification', 'approved by', 'doctor recommended', 'physician recommended', 'urologist', 'gynecologist', 'clinically proven', 'clinical trial',
+                'doctor approved', 'medically reviewed', 'medically endorsed', 'clinically tested', 'scientifically proven', 'board certified',
+            ]
+            REQUIRED_WARNING_SUBSTRING = '该品类涉及平台内容政策敏感区'
+            REQUIRED_WARNING_TEXT = '该品类涉及平台内容政策敏感区，Pinterest/TikTok搜索词生成前建议人工过一遍平台规则'
+
+            STAGE_ENUM = ['Aware', 'Appeal', 'Ask', 'Act', 'Advocate']
+            Q_RE = re.compile(r'^[\x00-\x7f]+$')
+            INTENT_CN_RE = re.compile(
+                r'^(共鸣|决策前|决策|叙事|场景灵感|场景|对比|情绪认同|情绪|方法求解|求助|求推荐|'
+                r'泛用|生活方式|痛点|种草|视觉参考|购买前|购买后|身份认同|陈列|预期管理|风险确认|'
+                r'验证|质疑):[一-龥，、/0-9]+$'
+            )
+            QUERY_ITEM_ALLOWED_KEYS = {'q', 'intent_cn', 'stage'}
+            BUNDLE_TOP_ALLOWED_KEYS = {'product_name', 'category', 'source_language_note', 'queries', 'meta'}
+            QUERIES_ALLOWED_KEYS = {'pinterest', 'tiktok', 'reddit'}
+
+
+            def _extract_json_array(raw_text):
+                """Best-effort recovery of a JSON array from raw LLM text: strips markdown
+                code fences and leading/trailing prose, then falls back to slicing between
+                the first '[' and the last ']'."""
+                text = (raw_text or "").strip()
+                text = re.sub(r'^```(?:json)?', '', text.strip(), flags=re.IGNORECASE).strip()
+                text = re.sub(r'```$', '', text.strip()).strip()
+                try:
+                    return json.loads(text), None
+                except Exception:
+                    pass
+                start = text.find('[')
+                end = text.rfind(']')
+                if start != -1 and end != -1 and end > start:
+                    candidate = text[start:end + 1]
+                    try:
+                        return json.loads(candidate), None
+                    except Exception as exc:
+                        return None, f"could not parse JSON array even after fence/prose stripping: {exc}"
+                return None, "no JSON array found in model output"
+
+
+            def _check_bucket_structure(name, items, errors):
+                """Mirrors schema.json's bucket15 + query_item shape (required,
+                additionalProperties:false, q pattern, intent_cn pattern+maxLength, stage
+                enum) -- this is the hand-rolled equivalent of ajv.compile(schema.json),
+                since Dify's sandboxed code node cannot import ajv or jsonschema."""
+                if not isinstance(items, list):
+                    errors.append(f"[schema] {name}: expected a JSON array of 15 items, got {type(items).__name__}")
+                    return []
+                if len(items) != 15:
+                    errors.append(f"[schema] {name}: bucket has {len(items)} item(s), schema.json requires exactly 15 (minItems=maxItems=15)")
+
+                clean_items = []
+                for idx, item in enumerate(items):
+                    loc = f"{name}[{idx}]"
+                    if not isinstance(item, dict):
+                        errors.append(f"[schema] {loc}: item is not an object")
+                        continue
+                    extra_keys = sorted(set(item.keys()) - QUERY_ITEM_ALLOWED_KEYS)
+                    if extra_keys:
+                        errors.append(f"[schema] {loc}: additionalProperties violation, unexpected key(s) {extra_keys} (schema.json query_item additionalProperties:false)")
+                    missing_keys = sorted(QUERY_ITEM_ALLOWED_KEYS - set(item.keys()))
+                    if missing_keys:
+                        errors.append(f"[schema] {loc}: missing required key(s) {missing_keys}")
+                        continue
+                    q = item.get('q')
+                    intent_cn = item.get('intent_cn')
+                    stage = item.get('stage')
+                    if not isinstance(q, str) or not q:
+                        errors.append(f"[schema] {loc}.q: must be a non-empty string")
+                    elif not Q_RE.match(q):
+                        errors.append(f"[schema] {loc}.q: must be ASCII only (axiom1) -- got {q!r}")
+                    if not isinstance(intent_cn, str) or not intent_cn:
+                        errors.append(f"[schema] {loc}.intent_cn: must be a non-empty string")
+                    else:
+                        if len(intent_cn) > 20:
+                            errors.append(f"[schema] {loc}.intent_cn: {len(intent_cn)} chars, must be <=20 (axiom4)")
+                        if not INTENT_CN_RE.match(intent_cn):
+                            errors.append(f"[schema] {loc}.intent_cn: does not match closed-set label pattern (axiom4) -- got {intent_cn!r}")
+                    if not isinstance(stage, str) or stage not in STAGE_ENUM:
+                        errors.append(f"[schema] {loc}.stage: must be one of {STAGE_ENUM} -- got {stage!r}")
+                    clean_items.append(item)
+                return clean_items
+
+
+            def _density_check(name, items, errors):
+                """Mirrors scripts/validate.js densityCheck -- axiom2, not expressible in
+                schema.json (cross-item aggregate)."""
+                lowered = [(it.get('q') or '').lower() for it in items]
+
+                if name == 'pinterest':
+                    hits = sum(1 for q in lowered if any(w in q for w in PINTEREST_WORDS))
+                    if hits < 10:
+                        errors.append(f"[axiom2] pinterest: only {hits}/15 hit PINTEREST_WORDS (need >=10)")
+
+                if name == 'tiktok':
+                    hashtag_hits = sum(1 for q in lowered if q.strip().startswith('#'))
+                    format_hits = sum(1 for q in lowered if any(w in q for w in TIKTOK_FORMAT_WORDS))
+                    if hashtag_hits < 8 and format_hits < 10:
+                        errors.append(f"[axiom2] tiktok: hashtagHits={hashtag_hits} (<8) AND formatHits={format_hits} (<10), need one branch of the OR to hold")
+
+                if name == 'reddit':
+                    q_hits = sum(1 for q in lowered if any(w in q for w in REDDIT_QWORDS) or q.strip().endswith('?'))
+                    banned_hits = sum(1 for q in lowered if any(w in q for w in REDDIT_BANNED_WORDS))
+                    if q_hits < 10:
+                        errors.append(f"[axiom2] reddit: only {q_hits}/15 hit REDDIT_QWORDS (need >=10)")
+                    if banned_hits > 0:
+                        errors.append(f"[axiom2] reddit: {banned_hits} item(s) contain a REDDIT_BANNED_WORDS hit (must be 0)")
+
+
+            def _near_dup_check(name, items, errors):
+                """Mirrors scripts/validate.js nearDupCheck -- batch self-check (workflow.md
+                2E), not one of the 4 numbered axioms, but still part of the real,
+                enforced validate.js contract, so ported here too."""
+                counts = {}
+                for it in items:
+                    q = (it.get('q') or '').lower().strip()
+                    key = ' '.join(q.split()[:2])
+                    counts[key] = counts.get(key, 0) + 1
+                dup_count = sum(c - 1 for c in counts.values() if c > 1)
+                if dup_count > 3:
+                    errors.append(f"[batch self-check] {name}: too many near-duplicate first-2-word openings ({dup_count}, allowed <=3)")
+
+
+            def _sensitive_category_check(category, product_name, all_buckets, warnings_list, errors):
+                """Mirrors scripts/validate.js sensitiveCategoryCheck exactly: scans
+                category + product_name + every generated q + every generated intent_cn
+                (fullText), lowercased. This is the SECOND line of defense (the FIRST is
+                Phase 1's own raw-input scan in phase1_gate, which sees strictly more text
+                than this can). Both signals scan the SAME fullText (category,
+                product_name, and all generated q + intent_cn)."""
+                category_text = f"{category or ''} {product_name or ''}".lower()
+                all_query_text_parts = []
+                for items in all_buckets:
+                    for it in items:
+                        if isinstance(it, dict):
+                            if isinstance(it.get('q'), str):
+                                all_query_text_parts.append(it['q'])
+                            if isinstance(it.get('intent_cn'), str):
+                                all_query_text_parts.append(it['intent_cn'])
+                all_query_text = ' '.join(all_query_text_parts).lower()
+                full_text = f"{category_text} {all_query_text}"
+
+                hit_category_signal = any(w.lower() in full_text for w in SENSITIVE_CATEGORY_WORDS)
+                hit_authority_signal = any(w.lower() in full_text for w in AUTHORITY_CLAIM_WORDS)
+
+                if hit_category_signal and hit_authority_signal:
+                    has_required_warning = any(isinstance(w, str) and REQUIRED_WARNING_SUBSTRING in w for w in warnings_list)
+                    if not has_required_warning:
+                        errors.append(
+                            "[sensitive-category] category/product_name/generated queries hit a sensitive-category "
+                            "signal AND an authority-claim signal, but meta.warnings does not contain the required "
+                            f'"{REQUIRED_WARNING_SUBSTRING}" notice (workflow.md Phase1 step 6)'
+                        )
+                return hit_category_signal and hit_authority_signal
+
+
+            def main(pinterest_text: str, tiktok_text: str, reddit_text: str,
+                     product_name_final: str, category_final: str, topic_angle_final: str,
+                     core_benefit_missing: str, sensitive_hit_phase1: str, sensitive_warning_text: str) -> dict:
+                errors = []
+
+                pinterest_raw, perr = _extract_json_array(pinterest_text)
+                if perr:
+                    errors.append(f"[schema] pinterest: {perr}")
+                    pinterest_raw = []
+                tiktok_raw, terr = _extract_json_array(tiktok_text)
+                if terr:
+                    errors.append(f"[schema] tiktok: {terr}")
+                    tiktok_raw = []
+                reddit_raw, rerr = _extract_json_array(reddit_text)
+                if rerr:
+                    errors.append(f"[schema] reddit: {rerr}")
+                    reddit_raw = []
+
+                pinterest_items = _check_bucket_structure('pinterest', pinterest_raw, errors)
+                tiktok_items = _check_bucket_structure('tiktok', tiktok_raw, errors)
+                reddit_items = _check_bucket_structure('reddit', reddit_raw, errors)
+
+                # Aggregate checks only run against parsed items -- consistent with
+                # scripts/validate.js only running aggregateChecks() after ajv (structural)
+                # passes. Here we run them regardless so a single failing report always
+                # lists every concrete problem at once (more useful for the "route to an
+                # end that surfaces the SPECIFIC failing check" requirement), but a
+                # structural failure already guarantees is_valid=False independent of
+                # these.
+                for name, items in (('pinterest', pinterest_items), ('tiktok', tiktok_items), ('reddit', reddit_items)):
+                    if len(items) == 15:
+                        _density_check(name, items, errors)
+                        _near_dup_check(name, items, errors)
+
+                stages_seen = set()
+                for items in (pinterest_items, tiktok_items, reddit_items):
+                    for it in items:
+                        if isinstance(it.get('stage'), str):
+                            stages_seen.add(it['stage'])
+                if len(stages_seen) < 3:
+                    errors.append(f"[axiom3] 5A coverage across all 45 items is only {len(stages_seen)} distinct stage(s), need >=3")
+
+                # meta.warnings assembly. sensitive_hit_phase1 (Phase1's OWN broader scan,
+                # including raw input text that never reaches category/product_name/q/
+                # intent_cn) is unioned with a fresh post-hoc scan over the ACTUAL
+                # generated output (mirrors scripts/validate.js exactly). Warning is added
+                # if EITHER trips, which guarantees the post-hoc check below always finds
+                # the warning present when it itself trips (by construction) while still
+                # preserving Phase1-as-first-line-of-defense behavior for signals that
+                # never leak into the generated text.
+                warnings_list = []
+                if core_benefit_missing == "true":
+                    warnings_list.append("core_benefit 为推断值")
+
+                provisional_warnings = list(warnings_list)
+                if sensitive_hit_phase1 == "true" and sensitive_warning_text:
+                    provisional_warnings.append(sensitive_warning_text)
+
+                posthoc_errors = []
+                posthoc_hit = _sensitive_category_check(
+                    category_final, product_name_final,
+                    [pinterest_items, tiktok_items, reddit_items],
+                    provisional_warnings, posthoc_errors,
+                )
+                if posthoc_hit and REQUIRED_WARNING_TEXT not in provisional_warnings:
+                    provisional_warnings.append(REQUIRED_WARNING_TEXT)
+                warnings_list = provisional_warnings
+
+                # Re-run the post-hoc check now that the warning has been finalized, so
+                # the reported errors reflect the true final state (should never fire
+                # given the union-append above, but keeps the check honest/self-verifying
+                # instead of just trusting the append).
+                final_check_errors = []
+                _sensitive_category_check(
+                    category_final, product_name_final,
+                    [pinterest_items, tiktok_items, reddit_items],
+                    warnings_list, final_check_errors,
+                )
+                errors.extend(final_check_errors)
+
+                # based_on_5a: computed from the ACTUAL generated stage tally (top-2 most
+                # frequent stages), not the a-priori quota target -- matches schema.json's
+                # "Dominant 5A stage(s) this run leaned on" description and matches how
+                # the real evals/*.json examples were written (their based_on_5a reflects
+                # actual content, not the quota table).
+                stage_counts = {s: 0 for s in STAGE_ENUM}
+                for items in (pinterest_items, tiktok_items, reddit_items):
+                    for it in items:
+                        st = it.get('stage')
+                        if st in stage_counts:
+                            stage_counts[st] += 1
+                ranked = sorted(STAGE_ENUM, key=lambda s: (-stage_counts[s], STAGE_ENUM.index(s)))
+                top_stages = [s for s in ranked if stage_counts[s] > 0][:2]
+                based_on_5a = "+".join(top_stages) if top_stages else "Aware"
+
+                bundle = {
+                    "product_name": product_name_final,
+                    "category": category_final,
+                    "queries": {
+                        "pinterest": pinterest_items,
+                        "tiktok": tiktok_items,
+                        "reddit": reddit_items,
+                    },
+                    "meta": {
+                        "based_on_5a": based_on_5a,
+                        "generated_by": "100x-search-query",
+                        "topic_angle": topic_angle_final,
+                        "warnings": warnings_list,
+                    },
+                }
+
+                # Final additionalProperties sweep at the top level / queries level (the
+                # bundle is assembled by this same function so these can't actually drift,
+                # but kept as an explicit, honest assertion mirroring schema.json's
+                # additionalProperties:false on the top-level object and on `queries`).
+                extra_top = sorted(set(bundle.keys()) - BUNDLE_TOP_ALLOWED_KEYS)
+                if extra_top:
+                    errors.append(f"[schema] bundle: unexpected top-level key(s) {extra_top}")
+                extra_queries = sorted(set(bundle["queries"].keys()) - QUERIES_ALLOWED_KEYS)
+                if extra_queries:
+                    errors.append(f"[schema] bundle.queries: unexpected key(s) {extra_queries}")
+
+                is_valid = len(errors) == 0
+                if errors:
+                    errors_text = "校验未通过，具体原因：\n" + "\n".join(f"- {e}" for e in errors)
+                else:
+                    errors_text = ""
+
+                return {
+                    "bundle_json": json.dumps(bundle, ensure_ascii=False, indent=2),
+                    "is_valid": "true" if is_valid else "false",
+                    "errors_text": errors_text,
+                    "error_count": len(errors),
+                    "queries_obj": bundle["queries"],
+                    "warnings_list": warnings_list,
+                    "warnings_text": "\n".join(warnings_list),
+                }
+          variables:
+            - variable: pinterest_text
+              value_selector: [pinterest_llm, text]
+            - variable: tiktok_text
+              value_selector: [tiktok_llm, text]
+            - variable: reddit_text
+              value_selector: [reddit_llm, text]
+            - variable: product_name_final
+              value_selector: [phase1_gate, product_name_final]
+            - variable: category_final
+              value_selector: [phase1_gate, category_final]
+            - variable: topic_angle_final
+              value_selector: [phase1_gate, topic_angle_final]
+            - variable: core_benefit_missing
+              value_selector: [phase1_gate, core_benefit_missing]
+            - variable: sensitive_hit_phase1
+              value_selector: [phase1_gate, sensitive_hit_phase1]
+            - variable: sensitive_warning_text
+              value_selector: [phase1_gate, sensitive_warning_text]
+          outputs:
+            bundle_json:
+              type: string
+            is_valid:
+              type: string
+            errors_text:
+              type: string
+            error_count:
+              type: number
+            queries_obj:
+              type: object
+            warnings_list:
+              type: array[string]
+            warnings_text:
+              type: string
+          selected: false
+        position: { x: 1660, y: 360 }
+        positionAbsolute: { x: 1660, y: 360 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 100
+      - id: final_gate
+        type: custom
+        data:
+          type: if-else
+          title: "总校验是否全部通过"
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: bundle-is-valid
+                  variable_selector: [assemble_and_validate, is_valid]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+          selected: false
+        position: { x: 1960, y: 360 }
+        positionAbsolute: { x: 1960, y: 360 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 126
+      - id: rework_end
+        type: custom
+        data:
+          type: end
+          title: "未通过校验：列出具体失败项，需返工"
+          outputs:
+            - variable: message
+              value_selector: [assemble_and_validate, errors_text]
+              value_type: string
+        position: { x: 2260, y: 560 }
+        positionAbsolute: { x: 2260, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 90
+      - id: render_tables
+        type: custom
+        data:
+          type: template-transform
+          title: "渲染 3 张 Markdown 表（可选输出）"
+          variables:
+            - variable: queries
+              value_selector: [assemble_and_validate, queries_obj]
+          template: |
+            ## Pinterest
+
+            | # | query | search_intent_cn | 5a_stage |
+            |---|---|---|---|
+            {% for item in queries.pinterest %}| {{ loop.index }} | {{ item.q }} | {{ item.intent_cn }} | {{ item.stage }} |
+            {% endfor %}
+
+            ## TikTok
+
+            | # | query | search_intent_cn | 5a_stage |
+            |---|---|---|---|
+            {% for item in queries.tiktok %}| {{ loop.index }} | {{ item.q }} | {{ item.intent_cn }} | {{ item.stage }} |
+            {% endfor %}
+
+            ## Reddit
+
+            | # | query | search_intent_cn | 5a_stage |
+            |---|---|---|---|
+            {% for item in queries.reddit %}| {{ loop.index }} | {{ item.q }} | {{ item.intent_cn }} | {{ item.stage }} |
+            {% endfor %}
+          selected: false
+        position: { x: 2260, y: 160 }
+        positionAbsolute: { x: 2260, y: 160 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 80
+      - id: kb_writeback_format
+        type: custom
+        data:
+          type: template-transform
+          title: "格式化知识库写回文本块（可选增强）"
+          variables:
+            - variable: category
+              value_selector: [phase1_gate, category_final]
+            - variable: product_name
+              value_selector: [phase1_gate, product_name_final]
+            - variable: topic_angle
+              value_selector: [phase1_gate, topic_angle_final]
+            - variable: queries
+              value_selector: [assemble_and_validate, queries_obj]
+          template: |
+            category: {{ category }}
+            product_name: {{ product_name }}
+            topic_angle: {{ topic_angle }}
+
+            pinterest_patterns:
+            {% for item in queries.pinterest %}- [{{ item.stage }}] {{ item.q }} :: {{ item.intent_cn }}
+            {% endfor %}
+            tiktok_patterns:
+            {% for item in queries.tiktok %}- [{{ item.stage }}] {{ item.q }} :: {{ item.intent_cn }}
+            {% endfor %}
+            reddit_patterns:
+            {% for item in queries.reddit %}- [{{ item.stage }}] {{ item.q }} :: {{ item.intent_cn }}
+            {% endfor %}
+          selected: false
+        position: { x: 2560, y: 160 }
+        positionAbsolute: { x: 2560, y: 160 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 260
+        height: 80
+      - id: kb_index
+        type: custom
+        data:
+          type: knowledge-index
+          title: "写回知识库：本品类的搜索词模式（可选增强）"
+          dataset_id: "REPLACE_WITH_DATASET_ID"
+          index_chunk_variable_selector: [kb_writeback_format, output]
+          keyword_number: 10
+          retrieval_model:
+            top_k: 3
+            score_threshold_enabled: false
+            score_threshold: 0.5
+          selected: false
+        position: { x: 2860, y: 160 }
+        positionAbsolute: { x: 2860, y: 160 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 100
+      - id: success_end
+        type: custom
+        data:
+          type: end
+          title: "输出搜索词 bundle"
+          outputs:
+            - variable: bundle
+              value_selector: [assemble_and_validate, bundle_json]
+              value_type: string
+            - variable: markdown_tables
+              value_selector: [render_tables, output]
+              value_type: string
+            - variable: warnings
+              value_selector: [assemble_and_validate, warnings_text]
+              value_type: string
+        position: { x: 3160, y: 160 }
+        positionAbsolute: { x: 3160, y: 160 }
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 110
+    edges:
+      - id: start-source-phase1_gate-target
+        source: start
+        sourceHandle: source
+        target: phase1_gate
+        targetHandle: target
+        type: custom
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+      - id: phase1_gate-source-class_a_gate-target
+        source: phase1_gate
+        sourceHandle: source
+        target: class_a_gate
+        targetHandle: target
+        type: custom
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+      - id: class_a_gate-true-reject_end-target
+        source: class_a_gate
+        sourceHandle: "true"
+        target: reject_end
+        targetHandle: target
+        type: custom
+        data: { sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false }
+      - id: class_a_gate-false-kb_retrieval-target
+        source: class_a_gate
+        sourceHandle: "false"
+        target: kb_retrieval
+        targetHandle: target
+        type: custom
+        data: { sourceType: if-else, targetType: knowledge-retrieval, isInIteration: false, isInLoop: false }
+      - id: kb_retrieval-source-pinterest_llm-target
+        source: kb_retrieval
+        sourceHandle: source
+        target: pinterest_llm
+        targetHandle: target
+        type: custom
+        data: { sourceType: knowledge-retrieval, targetType: llm, isInIteration: false, isInLoop: false }
+      - id: kb_retrieval-source-tiktok_llm-target
+        source: kb_retrieval
+        sourceHandle: source
+        target: tiktok_llm
+        targetHandle: target
+        type: custom
+        data: { sourceType: knowledge-retrieval, targetType: llm, isInIteration: false, isInLoop: false }
+      - id: kb_retrieval-source-reddit_llm-target
+        source: kb_retrieval
+        sourceHandle: source
+        target: reddit_llm
+        targetHandle: target
+        type: custom
+        data: { sourceType: knowledge-retrieval, targetType: llm, isInIteration: false, isInLoop: false }
+      - id: pinterest_llm-source-assemble_and_validate-target
+        source: pinterest_llm
+        sourceHandle: source
+        target: assemble_and_validate
+        targetHandle: target
+        type: custom
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+      - id: tiktok_llm-source-assemble_and_validate-target
+        source: tiktok_llm
+        sourceHandle: source
+        target: assemble_and_validate
+        targetHandle: target
+        type: custom
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+      - id: reddit_llm-source-assemble_and_validate-target
+        source: reddit_llm
+        sourceHandle: source
+        target: assemble_and_validate
+        targetHandle: target
+        type: custom
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+      - id: assemble_and_validate-source-final_gate-target
+        source: assemble_and_validate
+        sourceHandle: source
+        target: final_gate
+        targetHandle: target
+        type: custom
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+      - id: final_gate-false-rework_end-target
+        source: final_gate
+        sourceHandle: "false"
+        target: rework_end
+        targetHandle: target
+        type: custom
+        data: { sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false }
+      - id: final_gate-true-render_tables-target
+        source: final_gate
+        sourceHandle: "true"
+        target: render_tables
+        targetHandle: target
+        type: custom
+        data: { sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false }
+      - id: render_tables-source-kb_writeback_format-target
+        source: render_tables
+        sourceHandle: source
+        target: kb_writeback_format
+        targetHandle: target
+        type: custom
+        data: { sourceType: template-transform, targetType: template-transform, isInIteration: false, isInLoop: false }
+      - id: kb_writeback_format-source-kb_index-target
+        source: kb_writeback_format
+        sourceHandle: source
+        target: kb_index
+        targetHandle: target
+        type: custom
+        data: { sourceType: template-transform, targetType: knowledge-index, isInIteration: false, isInLoop: false }
+      - id: kb_index-source-success_end-target
+        source: kb_index
+        sourceHandle: source
+        target: success_end
+        targetHandle: target
+        type: custom
+        data: { sourceType: knowledge-index, targetType: end, isInIteration: false, isInLoop: false }
+    viewport: { x: 0, y: 0, zoom: 0.5 }

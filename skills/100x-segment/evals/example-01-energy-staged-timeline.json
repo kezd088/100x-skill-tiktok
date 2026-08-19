@@ -1,0 +1,75 @@
+{
+  "source_text": "You know what your afternoon slump is actually scared of? Not coffee, not a nap, not another snack. Twenty years in sports recovery taught me one thing about tired bodies. If you are running on four hours of sleep and three cups of coffee just to function, this is for you. This blend wakes your cells back up and fires up your natural energy switch. Day one, you will feel a small spark, like something just turned back on. Day seven, you will notice you stop reaching for a second coffee before lunch. Day fourteen, people will ask why you suddenly seem so alive again. One scoop before nine in the morning is enough. Do not take a second scoop, it works faster than most people expect. No results in thirty days? Full refund, no questions asked. Only sixty starter packs left for this batch, once they are gone the price goes back up. Tap the link in the bottom left corner right now and see what nine in the morning is supposed to feel like.",
+  "language": "en",
+  "archetype": "A",
+  "segments": [
+    {
+      "segment_id": 1,
+      "module": "hook",
+      "raw_text": "You know what your afternoon slump is actually scared of? Not coffee, not a nap, not another snack.",
+      "text_annotated": "You know what your afternoon slump is actually scared of? ‖ Not coffee, · not a nap, · not another snack."
+    },
+    {
+      "segment_id": 2,
+      "module": "authority",
+      "raw_text": "Twenty years in sports recovery taught me one thing about tired bodies.",
+      "text_annotated": "Twenty years in sports recovery taught me one thing about tired bodies."
+    },
+    {
+      "segment_id": 3,
+      "module": "pain",
+      "raw_text": "If you are running on four hours of sleep and three cups of coffee just to function, this is for you.",
+      "text_annotated": "If you are running on four hours of sleep · and three cups of coffee just to function, · this is for you."
+    },
+    {
+      "segment_id": 4,
+      "module": "mechanism",
+      "raw_text": "This blend wakes your cells back up and fires up your natural energy switch.",
+      "text_annotated": "This blend wakes your cells back up and fires up your natural energy switch."
+    },
+    {
+      "segment_id": 5,
+      "module": "staged_timeline",
+      "raw_text": "Day one, you will feel a small spark, like something just turned back on. Day seven, you will notice you stop reaching for a second coffee before lunch. Day fourteen, people will ask why you suddenly seem so alive again.",
+      "text_annotated": "Day one, · you will feel a small spark, like ‖ something just turned back on. ‖ Day seven, · you will notice you stop reaching for a second coffee before lunch. ‖ Day fourteen, · people will ask why you suddenly seem so alive again."
+    },
+    {
+      "segment_id": 6,
+      "module": "dosage",
+      "raw_text": "One scoop before nine in the morning is enough. Do not take a second scoop, it works faster than most people expect.",
+      "text_annotated": "One scoop before nine in the morning is enough. ‖ Do not take a second scoop, · it works faster than most people expect."
+    },
+    {
+      "segment_id": 7,
+      "module": "risk_reversal",
+      "raw_text": "No results in thirty days? Full refund, no questions asked.",
+      "text_annotated": "No results in thirty days? ‖ Full refund, · no questions asked."
+    },
+    {
+      "segment_id": 8,
+      "module": "scarcity",
+      "raw_text": "Only sixty starter packs left for this batch, once they are gone the price goes back up.",
+      "text_annotated": "Only sixty starter packs left for this batch, · once they are gone the price goes back up."
+    },
+    {
+      "segment_id": 9,
+      "module": "cta",
+      "raw_text": "Tap the link in the bottom left corner right now and see what nine in the morning is supposed to feel like.",
+      "text_annotated": "Tap the link in the bottom left corner right now · and see what nine in the morning is supposed to feel like."
+    }
+  ],
+  "shots": [
+    { "shot_id": 1, "segment_refs": [1], "shot_purpose": "hook" },
+    { "shot_id": 2, "segment_refs": [2, 3], "shot_purpose": "build" },
+    { "shot_id": 3, "segment_refs": [4], "shot_purpose": "reveal" },
+    { "shot_id": 4, "segment_refs": [5], "shot_purpose": "demo" },
+    { "shot_id": 5, "segment_refs": [6], "shot_purpose": "demo" },
+    { "shot_id": 6, "segment_refs": [7, 8], "shot_purpose": "cta" },
+    { "shot_id": 7, "segment_refs": [9], "shot_purpose": "cta" }
+  ],
+  "meta": {
+    "generated_by": "100x-segment",
+    "warnings": [],
+    "eval_note": "synthetic example, not a real product or transcript"
+  }
+}

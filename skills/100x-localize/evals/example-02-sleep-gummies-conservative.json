@@ -1,0 +1,15 @@
+{
+  "source_script": "This sleep gummy is basically magic, it will change your life overnight. One gummy about thirty minutes before bed and you crash into deep sleep, no more staring at the ceiling at 2am. It has melatonin, magnesium, and L-theanine working together. Doctors everywhere are talking about this blend. Grab yours before we sell out again this week.",
+  "source_language_note": "source copy: en (synthetic example, not a real ad script)",
+  "target_region": "mx",
+  "register_profile": "compliance-conservative",
+  "localized_script": "Esta gomita para dormir combina melatonina, magnesio y L-teanina. Tómala unos treinta minutos antes de dormir y notarás que te cuesta menos quedarte dormido, sin quedarte viendo el techo a las 2am. Cada vez más personas comentan esta combinación en redes. Consíguela antes de que se agote esta semana.",
+  "meta": {
+    "generated_by": "100x-localize",
+    "compression_ratio": 0.880,
+    "warnings": [
+      "register_profile=compliance-conservative: 源文案'basically magic, it will change your life overnight'（属于本档位禁语清单里的'永久改变人生'类无证据宣称）已改写为具体机制描述（成分+起效窗口），未复述该宣称",
+      "register_profile=compliance-conservative: 源文案'Doctors everywhere are talking about this blend'未点名具体医生/机构，为避免暗示未经核实的专业背书，本地化改写为泛化的社交讨论表述'cada vez más personas comentan'"
+    ]
+  }
+}

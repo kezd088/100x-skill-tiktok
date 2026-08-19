@@ -1,0 +1,13 @@
+{
+  "name": "100x-localize",
+  "version": "1.3.0",
+  "private": true,
+  "description": "Validation tooling for the 100x-localize skill (LocalizationBundle output contract). Not published -- this package.json exists only so scripts/validate.js can pull in ajv for real JSON Schema enforcement (structural checks: required/additionalProperties/enum/pattern/if-then) instead of a hand-rolled re-implementation. Cross-field checks that JSON Schema draft-07 cannot express (axiom 1 compression-ratio ceiling/floor, axiom 4 fabricated-authority-claim detection) stay hand-written in scripts/validate.js -- see that file's header comment and axioms.md.",
+  "scripts": {
+    "validate": "node scripts/validate.js",
+    "selftest": "node scripts/validate.js --selftest"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}

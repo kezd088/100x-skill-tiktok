@@ -1,0 +1,36 @@
+{
+  "template_id": "VID-A-efficacy-stack",
+  "template_name": "⑥ 功效堆叠（一喷见效·视频）",
+  "category": "视频",
+  "variables_used": {
+    "persona": "戴着黄色橡胶手套的手",
+    "product_name": "多功能去污喷雾 (synthetic example, not a real product)",
+    "product_lock": "透明宽口塑料瓶，橙色喷头，正面白底黑字标签，450ml，暂无参考图",
+    "target": "白色厨房台面上的姜黄渍",
+    "effect_formula": "泡沫爆发",
+    "scene": "家庭厨房台面"
+  },
+  "rendered_body": "手机后摄，固定机位。戴着黄色橡胶手套的手手持多功能去污喷雾 (synthetic example, not a real product)（透明宽口塑料瓶，橙色喷头，正面白底黑字标签，450ml，暂无参考图）对准白色厨房台面上的姜黄渍。喷洒瞬间浓稠白色活性泡沫爆发覆盖污渍并翻腾，随后百洁布擦去，显露洁净微湿无瑕表面。。背景是可见的家庭厨房台面。无美颜，无景深，无滤镜，无补光灯，真实皮肤纹理，真实环境。",
+  "reference_locks": [
+    {
+      "entity": "产品",
+      "ref_number": 2,
+      "status": "first_lock",
+      "value": "透明宽口塑料瓶，橙色喷头，正面白底黑字标签，450ml，暂无参考图"
+    }
+  ],
+  "model": "seedance",
+  "video_unit": {
+    "duration_seconds": 10.0,
+    "final_prompt_wrapped": "Static smartphone rear-camera shot, fixed frame, synthetic example, not a real product. A hand wearing bright yellow rubber gloves holds a clear wide-mouth plastic spray bottle with an orange nozzle and a printed white label, aiming it at a turmeric-yellow stain on a white kitchen countertop. Thick white foam bursts out on contact, swelling and churning over the stain; a scrub sponge wipes it away, revealing a clean, faintly damp, unblemished surface. The kitchen counter is visible in the background, ordinary household clutter, raw smartphone footage, natural skin texture on the visible hand, no added lighting rig. no text, no subtitles, no watermarks"
+  },
+  "meta": {
+    "generated_by": "100x-prompt-compose",
+    "existing_refs_input": { "产品": [1], "人物": [] },
+    "established_refs_after": { "产品": [1, 2], "人物": [] },
+    "model_choice_source": "user_specified",
+    "warnings": [
+      "product_lock 为首次锁定的文字描述（无参考图），未来同一产品的其他分镜若要复用，须写「参考图2产品」"
+    ]
+  }
+}

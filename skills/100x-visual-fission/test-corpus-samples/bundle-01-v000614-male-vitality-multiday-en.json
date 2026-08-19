@@ -1,0 +1,57 @@
+{
+  "product_name": "male vitality capsules (synthetic example, based on a real English-language ad's day-by-day narrative, not a real product)",
+  "category": "男性保健品",
+  "source_material_note": "Derived from the narrative arc of a real English-language hat-graded TikTok ad transcript (V000614) reviewed in this validation run. Text-only degraded Class A path (workflow.md Phase 1 step 5) -- identity anchors below are synthetic archetypes invented for this test, not vision-reversed from any real photo. The source ad's explicit size-claim language ('gaining three inches', 'pushing limits') has been intentionally NOT carried into the frames -- rewritten into genuinely photographable posture/energy/expression changes, per axiom 4.",
+  "constants": {
+    "person_identity_anchor": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers",
+    "scene_identity_anchor": "cozy bedroom corner with a cream linen headboard and warm bedside lamp glow",
+    "product_identity_anchor": "small amber glass supplement bottle with a matte black dropper cap and a simple white label"
+  },
+  "variables": [
+    { "dimension": "camera", "name": "framing", "observed_values": ["medium shot waist-up", "close-up on face and shoulders"], "range_description": "mid-distance waist-up framing for posture read vs tight close-up for facial expression read" },
+    { "dimension": "pose", "name": "energy stance", "observed_values": ["slouched seated on bed edge", "upright standing with open chest"], "range_description": "low-energy slouched seated posture vs confident upright standing posture" }
+  ],
+  "media_plan": {
+    "structure": "multi_day",
+    "frame_count": 4,
+    "frames": [
+      { "role": "day", "day_index": 1, "visual_action": "seated on the edge of the bed, slouched forward, tired subdued expression, morning light through the curtain", "uses_first_frame_as_reference": false },
+      { "role": "day", "day_index": 4, "visual_action": "using frame 1 as reference, seated upright on the bed edge, slightly more alert but still reserved expression, same morning lighting unchanged", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 7, "visual_action": "using frame 1 as reference, standing upright beside the bed, neutral relaxed expression, same morning lighting and room layout unchanged", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 14, "visual_action": "using frame 1 as reference, standing tall with open confident posture, bright alert expression, same bedroom setting unchanged", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "source ad narrates a clear multi-day arc ('Within the first week... After two weeks'); the copy cites 3 check-in milestones (day 1 implicit start, day 7 week 1, day 14 week 2). Day 4 is interpolated as a transition frame to meet the multi_day minimum of 4 frames -- source copy never explicitly mentions day 4, see meta.warnings."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "medium waist-up, seated edge of bed",
+      "character_prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers",
+      "scene_prompt": "cozy bedroom corner with a cream linen headboard and warm bedside lamp glow",
+      "action_prompt": "seated on the bed edge, holding the supplement bottle in one hand at chest level, medium waist-up framing",
+      "combined_prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers, cozy bedroom corner with a cream linen headboard and warm bedside lamp glow, small amber glass supplement bottle with a matte black dropper cap and a simple white label, seated on the bed edge holding the bottle at chest level, medium waist-up framing",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "close-up face, standing upright",
+      "character_prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers",
+      "scene_prompt": "cozy bedroom corner with a cream linen headboard and warm bedside lamp glow",
+      "action_prompt": "standing upright near the headboard, bottle resting on the nightstand, close-up on face and shoulders, front-on composition",
+      "combined_prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers, cozy bedroom corner with a cream linen headboard and warm bedside lamp glow, small amber glass supplement bottle with a matte black dropper cap and a simple white label, standing upright near the headboard with bottle resting on the nightstand, close-up on face and shoulders, front-on composition",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 1, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers, cozy bedroom corner with a cream linen headboard and warm bedside lamp glow, small amber glass supplement bottle with a matte black dropper cap and a simple white label, seated on the edge of the bed, slouched forward, tired subdued expression, morning light through the curtain, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 4, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers, cozy bedroom corner with a cream linen headboard and warm bedside lamp glow, small amber glass supplement bottle with a matte black dropper cap and a simple white label, using frame 1 as reference, seated upright on the bed edge, slightly more alert but still reserved expression, same morning lighting unchanged, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 3, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 7, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers, cozy bedroom corner with a cream linen headboard and warm bedside lamp glow, small amber glass supplement bottle with a matte black dropper cap and a simple white label, using frame 1 as reference, standing upright beside the bed, neutral relaxed expression, same morning lighting and room layout unchanged, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 4, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 14, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "adult male mid-30s, short dark hair, light stubble, wearing a plain navy t-shirt and dark grey joggers, cozy bedroom corner with a cream linen headboard and warm bedside lamp glow, small amber glass supplement bottle with a matte black dropper cap and a simple white label, using frame 1 as reference, standing tall with open confident posture, bright alert expression, same bedroom setting unchanged, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "multi_day",
+    "generated_by": "100x-visual-fission",
+    "warnings": ["day_index=4 is interpolated to meet the 4-frame multi_day minimum; source copy never explicitly cites day 4 as a milestone"]
+  }
+}

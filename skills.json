@@ -1,0 +1,173 @@
+{
+  "repo": "100x-skill-tiktok",
+  "_note": "skills[] 只列已建成、通过独立验证的内容 skill。未建的其余名额不在此虚列占位。100x-tiktok 是任务前后路由，不生成内容、不参与独立验证，单独放在 router 字段，不计入 planned_total。",
+  "planned_total": 8,
+  "router": {
+    "id": "100x-tiktok",
+    "path": "skills/100x-tiktok",
+    "version": "1.0.0",
+    "type": "router",
+    "summary": "TikTok/UGC 创意流水线总路由：任务前诊断该从哪个 skill 入手，任务后指出下一步，不代替任何 skill 的独立调用能力，本身不产出内容。",
+    "routes_to": ["100x-video-reverse", "100x-segment", "100x-localize", "100x-persona", "100x-exaggerate", "100x-search-query", "100x-visual-fission", "100x-prompt-compose"],
+    "trigger_examples": [
+      "/100x-tiktok",
+      "/tiktok",
+      "帮我看看这条 TikTok 怎么弄",
+      "做一条 TikTok 广告",
+      "TikTok 视频创意流水线",
+      "这条口播脚本下一步怎么改"
+    ]
+  },
+  "skills": [
+    {
+      "id": "100x-video-reverse",
+      "path": "skills/100x-video-reverse",
+      "version": "1.0.0",
+      "step": "0-video-reverse",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "输入一条视频（先经 ffmpeg 抽帧，agent 读帧图）→ 输出两段：复刻提示词（shots[] 分镜时间轴 + visual_forms[] 画面形态轴，双轴正交挂钩）+ 变量化（{VAR} 插槽模板 + 同视频内跨镜头不变量与变化轴），每条提示词 prompt_en 喂模型、prompt_zh 给运营读改。",
+      "trigger_examples": [
+        "反推这条视频",
+        "这个视频怎么复刻",
+        "把视频拆成提示词",
+        "视频反推",
+        "帮我拆解这条爆款",
+        "reverse this video",
+        "video to prompt",
+        "extract prompts from this video"
+      ],
+      "validate_cmd": "node skills/100x-video-reverse/scripts/validate.js --selftest",
+      "extra_cmd": "node skills/100x-video-reverse/scripts/extract-frames.mjs --selftest",
+      "note": "本仓唯一需要外部二进制依赖的 skill：agent 读不了 mp4，必须先跑 scripts/extract-frames.mjs（依赖 ffmpeg 与 ffprobe）把视频抽成帧图。也是原 7 个规划名额之外新增的第 8 个功能 skill。"
+    },
+    {
+      "id": "100x-search-query",
+      "path": "skills/100x-search-query",
+      "version": "1.5.0",
+      "step": "3.4-search-query",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "输入产品/人设卡片，输出 Pinterest / TikTok / Reddit 三平台各 15 条英文搜索短语，用于找视觉参考素材。",
+      "trigger_examples": [
+        "find reference images",
+        "what should I search on Pinterest",
+        "给我搜索关键词",
+        "去哪找参考图"
+      ],
+      "validate_cmd": "node skills/100x-search-query/scripts/validate.js --selftest"
+    },
+    {
+      "id": "100x-persona",
+      "path": "skills/100x-persona",
+      "version": "1.2.0",
+      "step": "3.1-persona-scene",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "输入脚本文案，输出讲述人物设定 + 独立场景设定，每条都可回溯到脚本原文的具体引用。",
+      "trigger_examples": [
+        "给这条脚本配个人设",
+        "这个场景怎么设定",
+        "who should deliver this script",
+        "what setting fits this ad"
+      ],
+      "validate_cmd": "node skills/100x-persona/scripts/validate.js --selftest"
+    },
+    {
+      "id": "100x-segment",
+      "path": "skills/100x-segment",
+      "version": "1.0.0",
+      "step": "1-segment",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "输入口播脚本纯文本（英/西），输出三层独立叠加的切分：L1 段落逻辑（10 模块+7 原型）、L2 镜头目的预判、L3 行内气口标记。",
+      "trigger_examples": [
+        "帮我分段",
+        "这条脚本怎么分段",
+        "拆一下这条口播文案",
+        "这段哪里该喘气",
+        "segment this script",
+        "break this voiceover into beats"
+      ],
+      "validate_cmd": "node skills/100x-segment/scripts/validate.js --selftest"
+    },
+    {
+      "id": "100x-localize",
+      "path": "skills/100x-localize",
+      "version": "1.3.0",
+      "step": "2c-localize",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "源文案（任意源语言）→ 墨西哥西语默认本地化版本，主动压缩长度、贴合真实语料实际强度分布，非逐字翻译。",
+      "trigger_examples": [
+        "投放语本地化",
+        "本地化成西语",
+        "翻译成西语文案",
+        "改写成墨西哥西语",
+        "localize this ad copy",
+        "translate this script into Spanish",
+        "Mexican Spanish localization"
+      ],
+      "validate_cmd": "node skills/100x-localize/scripts/validate.js --selftest"
+    },
+    {
+      "id": "100x-exaggerate",
+      "path": "skills/100x-exaggerate",
+      "version": "1.2.0",
+      "step": "3.3-exaggerate-contrast",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "输入脚本，输出夸张技法 beat（5 值闭集枚举）+ 反差配对 beat（4 值闭集枚举），每条逐字回指脚本原句，强度按市场+帽度天花板校准。",
+      "trigger_examples": [
+        "帮这条脚本加点夸张",
+        "这里怎么做反差",
+        "这段有点平，怎么更抓人",
+        "加个前后对比",
+        "make this script more dramatic",
+        "add a before/after contrast",
+        "how do I exaggerate this without it looking fake"
+      ],
+      "validate_cmd": "node skills/100x-exaggerate/scripts/validate.js --selftest"
+    },
+    {
+      "id": "100x-visual-fission",
+      "path": "skills/100x-visual-fission",
+      "version": "1.1.0",
+      "step": "5-visual-fission",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "输入 ≥2 条锁定的人物/场景/产品参考 + 产品文案，输出媒介裂变提示词矩阵（单帧/首尾/首中尾/数日 × VTP A/B/C 机位预设），附固定负面词常量。",
+      "trigger_examples": [
+        "帮我裂变这条视觉参考",
+        "这个产品出几个变体",
+        "生成裂变提示词矩阵",
+        "媒介裂变",
+        "视觉裂变",
+        "fission this reference",
+        "generate prompt variants for this product",
+        "multiply this reference image into variants"
+      ],
+      "validate_cmd": "node skills/100x-visual-fission/scripts/validate.js --selftest"
+    },
+    {
+      "id": "100x-prompt-compose",
+      "path": "skills/100x-prompt-compose",
+      "version": "1.2.0",
+      "step": "6-prompt-model",
+      "status": "validated",
+      "validation_result": "已通过独立验证",
+      "summary": "输入模板 id（或需求描述）+ 变量，输出逐字渲染、按目标模型（Veo/Seedance/即创）包装好的最终生成提示词。",
+      "trigger_examples": [
+        "帮我组装提示词",
+        "填个模板出提示词",
+        "这条视频用什么模型",
+        "生成视频提示词",
+        "选个模板配变量",
+        "compose a video prompt",
+        "fill in this template",
+        "generate an AI video prompt"
+      ],
+      "validate_cmd": "node skills/100x-prompt-compose/scripts/validate.js --selftest"
+    }
+  ]
+}

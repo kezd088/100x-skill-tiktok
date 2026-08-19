@@ -1,0 +1,305 @@
+id=A000033 name=权威诊断否定衰老 psychology=authority_reframe categories=['heart_cardiovascular', 'joint_bone_health', 'skincare']
+  avoid_when=['演员过年轻缺可信度', '美区推补剂假扮执业医生']
+  compliance_risks=['假医生宣称触FTC/FDA红线', '避免直接医疗诊断']
+  localization=美区演员穿中性专业装(polo/scrubs),规避执业医师身份宣称
+  slots_examples=['上了年纪/天生如此/遗传']
+
+id=A000047 name=中医权威天然背书 psychology=authority_endorsement categories=['heart_cardiovascular', 'joint_pain', 'fatigue_relief']
+  avoid_when=['宣称完全颠覆医疗共识', '受众抗拒扮演式权威']
+  compliance_risks=['伪医疗权威+夸大宣称有平台合规风险']
+  localization=美区主流可测试临床医生风格vs传统医学美学
+  slots_examples=['营养师', '实验室']
+
+id=A000056 name=伪医生权威背书 psychology=authority_bias categories=['heart_cardiovascular', 'vitamins', 'joint_bone_health']
+  avoid_when=['强限流医疗宣称的平台', '无资质易触合规红线']
+  compliance_risks=['非认证医疗专家做医学宣称高合规风险', '伪医疗权威']
+  localization=美区须谨慎,非授权医疗宣称易触FTC,建议加免责
+  slots_examples=['白大褂/营养师/研究员', '3D器官/分子演示']
+
+id=A000109 name=资深年龄背书人设 psychology=self_recognition categories=['anti_aging', 'beauty', 'hair_growth', 'supplements']
+  avoid_when=['创作者外形无法视觉背书年龄宣称']
+  compliance_risks=['未证实功效宣称需谨慎']
+  localization=美区偏好 let's be real 式坦诚而非直接炫耀
+  slots_examples=['35岁', '护肤研究10年']
+
+id=A000140 name=素人手部展示 psychology=ugc_authenticity categories=['anti_aging', 'skincare', 'supplements', 'home_goods']
+  avoid_when=['需强人设信任背书', '需真人表情演出打动高价受众']
+  compliance_risks=[]
+  localization=美区手部展示须干净利落,契合中产素人日常品质感
+  slots_examples=['steady unboxing hands', 'conversational neutral tone']
+
+id=A000214 name=无声专家反应背书 psychology=authority_bias categories=['gut_health', 'immunity', 'other']
+  avoid_when=['受众高度警惕模拟专业人士', '需口头合规声明的强监管市场']
+  compliance_risks=['伪医疗背书', '模拟专业人士误导']
+  localization=美区制服须高度真实(标准scrub剪裁+胸牌)
+  slots_examples=['白大褂专家', '厨房备菜']
+
+id=A000232 name=医生权威揭黑幕人设 psychology=authority_anti_establishment categories=['heart_cardiovascular', 'gut_health', 'immunity']
+  avoid_when=['强合规买量渠道', '官方旗舰正能量线']
+  compliance_risks=['假医生身份+医疗断言易被判虚假医疗广告封禁']
+  localization=美区'开止痛药多吃纤维'是本土痛点,可保留特化
+  slots_examples=['大药厂', '这是衰老正常现象']
+
+id=A000262 name=熟龄专家现身背书 psychology=authority_proof categories=['other', 'heart_cardiovascular', 'gut_health']
+  avoid_when=['目标为反感说教的Gen Z受众']
+  compliance_risks=['个人证言暗示疗效可能违规', '伪医疗权威风险']
+  localization=美区避免直接宣称治病;熟龄受众吃说教权威
+  slots_examples=['83岁草药长者/资深营养师', '血压优于年轻人/体检全绿']
+
+id=A000279 name=专家权威辟谣人设 psychology=expectation_violation categories=['immunity', 'gut_health', 'skincare']
+  avoid_when=['无科学成分可解释的品类']
+  compliance_risks=['伪医学权威/虚假身份', '超越法律的问诊表演']
+  localization=美区用研究员/配方师等合规身份,忌医生问诊
+  slots_examples=['临床配方师']
+
+id=A000300 name=白大褂科研背书人设 psychology=authority_trust categories=['gut_health', 'other', 'women_health', 'supplements']
+  avoid_when=['主打素人真实感的内容', '身份易被证伪']
+  compliance_risks=['伪医疗权威/未执业资质宣称', 'FTC/FDA凭证披露要求']
+  localization=美区强调学术身份而非临床诊断口吻,加免责字幕
+  slots_examples=['研究员/生物学家/营养师']
+
+id=A000331 name=传统社群秘方背书 psychology=naturalness_trust categories=['gut_health', 'weight_management']
+  avoid_when=['强化学合成制剂', '科技未来感包装']
+  compliance_risks=['身份虚构假演戏质疑']
+  localization=美区须交代非执业身份逻辑，规避阿米什用现代器械矛盾
+  slots_examples=['阿米什/原住民/长寿村民']
+
+id=A000362 name=伴侣代诉痛点钩子 psychology=self_recognition categories=['men_health', 'hair_loss', 'sleep_health']
+  avoid_when=['面向单身年轻男性', '非家庭代购品类']
+  compliance_risks=['敏感生理词可能触发平台限流']
+  localization=拉美西语市场家庭关怀观念重,英语版需自立幽默避免说教
+  slots_examples=['妻子/女儿代父亲', '精力衰退/脱发']
+
+id=A000385 name=跨性别关切代购视角 psychology=intimacy_trust categories=['men_health', 'anti_aging', 'supplements']
+  avoid_when=['中性无性别产品']
+  compliance_risks=[]
+  localization=美区含蓄谈私密健康有心照不宣共鸣
+  slots_examples=['妻子/闺蜜', '精力/健康']
+
+id=A000407 name=护士身份细胞背书 psychology=authority categories=['anti_aging', 'men_health', 'supplements']
+  avoid_when=['需纯素人真实感', '严格医疗宣称监管']
+  compliance_risks=['非持牌医护科普医疗内容风险']
+  localization=需符合当地医护制服认知,加免责声明
+  slots_examples=['护士/营养师/教练', '需靶向线粒体细胞能量']
+
+id=A000417 name=药师权威成分背书 psychology=authority_bias categories=['men_health', 'anti_aging', 'supplements', 'skincare']
+  avoid_when=['无法核实的伪专家人设']
+  compliance_risks=['白大褂直接宣称治疗疾病可能违规医疗宣称']
+  localization=美区认可NSF/Made in USA等本土认证标
+  slots_examples=['药剂师/泌尿科医生/营养师', '执照相框/NSF认证/第三方检测']
+
+id=A000451 name=疗程人群协同召唤 psychology=self_recognition categories=['weight_management', 'vitamins', 'mental_wellness', 'sleep']
+  avoid_when=['安全认证不明确', '无合规边界把控']
+  compliance_risks=['FDA保健品宣称边界', '断言治疗疾病风险']
+  localization=美区用'on a X journey'表述,勿断言治病
+  slots_examples=['某减重药疗程/术后恢复期', '帮助吸收/缓解副作用']
+
+id=A000456 name=移民打工人情感背书 psychology=in_group_identity categories=['vitamins', 'sleep', 'mental_wellness', 'anti_aging']
+  avoid_when=['高端生活方式产品', '办公室白领人群']
+  compliance_risks=[]
+  localization=必须用目标社群本地俚语,避免书面翻译
+  slots_examples=['某方言工种词', '打两份工/护士家人推荐']
+
+id=A000475 name=利他人设温情收尾 psychology=reciprocity categories=['vitamins', 'sleep', 'beauty_cosmetics', 'mental_wellness']
+  avoid_when=['纯冷启动无人设视频', '严肃品牌调性']
+  compliance_risks=[]
+  localization=拉美区飞吻/mi amor亲昵,大盘需转本地社交语
+  slots_examples=['只想分享真正有用的', '飞吻/挥手']
+
+id=A000505 name=专家资质背书 psychology=authority_heuristic categories=['sleep', 'mental_wellness', 'vitamins', 'skincare']
+  avoid_when=['伪造资质', '平台严查伪医学权威时']
+  compliance_risks=['伪医学权威/无资质背书风控风险']
+  localization=美区无出镜时纯口播称Doctora可信度打折,建议配专业视觉线索
+  slots_examples=['药剂师/营养师/皮肤科顾问']
+
+id=A000596 name=反差专家造型钩子 psychology=orienting_response categories=['men_health', 'hair_restoration', 'fitness_supplements', 'body_odor']
+  avoid_when=['品牌要求极度严谨权威', '走正规处方渠道']
+  compliance_risks=['露骨发问触碰平台红线']
+  localization=美区录音棚麦克风需真实,俚语替换露骨用词
+  slots_examples=['彩色反光墨镜']
+
+id=A000598 name=假医生权威警告开场 psychology=expectation_violation categories=['men_health', 'hair_loss', 'anti_aging', 'skincare']
+  avoid_when=['品牌无真实研发背景', '调性温和高端']
+  compliance_risks=['伪造医疗资质虚假广告', '粗口触发平台封号']
+  localization=美区避免虚构具体医院名及医疗资质,粗口软化为强否定词
+  slots_examples=['皮肤科医生/理财顾问/营养师', '30岁脱发正常/存不下钱正常']
+
+id=A000642 name=亲情第三方见证 psychology=self_recognition categories=['weight_management', 'anti_aging', 'beauty_skincare', 'hair_restoration']
+  avoid_when=['高冷奢华品牌', '无外在可见变化品类']
+  compliance_risks=['夸大蜕变对比']
+  localization=美区避免 body-shaming 台词,以健康蜕变和恢复自信为导向
+  slots_examples=['闺蜜/女儿', '妈妈']
+
+id=A000660 name=绿幕专家反应叙事 psychology=authority_bias categories=['weight_management', '护肤', '牙齿护理', '生发护理']
+  avoid_when=['品牌需高端优雅调性', '身材焦虑严打期']
+  compliance_risks=['伪医学权威/名人切片授权', '医学身份冒用']
+  localization=美区专业形象需极写实,加免责声明规避政策
+  slots_examples=['医生 / 营养师 / 实验室研究员']
+
+id=A000678 name=权威制服反差警告 psychology=expectation_violation categories=['gut_health', 'detox_cleanse', 'weight_management', 'hair_loss']
+  avoid_when=['非医学品类', '审核收紧期', '品牌温和调性']
+  compliance_risks=['假扮医生', '虚假医疗广告', '封号风险']
+  localization=美区避免绝对化诊断,静音搬运易判低质
+  slots_examples=['白大褂或实验室装', '一夜见效']
+
+id=A000725 name=反差权威人设背书 psychology=authority_bias categories=['women_health', 'weight_management', 'sleep', 'hair']
+  avoid_when=['高端理性人群', '需严谨临床可信度']
+  compliance_risks=['伪医学背书', '冒充专业人士']
+  localization=反差度需匹配目标圈层,美区高知人群易判scam
+  slots_examples=['手术服/白大褂/证书', '粗俗俚语/数钱表演']
+
+id=A000800 name=白大褂权威诊断 psychology=authority_self_recognition categories=['weight_management', 'beauty_skincare', 'posture_correction', 'oral_care']
+  avoid_when=['品牌走轻松body positivity调性', '面向Gen-Z趣味群体']
+  compliance_risks=['假医生背书封号风险', '涉Body Shaming被举报']
+  localization=美区避免贬低身体的言辞,聚焦客观现象避免政治正确抗议
+  slots_examples=['下巴/腰腹', '执照/白大褂/实验室']
+
+id=A000807 name=高龄反差自曝 psychology=expectation_violation categories=['anti_aging', 'skincare', 'longevity_supplements', 'hair_restoration']
+  avoid_when=['演员外貌与自称年龄无差', '医美痕迹过重显假']
+  compliance_risks=['虚假年龄宣称合规风险', '需加results-may-vary免责']
+  localization=美区避免年龄歧视用语,强调aging gracefully正向价值
+  slots_examples=['我今年X岁', '看起来只有四十多']
+
+id=A000829 name=反差年龄人设背书 psychology=expectation_violation categories=['anti_aging', 'skin_care', 'wellness', 'cosmetics']
+  avoid_when=['演员缺乏说服力或反差假时', '高审美意识女权受众']
+  compliance_risks=['ageism年龄羞辱', '夸大功效']
+  localization=美区避免predatory观感,重构为self-love/健康生活方式
+  slots_examples=['60岁配小25岁伴侣/69岁被搭讪', '年轻伴侣/成年子女/闺蜜同龄']
+
+id=A000855 name=俚语痛点圈层定向 psychology=expectation_violation categories=['vitamins', 'energy', 'wellness']
+  avoid_when=['主流高合规买量渠道', '面向高知中产受众']
+  compliance_risks=['粗俗/擦边词汇拒登限流', '性暗示违禁']
+  localization=不同拉美群体俚语接受度不同,须按主投州微调;买量需安全替换版
+  slots_examples=['老哥们式黑话', '体力劳动男性']
+
+id=A000877 name=专家科研背书开场 psychology=authority categories=['vitamins', 'gut_health', 'weight_management', 'skincare']
+  avoid_when=['纯娱乐GenZ品类', '低技术含量产品']
+  compliance_risks=['高公信力身份+疗效宣称易触FDA/平台审', '夸大医疗宣称']
+  localization=美区避免直接治疗疾病宣称,转为支持日常代谢
+  slots_examples=['临床营养师/生化研究员']
+
+id=A000968 name=老龄专家反差背书 psychology=expectation_violation categories=['skin_care', 'weight_management', 'gut_health', 'mental_wellness']
+  avoid_when=['面向Gen-Z重视快速变化的受众']
+  compliance_risks=['专业身份宣称需真实']
+  localization=美区避免年龄歧视色彩，可做自嘲化演绎
+  slots_examples=['82岁仍开车的母亲', '退休医生/营养学教授']
+
+id=A001000 name=专家科普背书人设 psychology=authority categories=['gut_health', 'skin_care', 'anti_aging', 'vitamins']
+  avoid_when=['平台严打伪医学权威', '无法承担专业背书风险']
+  compliance_risks=['伪医学权威/夸大背书风险']
+  localization=美区避免攻击主流医疗,以科普角度切入保权威调性
+  slots_examples=['白大褂/讲座讲台', '吸收协同/成分作用']
+
+id=A001024 name=反商业自证人设 psychology=reciprocity categories=['other', 'skin_care', 'vitamins', 'women_health']
+  avoid_when=['强合规功效承诺场景', '精致摆拍破坏真实感']
+  compliance_risks=['反广告框架可能与信披规则冲突']
+  localization=美区用地道口语/方言,保留结巴停顿真实感
+  slots_examples=['不是恰饭/没拿钱']
+
+id=A001049 name=细分病症身份锁定 psychology=self_recognition categories=['mental_wellness', 'vitamins', 'men_health']
+  avoid_when=['投放审核禁提病症词', '需广泛人群覆盖']
+  compliance_risks=['病症词触发平台/医疗审核', '封户风险']
+  localization=美区病症词极敏感,备合规变体如'kids who can't sit still'
+  slots_examples=['ADHD孩子父母/严重脱发者/焦虑发作者', '藏红花/某天然根茎']
+
+id=A001062 name=主理人经营困境解密 psychology=commitment_consistency categories=['energy', 'vitamins', 'sleep', 'hair_care']
+  avoid_when=['无真实事实支撑装弱博同情', '大集团扮小微企业']
+  compliance_risks=['虚假哭穷透支信誉']
+  localization=美区须逻辑闭环大方磊落,非卑微乞求同情
+  slots_examples=['利润太薄无法维持', '平台扣点越来越高']
+
+id=A001063 name=权威去污名痛点中断 psychology=cognitive_dissonance categories=['women_health', 'hair_care', 'gut_health', 'sexual_wellness']
+  avoid_when=['品牌走轻松软卖生活风']
+  compliance_risks=['视觉病理呈现触平台社区准则']
+  localization=语言须像美区护士真实用语如 down there
+  slots_examples=['注册护士/皮肤科医生', '私处感染/囊肿痘']
+
+id=A001093 name=白大褂徽章权威锚 psychology=authority_bias categories=['vitamins', 'anti_aging', 'skin_care', 'gut_health']
+  avoid_when=['产品需情绪冲动购买而非理性信任']
+  compliance_risks=['虚假医疗身份/医疗宣称风险']
+  localization=美区避免宣称治病,遵FDA claims用practitioner措辞
+  slots_examples=['营养师制服/实验室外套']
+
+id=A001117 name=病友同盟人设 psychology=empathy_alliance categories=['vitamins', 'men_health', 'gut_health', 'skin_care']
+  avoid_when=['强依赖创作者独特人设难换脸时']
+  compliance_risks=['虚构亲历经历的合规风险']
+  localization=
+  slots_examples=["I've been through it all"]
+
+id=A001149 name=专家循证身份开场 psychology=authority_credibility categories=['vitamins', 'skin_care', 'anti_aging', 'men_health']
+  avoid_when=['无真实资质的普通达人']
+  compliance_risks=['虚假身份/医疗宣称/被起诉']
+  localization=美区身份陈述避免疾病治愈声明,截图须可检索
+  slots_examples=['配方师/生化学者', '学术主页截图']
+
+id=A001171 name=闺蜜圈层身份锚定 psychology=social_proof categories=['vitamins', 'skin_care', 'hair_care', 'gut_health']
+  avoid_when=['泛人群或男性受众', '圈层词与品牌调性冲突']
+  compliance_risks=[]
+  localization=圈层称呼按目标族群本土习惯选词,避免刻板印象
+  slots_examples=['my girls / besties / us', '头发皮肤指甲/身材管理']
+
+id=A001207 name=平台限流内幕人设 psychology=cognitive_dissonance categories=['weight_management', 'skin_care', 'vitamins', 'hair_care']
+  avoid_when=['老牌官方背景严肃形象']
+  compliance_risks=['阴谋论触犯内容安全审查']
+  localization=美区give y'all game俚语适潮人,中产改中性表达
+  slots_examples=["'他们不想你知道'"]
+
+id=A001220 name=素人分享中间人 psychology=social_proof categories=['vitamins', 'skin_care', 'gut_health', 'other', 'hair_care']
+  avoid_when=['需高度正式临床语言的品牌']
+  compliance_risks=['伪造真实性被识破反噬']
+  localization=车内/居家等原生UGC场景更卸防备
+  slots_examples=['闺蜜安利/自用记录']
+
+id=A001221 name=医患角色扮演面诊 psychology=self_recognition categories=['vitamins', 'gut_health', 'hair_care', 'skin_care']
+  avoid_when=['需机构级合规审查的严格临床品牌']
+  compliance_risks=['医疗诊断擦边/FDA边界', '擦边贬义体态词']
+  localization=避免明确诊断宣称,聚焦自感体征
+  slots_examples=['刷手服专家vs居家患者']
+
+id=A001248 name=居家素人低防备人设 psychology=authenticity_trust categories=['vitamins', 'weight_management', 'men_health']
+  avoid_when=['需高端权威专业形象时']
+  compliance_risks=[]
+  localization=同语系社区化口吻建文化信任圈
+  slots_examples=['睡衣/卫衣']
+
+id=A001348 name=反营销自清信誉声明 psychology=expectation_violation categories=['women_health', 'skin_care', 'gut_health', 'vitamins']
+  avoid_when=['品牌官方账号无达人媒介', '新号无背书']
+  compliance_risks=['若实为软广的虚假自清易被质疑']
+  localization=美区用户对虚假自清敏感,声明须真诚自然
+  slots_examples=['我不是为了赚你的佣金才推荐']
+
+id=A001349 name=社群专属文化归属声明 psychology=in_group_identity categories=['skin_care', 'hair_care', 'vitamins', 'women_health']
+  avoid_when=['通投大盘流量', '非该群体人套用话术']
+  compliance_risks=['文化挪用争议']
+  localization=美区选角必须完全符合该社群语言习惯,避免文化挪用
+  slots_examples=['专门为我们群体打造,由我们生产', '我们得照顾好自己']
+
+id=A001394 name=身份圈层召唤 psychology=in_group_identity categories=['skin_care', 'hair_care', 'vitamins', 'mental_wellness']
+  avoid_when=['创作者不属该群体强用显假', '品牌需机构权威中性调性']
+  compliance_risks=[]
+  localization=美区对同圈层UGC接受度高,俚语须真实匹配创作者身份
+  slots_examples=['姐妹/宝妈/达人/圈内人']
+
+id=A001424 name=资历背书专家人设 psychology=authority_bias categories=['gut_health', 'weight_management', 'vitamins']
+  avoid_when=['无法证实的专业宣称']
+  compliance_risks=['伪专家/伪医学背书违规']
+  localization=美区健康类需规避诊疗承诺
+  slots_examples=['从业N年的某领域专家']
+
+id=A001526 name=闺蜜私密安利 psychology=empathy categories=['workout_energy', 'vaginal_health', 'gut_health']
+  avoid_when=['需要临床权威人设的产品']
+  compliance_risks=['禁忌话题的平台限流']
+  localization=同伴俚语需地道,避免翻译腔
+  slots_examples=['girl js.../别不好意思', '体味/身材焦虑']
+
+id=A001532 name=配偶家人代言种草 psychology=social_proof categories=['men_health', 'other', 'weight_management']
+  avoid_when=['主打严肃临床科学形象时']
+  compliance_risks=['生理暗示过露触发平台下架']
+  localization=西语裔用mi amor等亲密称呼构建家庭氛围
+  slots_examples=['妻子/丈母娘', '丈夫/女婿']
+
+id=A001818 name=无所谓真诚人设 psychology=authenticity categories=['men_health', 'weight_management', 'specialty']
+  avoid_when=['白牌新品无口碑积累时']
+  compliance_risks=[]
+  localization=美区看重自主决定权，逆向说服契合
+  slots_examples=['我不在乎你买不买', '你自己']

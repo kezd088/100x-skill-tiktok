@@ -1,0 +1,320 @@
+app:
+  name: "Veo 视频生成"
+  description: "接收 100x-prompt-compose 输出的 Veo-ready prompt 与时长（category=视频, model=veo 时的 ComposedPromptBundle），调用 Dify 官方 Gemini Video 插件（Veo 3.1）实际生成视频，返回视频地址与执行状态。"
+  icon: "🎬"
+  icon_type: emoji
+  icon_background: "#FBE8D3"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/gemini_video:0.0.15@79506f51ced07347e29fcb068fd1540ddaf756cb4ac815a37224816e0507c476
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods: [local_file, remote_url]
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: [local_file, remote_url]
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    nodes:
+      - data:
+          title: "开始"
+          type: start
+          variables:
+            - label: "model"
+              variable: model
+              type: text-input
+              required: true
+              max_length: 50
+            - label: "duration_seconds"
+              variable: duration_seconds
+              type: number
+              required: true
+            - label: "final_prompt_wrapped"
+              variable: final_prompt_wrapped
+              type: paragraph
+              required: true
+              max_length: 8000
+        height: 116
+        id: "5200001"
+        position: { x: 30, y: 300 }
+        positionAbsolute: { x: 30, y: 300 }
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      - data:
+          title: "准备 Veo 参数"
+          type: code
+          code_language: python3
+          code: |
+            def main(duration_seconds: float, final_prompt_wrapped: str) -> dict:
+                # The real Dify "Gemini Video" plugin (langgenius/gemini_video,
+                # tool gemini_video_general) only accepts duration_seconds as a
+                # select with exactly these string values: "4", "6", "8"
+                # (confirmed from tools/gemini_video.yaml parameter schema on
+                # 2026-08-05). 100x-prompt-compose's veo.md profile fixes
+                # video_unit.duration_seconds to 8.0 in normal operation (no
+                # multi-GU splitting in this skill), so this almost always
+                # snaps to "8" with zero loss. This is a defensive fallback for
+                # any future/edge value outside {4, 6, 8}; ties round up
+                # (toward more footage) rather than down.
+                allowed = [4, 6, 8]
+                try:
+                    requested = float(duration_seconds)
+                except (TypeError, ValueError):
+                    requested = 8.0
+                snapped = min(allowed, key=lambda v: (abs(v - requested), -v))
+
+                return {
+                    "veo_duration_seconds": str(snapped),
+                    "veo_prompt": final_prompt_wrapped or "",
+                }
+          variables:
+            - value_selector: ["5200001", duration_seconds]
+              variable: duration_seconds
+            - value_selector: ["5200001", final_prompt_wrapped]
+              variable: final_prompt_wrapped
+          outputs:
+            veo_duration_seconds:
+              type: string
+            veo_prompt:
+              type: string
+          selected: false
+        height: 98
+        id: "5200002"
+        position: { x: 334, y: 300 }
+        positionAbsolute: { x: 334, y: 300 }
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      - data:
+          title: "调用 Gemini Video（Veo 3.1）"
+          type: tool
+          is_team_authorization: true
+          provider_id: langgenius/gemini_video/gemini_video
+          provider_name: langgenius/gemini_video/gemini_video
+          provider_type: builtin
+          plugin_id: langgenius/gemini_video
+          plugin_unique_identifier: langgenius/gemini_video:0.0.15@79506f51ced07347e29fcb068fd1540ddaf756cb4ac815a37224816e0507c476
+          tool_name: gemini_video_general
+          tool_label: "Gemini Video Generation"
+          tool_description: "gemini video generation support for Veo 3.1"
+          tool_node_version: "2"
+          # All 11 parameters on this plugin's own tool YAML are declared
+          # form: form (none are form: llm). Per this skill's own reference
+          # material there is an unresolved tension between a source-inference
+          # heuristic ("form:form -> tool_configurations") and a
+          # real-export-derived corrected rule ("tool_parameters is required
+          # for executable workflow tool nodes"); see visual-generate-veo.dify.notes.md
+          # for the full reasoning. This node follows the corrected rule and
+          # the canonical tool-node template: every bound value (constant or
+          # variable-linked) lives under tool_parameters, tool_configurations
+          # is left empty. Verify in the Dify UI after import.
+          tool_configurations: {}
+          tool_parameters:
+            model:
+              type: constant
+              value: "veo-3.1-generate-preview"
+            prompt:
+              type: mixed
+              value: "{{#5200002.veo_prompt#}}"
+            duration_seconds:
+              type: mixed
+              value: "{{#5200002.veo_duration_seconds#}}"
+            aspect_ratio:
+              type: constant
+              value: "9:16"
+            resolution:
+              type: constant
+              value: "720p"
+          selected: false
+        height: 328
+        id: "5200003"
+        position: { x: 638, y: 300 }
+        positionAbsolute: { x: 638, y: 300 }
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      - data:
+          title: "解析生成结果"
+          type: code
+          code_language: python3
+          code: |
+            def main(tool_files: list, tool_text: str) -> dict:
+                # The plugin's own implementation (tools/gemini_video.py in
+                # langgenius/dify-official-plugins) calls create_blob_message()
+                # with the raw generated mp4 bytes. It does NOT return an
+                # external hosted URL the way the raw Gemini REST API would
+                # (generateVideoResponse.generatedSamples[0].video.uri) --
+                # Dify wraps that blob as a File in this tool node's `files`
+                # output instead. The exact per-field shape of that File
+                # object (e.g. whether the hosted-URL key is `url` or
+                # `remote_url`) is inferred from Dify's general file-variable
+                # convention and is NOT confirmed against a live run of this
+                # specific plugin. Verify after a real import/execution and
+                # adjust the key lookups below if the real field name differs.
+                if not tool_files:
+                    return {
+                        "status": "failed",
+                        "video_url": "",
+                        "video_file": {},
+                        "error_detail": (tool_text or "Veo tool node returned no file output.").strip(),
+                    }
+
+                video_file = tool_files[0] if isinstance(tool_files, list) else tool_files
+                video_url = ""
+                if isinstance(video_file, dict):
+                    video_url = video_file.get("url") or video_file.get("remote_url") or ""
+
+                if not video_url:
+                    return {
+                        "status": "failed",
+                        "video_url": "",
+                        "video_file": video_file if isinstance(video_file, dict) else {},
+                        "error_detail": "Veo tool node returned a file without a resolvable url field; inspect the raw file object in a real run and adjust the parser.",
+                    }
+
+                return {
+                    "status": "success",
+                    "video_url": video_url,
+                    "video_file": video_file,
+                    "error_detail": "",
+                }
+          variables:
+            - value_selector: ["5200003", files]
+              variable: tool_files
+            - value_selector: ["5200003", text]
+              variable: tool_text
+          outputs:
+            status:
+              type: string
+            video_url:
+              type: string
+            video_file:
+              type: object
+            error_detail:
+              type: string
+          selected: false
+        height: 98
+        id: "5200004"
+        position: { x: 942, y: 300 }
+        positionAbsolute: { x: 942, y: 300 }
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      - data:
+          title: "结束"
+          type: end
+          outputs:
+            - variable: status
+              value_selector: ["5200004", status]
+            - variable: video_url
+              value_selector: ["5200004", video_url]
+            - variable: video_file
+              value_selector: ["5200004", video_file]
+            - variable: error_detail
+              value_selector: ["5200004", error_detail]
+        height: 142
+        id: "5200005"
+        position: { x: 1246, y: 300 }
+        positionAbsolute: { x: 1246, y: 300 }
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+    edges:
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: start
+          targetType: code
+        id: 5200001-source-5200002-target
+        source: "5200001"
+        sourceHandle: source
+        target: "5200002"
+        targetHandle: target
+        type: custom
+        selected: false
+        zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: code
+          targetType: tool
+        id: 5200002-source-5200003-target
+        source: "5200002"
+        sourceHandle: source
+        target: "5200003"
+        targetHandle: target
+        type: custom
+        selected: false
+        zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: tool
+          targetType: code
+        id: 5200003-source-5200004-target
+        source: "5200003"
+        sourceHandle: source
+        target: "5200004"
+        targetHandle: target
+        type: custom
+        selected: false
+        zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: code
+          targetType: end
+        id: 5200004-source-5200005-target
+        source: "5200004"
+        sourceHandle: source
+        target: "5200005"
+        targetHandle: target
+        type: custom
+        selected: false
+        zIndex: 0
+
+    viewport: { x: 50, y: 200, zoom: 0.7 }

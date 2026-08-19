@@ -1,0 +1,231 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-video-reverse/VideoReverseBundle.json",
+  "title": "VideoReverseBundle",
+  "description": "Output contract for 100x-video-reverse. Self-contained in this skill (this repo's shared schemas/ directory is still empty). One video in -> two sections out: (1) replication prompts on TWO parallel axes -- shots[] (per-cut, narrative-function axis) and visual_forms[] (per-visual-form axis); (2) variabilization -- slot_template ({VAR} placeholders + candidate values) and cross_shot_analysis (what stays fixed vs. what moves across cuts WITHIN this one video). NOTE (same schema/script split every skill in this repo uses): vanilla JSON Schema draft-07 CANNOT express, and scripts/validate.js therefore enforces: (a) time_bucket continuity C1-C5 -- these are string-parsed arithmetic comparisons across adjacent array items (first shot starts at 0.0, last shot ends at source.duration_sec +/-0.2, adjacent buckets touch with no gap/overlap, end>start, shot_id ascending); (b) the per-model segment duration cap -- target_model selects a numeric ceiling that must be compared against (end-start) parsed out of a STRING field, which no keyword can do; (c) referential integrity + zero-orphan coverage between visual_forms[].appears_in_shots and shots[].shot_id, in both directions (axiom 4); (d) the case-insensitive, word-boundary-matched AI-beautification banned-word scan on prompt_en (axiom 3) -- a case-insensitive curated word list is not practically expressible as a vanilla regex; (e) slot/template mutual closure -- every {VAR} token in template_en must have a slots[] entry and vice versa (axiom 5), which requires tokenizing a string field; (f) bilingual structural alignment between prompt_en and prompt_zh (equal slot counts / equal shot counts), a cross-field comparison. See axioms.md for the full split.",
+  "type": "object",
+  "required": ["source", "target_model", "shots", "visual_forms", "slot_template", "cross_shot_analysis", "meta"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "shots": { "minItems": 2 } }, "required": ["shots"] },
+      "then": { "properties": { "cross_shot_analysis": { "properties": { "invariants": { "minItems": 1 } } } } },
+      "description": "A single-shot video has nothing to compare ACROSS shots, so cross_shot_analysis is legitimately empty there -- but invariant_item.holds_in_shots requires >=2 shot ids by definition, which a 1-shot video can never satisfy. Rather than weakening holds_in_shots (which would let a caller claim something is 'invariant' from a single observation), the >=1 invariant requirement is made CONDITIONAL on the video actually having >=2 shots. This is one of the few cross-branch rules draft-07 CAN express, via if/then on a sibling array's length, so it stays in schema.json instead of being pushed into scripts/validate.js."
+    }
+  ],
+  "properties": {
+    "source": {
+      "type": "object",
+      "required": ["duration_sec", "aspect_ratio", "frames_analyzed", "extraction_method"],
+      "additionalProperties": false,
+      "properties": {
+        "duration_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 180,
+          "description": "Total source duration. The 180s ceiling is axiom 1's hard refusal threshold expressed structurally -- a bundle claiming to reverse a longer video is invalid by construction, not merely warned about. scripts/extract-frames.mjs refuses the same threshold upstream (exit 2) so this should never be reached in a normal run; it is kept here so a hand-written or model-fabricated bundle cannot smuggle a >180s claim past validation."
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "minLength": 3,
+          "description": "Normalized to a common ratio ('9:16'/'16:9'/'1:1'/'4:5') when the real dimensions match one, otherwise the literal 'WxH' string. Copied from scripts/extract-frames.mjs's meta.json, not re-derived by the model."
+        },
+        "frames_analyzed": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many extracted keyframes the reversal actually looked at. Ties the bundle back to a real extract-frames run -- this skill's agent cannot read mp4 directly (see SKILL.md known limitation #1), so a bundle with frames_analyzed it never saw is a fabrication."
+        },
+        "extraction_method": {
+          "enum": ["scene-detect", "scene-detect+interval-fill", "scene-detect+top-n"],
+          "description": "Echoed verbatim from extract-frames.mjs's meta.json extraction.method. 'top-n' means frames were DROPPED to fit the cap -- downstream readers must know the frame set is not exhaustive, so this is required, not optional."
+        }
+      }
+    },
+    "target_model": {
+      "enum": ["veo", "seedance", "即创", "generic"],
+      "description": "Selects the per-segment duration ceiling enforced by scripts/validate.js (axiom 2). Reuses the exact 3-value model enum this repo already committed to in 100x-prompt-compose/schema.json rather than inventing a parallel list, plus 'generic' for an unspecified engine. Caps come from 100x-prompt-compose/scripts/validate.js's MODEL_DURATION_CAP ({veo:8.0, seedance:10.0, 即创:null}), which independently matches the private-repo segment-cap table; '即创' has no published cap there (null) and 'generic' names no engine, so both fall back to the strictest tier (8.0s) -- see axioms.md axiom 2."
+    },
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/shot_item" },
+      "description": "AXIS A -- the per-cut axis. One entry per detected cut, covering the timeline end to end with no gaps (C1-C5, enforced in scripts/validate.js). A video short enough not to need splitting is a legal 1-item array."
+    },
+    "visual_forms": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/visual_form_item" },
+      "description": "AXIS B -- the per-visual-form axis. One entry per DISTINCT visual form present in the video, each pointing back at the shots it appears in. Deliberately NOT a field on shot_item: the same form recurs across non-adjacent cuts, and the whole point of this axis is to collapse those into one reusable prompt. form_type uniqueness across the array and full coverage of shots[] are cross-item rules scripts/validate.js enforces (axiom 4)."
+    },
+    "slot_template": { "$ref": "#/definitions/slot_template" },
+    "cross_shot_analysis": { "$ref": "#/definitions/cross_shot_analysis" },
+    "meta": {
+      "type": "object",
+      "required": ["generated_by", "frames_source"],
+      "additionalProperties": true,
+      "properties": {
+        "generated_by": { "const": "100x-video-reverse" },
+        "frames_source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the meta.json produced by scripts/extract-frames.mjs for this run. Makes the reversal auditable -- a reviewer can re-open the exact frames the prompts claim to describe."
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "definitions": {
+    "shot_purpose_enum": {
+      "enum": ["hook", "build", "reveal", "demo", "social_proof", "cta", "transition"],
+      "description": "Reuses 100x-segment/schema.json's shot_purpose enum VERBATIM (which itself reuses the storyboard 7-value list). Deliberate: 100x-segment predicts these 7 values from script text alone and its schema notes it cannot fill visual_description/camera_language because those 'require actually seeing the video'. This skill sees the video. Keeping one shared enum means a segment[] output and a shots[] output can be diffed field-for-field with no remap -- inventing an 8th value here would silently break that."
+    },
+    "form_type_enum": {
+      "enum": ["talking_head", "selfie_ugc", "product_closeup", "hands_demo", "before_after_split", "b_roll_lifestyle", "text_card", "screen_recording", "animation_graphic"],
+      "description": "Closed set of VISUAL FORMS (what the frame looks like), deliberately not CONTENT FORMS (who is talking / what they talk about). The private repo carries three mutually unaligned classification systems -- a 7-value per-shot narrative-purpose list, an 8-value whole-video content_form list (F1-F8), and a 47-value content-type list -- and has already recorded the cost of letting several coexist (a forced cross-mapping table). This skill commits to exactly ONE semantic axis. Seven of the nine values are grounded in the private repo's visual-type and UGC-camera-position vocabularies; 'text_card' and 'screen_recording' are ORIGINAL to this build, added because both occur constantly in real TikTok UGC yet fit none of the inherited values -- they are disclosed as unvalidated-against-real-corpus in SKILL.md's known limitations and in sources.md, not passed off as inherited."
+    },
+    "time_bucket": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]-[0-9]+\\.[0-9]$",
+      "description": "'start-end' in seconds with exactly one decimal place, mirroring the private repo's storyboard time_bucket format. The pattern only fixes the SHAPE. Everything that makes the timeline actually valid -- start<end, first bucket starting at 0.0, last bucket landing on source.duration_sec within +/-0.2, adjacent buckets touching exactly, and the (end-start) span respecting target_model's cap -- requires parsing the two numbers out of this string and comparing them against sibling array items and a top-level field. No JSON Schema keyword can do that; scripts/validate.js does all of it (axiom 2)."
+    },
+    "prompt_en": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 2000,
+      "pattern": "^(?=[\\x20-\\x7E]+$).*, no text, no subtitles, no watermarks$",
+      "description": "The generation-ready English prompt (axiom 3). The single pattern enforces two of the three axiom-3 rules at once: the lookahead pins the ENTIRE string to printable ASCII (which is what actually rejects stray Chinese/Spanish leaking into a field that must be pure English -- a plain 'is it English' test is not expressible, but 'contains no non-ASCII codepoint' is and catches the real failure mode), and the tail anchors the mandatory ', no text, no subtitles, no watermarks' suffix. The third rule -- the curated AI-beautification banned-word list -- is NOT here: it must be case-insensitive and word-boundary-matched, and draft-07 pattern has no case-insensitive flag, so expressing ~20 words x every casing as a readable regex is impractical. scripts/validate.js scans it with \\b-bounded matching. Bare substring matching is specifically forbidden there to avoid false positives (e.g. 'cure' inside 'secure'/'manicure' or 'polished' inside 'unpolished')."
+    },
+    "prompt_zh": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 2000,
+      "description": "Chinese reading copy for the operations team, paired 1:1 with prompt_en. NOT fed to any generation model -- Veo/Seedance receive prompt_en only, so this field carries no suffix/ASCII/banned-word constraints. scripts/validate.js checks STRUCTURAL alignment with prompt_en (both present, matching {VAR} slot counts where slots appear). Whether the Chinese is a FAITHFUL rendering of the English is a semantic judgment no assertion can make -- disclosed as a known limitation in SKILL.md, not silently claimed as validated."
+    },
+    "shot_item": {
+      "type": "object",
+      "required": ["shot_id", "time_bucket", "shot_purpose", "prompt_en", "prompt_zh"],
+      "additionalProperties": false,
+      "properties": {
+        "shot_id": { "type": "integer", "minimum": 1 },
+        "time_bucket": { "$ref": "#/definitions/time_bucket" },
+        "shot_purpose": { "$ref": "#/definitions/shot_purpose_enum" },
+        "camera_note": {
+          "type": "string",
+          "description": "Optional one-line objective camera fact (framing/angle/movement) as a flat string. Deliberately a flat string, not a {shot_size, angle, motion} object: the private storyboard axioms explicitly reject the split-object form and require it flattened to one line."
+        },
+        "prompt_en": { "$ref": "#/definitions/prompt_en" },
+        "prompt_zh": { "$ref": "#/definitions/prompt_zh" }
+      }
+    },
+    "visual_form_item": {
+      "type": "object",
+      "required": ["form_type", "appears_in_shots", "prompt_en", "prompt_zh"],
+      "additionalProperties": false,
+      "properties": {
+        "form_type": { "$ref": "#/definitions/form_type_enum" },
+        "appears_in_shots": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 },
+          "description": "shot_id values this form appears in. uniqueItems stops the same shot being listed twice within one form, but that these integers correspond to REAL shots[].shot_id entries -- and that no shot is left uncovered by any form -- is referential integrity + coverage, which schema.json cannot see. scripts/validate.js enforces both directions (axiom 4)."
+        },
+        "prompt_en": { "$ref": "#/definitions/prompt_en" },
+        "prompt_zh": { "$ref": "#/definitions/prompt_zh" }
+      }
+    },
+    "slot_item": {
+      "type": "object",
+      "required": ["name", "observed_value", "candidates"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "Slot token name WITHOUT braces (e.g. 'ETHNICITY'). ALL-CAPS is enforced structurally so the {VAR} tokenizer in scripts/validate.js has an unambiguous target and cannot mistake ordinary braced prose for a slot."
+        },
+        "observed_value": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[\\x20-\\x7E]+$",
+          "description": "What this slot ACTUALLY was in the source video. Kept separate from candidates so the bundle stays a faithful reversal first and a template second -- without it, a template could drift away from the video it claims to reverse with nothing to check it against. ASCII-locked for the same reason as candidates below."
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "pattern": "^[\\x20-\\x7E]+$" },
+          "description": "Substitution options for batch fission. minItems 2 is the definition of the field, not a style preference: a slot with fewer than two alternatives varies nothing and should have stayed literal text in the template. Mirrors the >=2 rule 100x-visual-fission puts on its own observed_values. ASCII-LOCKED, and this is not decoration: these values get substituted INTO template_en, which axiom 3 pins to printable ASCII. Without the same lock here, a bundle could pass every check while carrying Chinese candidate values that silently produce a half-Chinese 'English' prompt the moment the template is rendered -- axiom 3's guarantee would hold for every string this schema inspects directly and still be defeated at render time. Found during this build by the agent writing SKILL.md, who noticed axiom 3 locked the produced prompts but nothing locked the values destined to be spliced into them."
+        }
+      }
+    },
+    "slot_template": {
+      "type": "object",
+      "required": ["template_en", "template_zh", "slots"],
+      "additionalProperties": false,
+      "properties": {
+        "template_en": {
+          "type": "string",
+          "minLength": 20,
+          "pattern": "^(?=[\\x20-\\x7E]+$)(?=.*\\{[A-Z][A-Z0-9_]*\\}).*, no text, no subtitles, no watermarks$",
+          "description": "The English replication prompt with literal values replaced by {SLOT} tokens. Same ASCII + mandatory-suffix rules as prompt_en (a rendered template must itself be a valid generation prompt), plus a lookahead requiring at least one {SLOT} token -- a 'template' with no slots is just a prompt. WHICH tokens appear, and whether each has a matching slots[] entry, is axiom 5's mutual-closure check in scripts/validate.js."
+        },
+        "template_zh": {
+          "type": "string",
+          "minLength": 8,
+          "description": "Chinese counterpart. Must carry the SAME {SLOT} tokens as template_en -- token sets are compared between the two by scripts/validate.js, so an operator editing the Chinese cannot silently drop a variable."
+        },
+        "slots": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/slot_item" }
+        }
+      },
+      "description": "VARIABILIZATION BLOCK 1 -- turning one reversed prompt into a reusable template. This is the half that feeds batch production directly."
+    },
+    "invariant_item": {
+      "type": "object",
+      "required": ["aspect", "description", "holds_in_shots"],
+      "additionalProperties": false,
+      "properties": {
+        "aspect": { "enum": ["person", "scene", "product", "wardrobe", "lighting"] },
+        "description": { "type": "string", "minLength": 3 },
+        "holds_in_shots": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 },
+          "description": "minItems 2 is definitional: something observed in a single shot is not yet shown to be invariant. Values must be real shot_id entries -- scripts/validate.js checks."
+        }
+      }
+    },
+    "varying_axis_item": {
+      "type": "object",
+      "required": ["axis", "observed_values"],
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "enum": ["camera", "pose", "composition", "location", "action"],
+          "description": "First three values are byte-identical to 100x-visual-fission's variable_item.dimension enum, on purpose: this is a strict SUPERSET, so a downstream visual-fission run can consume the first three and ignore the rest without a mapping table. 'location' and 'action' are added because a single video moves through places and actions in a way a set of still references does not -- disclosed as an original extension in sources.md."
+        },
+        "observed_values": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "minItems 2: an axis with one observed value did not vary, and belongs in invariants[] instead."
+        }
+      }
+    },
+    "cross_shot_analysis": {
+      "type": "object",
+      "required": ["invariants", "varying_axes"],
+      "additionalProperties": false,
+      "properties": {
+        "invariants": { "type": "array", "minItems": 0, "items": { "$ref": "#/definitions/invariant_item" } },
+        "varying_axes": { "type": "array", "items": { "$ref": "#/definitions/varying_axis_item" } }
+      },
+      "description": "VARIABILIZATION BLOCK 2 -- what holds still vs. what moves ACROSS CUTS WITHIN THIS ONE VIDEO. Field names deliberately avoid 'constants'/'variables': those two names already carry precise machine-verified meanings in 100x-visual-fission, where they describe differences ACROSS >=2 SEPARATE reference materials. Same words, different unit of comparison -- reusing them would create two divergent definitions of one term across the repo, the exact recurring failure this repo's AGENTS.md calls out. Both arrays may be empty for a 1-shot video, which genuinely has no cross-shot dimension at all; for any video with >=2 shots the top-level allOf/if-then makes invariants[] mandatory, since a real multi-cut video always shares at least one anchor across its cuts. varying_axes stays optional even then -- a locked-off single-scene talking head really does vary on nothing."
+    }
+  }
+}

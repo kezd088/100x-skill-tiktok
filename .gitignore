@@ -1,0 +1,11 @@
+dist/
+node_modules/
+.env
+_work/
+# 真实语料绝不入公开仓
+**/evals/**/real-*
+_HANDOFF.md
+results/
+鸡尾酒脚本_51个独立Sheet.xlsx
+# 本地删除归档：保留内部质检与决策记录原件，绝不入公开仓
+.trash/

@@ -1,0 +1,13 @@
+{
+  "name": "100x-exaggerate",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Validation tooling for the 100x-exaggerate skill (ExaggerationContrastBundle output contract). Not published -- this package.json exists only so scripts/validate.js can pull in ajv for real JSON Schema enforcement (structural checks: required/additionalProperties/enum/pattern), same wiring as 100x-search-query. Cross-item/cross-field checks that JSON Schema draft-07 cannot express (literal-quote anchoring, contrast-pair non-degeneracy, market/hat-level calibration ceiling) stay hand-written in scripts/validate.js -- see that file's header comment and axioms.md.",
+  "scripts": {
+    "validate": "node scripts/validate.js",
+    "selftest": "node scripts/validate.js --selftest"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}

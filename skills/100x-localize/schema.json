@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-localize/LocalizationBundle.json",
+  "title": "LocalizationBundle",
+  "description": "Output contract for 100x-localize. Self-contained in this skill (this repo has no shared cross-skill schemas/ yet). One source ad script (any source language) in -> one Mexican-Spanish-default localized script out. NOTE: vanilla JSON Schema draft-07 can enforce per-field shape (required/type/enum/pattern/minLength) and even conditional per-field constraints via if/then (axiom 2's compliance-conservative banned-phrase ban, axiom 3's universal tú-only ban -- both are single-field pattern checks this schema fully expresses). It CANNOT enforce CROSS-FIELD arithmetic or content comparisons -- axiom 1's 'localized_script must not be more than 1.10x / less than 0.5x the character length of source_script' (comparing two string fields' lengths) and axiom 4's 'localized_script must not introduce an authority/certification token absent from source_script' (comparing two string fields' content). Those are enforced by the real, runnable script at scripts/validate.js, which loads this file at runtime and re-reads its enum lists + both pattern strings (rather than re-typing them) so the two files can't silently drift. See axioms.md for the split.",
+  "type": "object",
+  "required": [
+    "source_script",
+    "target_region",
+    "register_profile",
+    "localized_script",
+    "meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "source_script": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Verbatim source ad script/copy text to localize, in whatever language it was authored in (typically English or Chinese in this pipeline). Echoed here so axiom 1 (compression ratio) and axiom 4 (no newly-introduced authority claims) can compare against localized_script. Must not be a real customer/brand script when used in this repo's evals/ (synthetic only)."
+    },
+    "source_language_note": {
+      "type": "string",
+      "description": "Optional. Notes the language of source_script when it isn't obvious (e.g. 'source copy: en'). Does not change target_region or register_profile."
+    },
+    "target_region": {
+      "type": "string",
+      "enum": [
+        "mx",
+        "generic-latam"
+      ],
+      "default": "mx",
+      "description": "Spanish-market variant. v1 scope is Mexico-default plus a neutral pan-Latam fallback (07_西语口播风格规范.md §2). Spain ('es', vosotros/vos-form) and Argentina-specific 'vos' conjugation are explicitly OUT OF SCOPE for v1 -- see SKILL.md 核心约束 known-gap note and axioms.md TODO. A caller asking for those regions should be told this skill cannot yet honor region-specific conjugation and should fall back to 'generic-latam' with a meta.warnings note, not silently mislabeled as 'mx'."
+    },
+    "register_profile": {
+      "type": "string",
+      "enum": [
+        "default",
+        "compliance-conservative"
+      ],
+      "default": "default",
+      "description": "Axiom 2. 'default' matches this skill's real hat-graded ES corpus distribution (predominantly blackhat in the reference corpus) and places NO restriction on the claim phrasing below. 'compliance-conservative' is an OPT-IN downgrade that demotes 07_西语口播风格规范.md §5's conservative ban list from an assumed default to an optional profile (see profiles/compliance-conservative.md) -- that file itself self-discloses (§1) it is a language-ADAPTATION spec, not a conclusion empirically validated against real Spanish viral samples, so this skill does not treat its bans as the default posture."
+    },
+    "localized_script": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:(?!\\b[uU][sS][tT][eE][dD](?:[eE][sS])?\\b|\\b[vV][oO][sS][oO][tT][rR][oOaA][sS]\\b)[\\s\\S])*$",
+      "description": "Axiom 3 (universal, applies regardless of register_profile or target_region since v1 only supports the tú register -- see known-gap note on target_region): must not contain 'usted/ustedes' or 'vosotros/vosotras', IN ANY CASE COMBINATION (every alphabetic character in the banned tokens is its own two-case class, e.g. [Uu], so 'USTED'/'Usted'/'uSteD' are all caught, not just a leading-capital-letter special case). This is a quality bar this skill's OWN output must clear -- honesty note: reference ES corpora are NOT this disciplined (organic content occasionally mixes 'usted' with 'tú'). This pattern intentionally sets a stricter bar for generated output than what is typically observed in organic corpus content. KNOWN GAP (disclosed, not silently missed): this `pattern` keyword tests the raw string character-by-character with no preprocessing step -- vanilla JSON Schema draft-07 has no keyword to strip a zero-width/invisible Unicode character (e.g. U+200B ZERO WIDTH SPACE) out of a string before matching it, so a string like 'Us<ZWSP>ted' does NOT get caught by ajv alone (the literal 5-character run 'usted' never appears contiguously). scripts/validate.js's secondaryPatternCheck re-tests this SAME pattern (read back from this file) after stripping known invisible/format characters first -- for that specific bypass class, the hand-written layer is the actual enforcement, not merely a redundant second opinion. See axioms.md 公理3 for the full disclosure and the corresponding --selftest check."
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "generated_by",
+        "warnings"
+      ],
+      "additionalProperties": true,
+      "description": "additionalProperties:true is deliberate here (unlike every other object in this schema) -- meta is extensible, non-closed metadata (warnings/compression_ratio today, more fields later without a schema version bump), matching 100x-search-query/100x-persona's precedent for meta.",
+      "properties": {
+        "generated_by": {
+          "const": "100x-localize"
+        },
+        "compression_ratio": {
+          "type": "number",
+          "description": "Optional, informational echo of len(localized_script)/len(source_script) (axiom 1). scripts/validate.js recomputes this independently from the two fields above rather than trusting this value -- see axioms.md 公理1."
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Non-fatal flags: soft-degrade notes (e.g. target_region requested outside v1 scope, fell back to generic-latam), or compression/rewrite notes (e.g. which source sentence was dropped to meet the axiom-1 ceiling)."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "register_profile": {
+            "const": "compliance-conservative"
+          }
+        },
+        "required": [
+          "register_profile"
+        ]
+      },
+      "then": {
+        "properties": {
+          "localized_script": {
+            "pattern": "^(?:(?![tT][eE]\\s+[tT][rR][aA][nN][sS][fF][oO][rR][mM][aA]\\s+[lL][aA]\\s+[vV][iI][dD][aA]\\s+[pP][oO][rR]\\s+[cC][oO][mM][pP][lL][eE][tT][oO]\\s+[yY]\\s+[pP][aA][rR][aA]\\s+[sS][iI][eE][mM][pP][rR][eE]|[eE][rR][rR][aA][dD][iI][cC][aA]\\s+[eE][nN]\\s+[uU][nN]\\s+[aA][bB][rR][iI][rR]\\s+[yY]\\s+[cC][eE][rR][rR][aA][rR]\\s+[dD][eE]\\s+[oO][jJ][oO][sS][,\\s]*\\s+[pP][aA][rR][aA]\\s+[sS][iI][eE][mM][pP][rR][eE]|[sS][uU][pP][rR][iI][mM][eE]\\s+[eE][nN]\\s+[uU][nN]\\s+[aA][bB][rR][iI][rR]\\s+[yY]\\s+[cC][eE][rR][rR][aA][rR]\\s+[dD][eE]\\s+[oO][jJ][oO][sS][,\\s]*\\s+[pP][aA][rR][aA]\\s+[sS][iI][eE][mM][pP][rR][eE]|[sS][aA][nN][aA]\\s+[eE][nN]\\s+[uU][nN]\\s+[aA][bB][rR][iI][rR]\\s+[yY]\\s+[cC][eE][rR][rR][aA][rR]\\s+[dD][eE]\\s+[oO][jJ][oO][sS][,\\s]*\\s+[pP][aA][rR][aA]\\s+[sS][iI][eE][mM][pP][rR][eE]|[tT][oO][dD][oO]\\s+[eE][lL]\\s+[mM][uU][nN][dD][oO]\\s+[yY][aA]\\s+[lL][oO]\\s+[eE][sS][tT][aAáÁ]\\s+[uU][sS][aA][nN][dD][oO]\\s+[aA][hH][oO][rR][iI][tT][aA]|[cC][uU][eE][nN][tT][aA]\\s+[cC][oO][nN]\\s+[aA][pP][rR][oO][bB][aA][cC][iI][oOóÓ][nN]\\s+[oO][fF][iI][cC][iI][aA][lL]\\s+[dD][eE]\\s+[lL][aA]\\s+[fF][dD][aA]|[sS][eE][gG][uUúÚ][nN]\\s+[eE][sS][pP][eE][cC][iI][aA][lL][iI][sS][tT][aA][sS]\\s+[dD][eE]\\s+[hH][aA][rR][vV][aA][rR][dD]\\s+[lL][oO]\\s+[aA][sS][eE][gG][uU][rR][aA][nN])[\\s\\S])*$",
+            "description": "Axiom 2's compliance-conservative branch: only enforced when register_profile=='compliance-conservative'. This is this skill's OWN compiled example set of 5 common 'no-evidence' marketing-claim archetypes for Spanish-language ad copy (life-changes-forever / instant-fix-forever / mass-adoption-without-evidence / fake-regulatory-approval / fake-academic-authority) -- independently worded for this skill, not a verbatim transcript of any single source document's example sentences (see axioms.md/sources.md for which document's *problem categories*, not wording, informed this list). 'Erradica/suprime/sana en un abrir y cerrar de ojos, para siempre' is one bullet with 3 verb variants, expanded into 3 alternation arms here. Every alphabetic character is its own two-case class (e.g. [Cc]) so ANY case combination is caught, and every literal space in the source phrase becomes \\s+ so a doubled space/tab/newline inserted between words can't bypass the ban either; the literal comma in '...de ojos, para siempre' becomes an optional [,\\s]* run so the comma can be dropped, doubled, or have extra whitespace around it without escaping the ban. every accented character in the remaining 3 phrases (está/aprobación/según) is ALSO a two-way class covering its unaccented form (e.g. á -> [aAáÁ]) -- real Spanish TikTok captions frequently drop written accents (no-accent keyboards, fast typing), so 'esta'/'aprobacion'/'segun' without the written accent mark are caught exactly like the accented spelling. KNOWN GAP (see schema.json's axiom-3 pattern description and axioms.md 公理2 for full disclosure): this is still a raw character-class regex, so it cannot strip a zero-width/invisible Unicode character inserted mid-word, nor recognize a DECOMPOSED accent (a base letter followed by a separate Unicode combining accent mark, as opposed to the single precomposed accented character this pattern's classes list) -- scripts/validate.js's secondaryPatternCheck normalizes away invisible characters before re-testing this same pattern, which is why that hand-written layer matters here too, not only on the axiom-3 pattern. Under register_profile=='default' this pattern is NOT applied -- these phrases are allowed, matching the real corpus's actual (mostly blackhat) register."
+          }
+        }
+      }
+    }
+  ]
+}

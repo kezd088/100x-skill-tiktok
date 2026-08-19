@@ -1,0 +1,74 @@
+{
+  "source": {
+    "duration_sec": 16.0,
+    "aspect_ratio": "9:16",
+    "frames_analyzed": 6,
+    "extraction_method": "scene-detect"
+  },
+  "target_model": "generic",
+  "shots": [
+    {
+      "shot_id": 1,
+      "time_bucket": "0.0-5.0",
+      "shot_purpose": "hook",
+      "camera_note": "static handheld, screen fills frame",
+      "prompt_en": "Close-up of a smartphone screen showing an app home interface with colorful rounded icons and a bright gradient background, a thumb hovering just above the glass, static handheld framing, no text, no subtitles, no watermarks",
+      "prompt_zh": "智能手机屏幕特写镜头，展示带有彩色圆形图标和明亮渐变背景的应用主界面，一根拇指悬停在玻璃屏幕上方，手持固定取景。"
+    },
+    {
+      "shot_id": 2,
+      "time_bucket": "5.0-10.0",
+      "shot_purpose": "demo",
+      "prompt_en": "Close-up of the same smartphone screen as a thumb taps a circular button, the interface transitions to a new panel with a progress bar animating across the top, soft ambient room light reflecting faintly on the glass, no text, no subtitles, no watermarks",
+      "prompt_zh": "同一部智能手机屏幕的特写镜头，拇指点击一个圆形按钮，界面切换到新的面板，顶部有进度条动画滑动，环境光在玻璃屏幕上有轻微反光。"
+    },
+    {
+      "shot_id": 3,
+      "time_bucket": "10.0-16.0",
+      "shot_purpose": "cta",
+      "camera_note": "static locked camera, centered card composition",
+      "prompt_en": "A plain solid mint-green card standing upright against a soft neutral backdrop, a wide blank rectangular panel centered on the card, gentle diffused lighting, static locked camera, no text, no subtitles, no watermarks",
+      "prompt_zh": "一张薄荷绿纯色卡片竖立在柔和的中性背景前，卡片中央是一块空白的矩形区域，柔和的漫射光，固定机位。"
+    }
+  ],
+  "visual_forms": [
+    {
+      "form_type": "screen_recording",
+      "appears_in_shots": [1, 2],
+      "prompt_en": "Close-up of a smartphone screen displaying a colorful app interface with rounded icons and animated panel transitions, a thumb interacting with the glass, soft ambient light reflecting faintly on the screen, no text, no subtitles, no watermarks",
+      "prompt_zh": "智能手机屏幕特写镜头，展示带圆角图标和动态面板切换的彩色应用界面，一根拇指在玻璃屏幕上操作，环境柔光在屏幕上有轻微反光。"
+    },
+    {
+      "form_type": "text_card",
+      "appears_in_shots": [3],
+      "prompt_en": "A plain solid-color card standing upright against a soft neutral backdrop, a wide blank rectangular panel centered on the card, gentle diffused lighting, static locked camera, no text, no subtitles, no watermarks",
+      "prompt_zh": "一张纯色卡片竖立在柔和的中性背景前，卡片中央是一块空白的矩形区域，柔和的漫射光，固定机位。"
+    }
+  ],
+  "slot_template": {
+    "template_en": "Close-up of a smartphone screen with {ICON_STYLE} on a {BACKDROP}, {INTERACTION} as the interface responds, cutting to a plain {CARD_COLOR} card with a blank centered panel, no text, no subtitles, no watermarks",
+    "template_zh": "智能手机屏幕特写镜头，{BACKDROP}上展示{ICON_STYLE}，{INTERACTION}并引发界面响应，随后切换到一张纯{CARD_COLOR}卡片，卡片中央为空白面板。",
+    "slots": [
+      { "name": "ICON_STYLE", "observed_value": "colorful rounded icons", "candidates": ["colorful rounded icons", "minimal line icons", "pastel square icons"] },
+      { "name": "BACKDROP", "observed_value": "bright gradient background", "candidates": ["bright gradient background", "plain white background", "soft blurred room background"] },
+      { "name": "INTERACTION", "observed_value": "a thumb tapping a circular button", "candidates": ["a thumb tapping a circular button", "a finger swiping upward", "a thumb double-tapping the screen"] },
+      { "name": "CARD_COLOR", "observed_value": "mint-green", "candidates": ["mint-green", "soft coral", "pale blue"] }
+    ]
+  },
+  "cross_shot_analysis": {
+    "invariants": [
+      { "aspect": "product", "description": "Same smartphone device and app interface visual style appears in both screen recording shots", "holds_in_shots": [1, 2] },
+      { "aspect": "lighting", "description": "Soft ambient lighting with gentle reflections is consistent across the screen recording shots", "holds_in_shots": [1, 2] }
+    ],
+    "varying_axes": [
+      { "axis": "composition", "observed_values": ["full interface view", "close on a single button interaction", "blank card composition"] },
+      { "axis": "action", "observed_values": ["idle interface display", "tapping and transitioning", "static card display"] }
+    ]
+  },
+  "meta": {
+    "generated_by": "100x-video-reverse",
+    "frames_source": "evals/_fixtures/example-04-app-screen-recording-en/frames-meta.json",
+    "warnings": [],
+    "note": "合成样例，用于 100x-video-reverse 的 schema/公理校验测试。App 界面、卡片内容均为虚构，不对应任何真实 App 或真实品牌。target_model=generic（未指名引擎，按公理2落最严档 8.0s 上限）。3 镜头覆盖 screen_recording + text_card 两种画面形态。text_card 那一镜刻意只描述卡片的纯色/留白构图，不写任何可读文字内容——一是因为 text/caption/title/letter/word/overlay/font/logo 本身就在21个禁词表内，二是因为公理3强制所有 prompt_en 都以 'no text, no subtitles, no watermarks' 收尾，这条 prompt 从措辞和语义上都必须回避描述可读文字，真实生产流程里可读文字通常是后期另外加上的。"
+  }
+}

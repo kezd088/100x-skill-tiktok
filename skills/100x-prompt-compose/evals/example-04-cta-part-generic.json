@@ -1,0 +1,19 @@
+{
+  "template_id": "PART-CTA",
+  "template_name": "⑭ CTA 结尾（购买引导·拼接件）(synthetic example, not a real product)",
+  "category": "通用件",
+  "variables_used": {
+    "object": "your energy levels",
+    "urgency": "another sluggish week goes by"
+  },
+  "rendered_body": "手机前置或后摄。人物自然收尾，平静而有感染力地说英文 CTA，例如：Grab this for your energy levels at the link below — your your energy levels will thank you! Don't wait another sluggish week goes by. 无补光灯，无美颜，人物面部没有高光，真实皮肤纹理和瑕疵。",
+  "reference_locks": [],
+  "model": null,
+  "video_unit": null,
+  "meta": {
+    "generated_by": "100x-prompt-compose",
+    "warnings": [
+      "PART-CTA 模板 body 对 {object} 变量重复拼接了「your」前缀，产生「your your energy levels」这类双重指示词——这是源模板本身的设计问题（IMG 模板库原始 object 示例值「your dog's teeth」同样会复现这个重复），不是本 skill 渲染逻辑的 bug，按 axiom1「逐字占位替换」如实保留，未擅自改写模板正文"
+    ]
+  }
+}

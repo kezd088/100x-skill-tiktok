@@ -1,0 +1,41 @@
+{
+  "id": "100x-persona",
+  "name": "100x-persona",
+  "version": "1.2.0",
+  "author": "100x",
+  "layer": "L2-creative-generation",
+  "step": "3.1-persona-scene",
+  "type": "generative",
+  "status": "v1.2",
+  "summary": "Script draft text in -> delivering persona + independent physical scene out, each traceable back to a literal quote in the script, for casting/shooting decisions.",
+  "validation": {
+    "structural_and_per_item": "schema.json (JSON Schema draft-07), actually EXECUTED by ajv (devDependency declared in package.json, run 'npm install' first) inside scripts/validate.js -- enforces required fields, type, additionalProperties:false, enum (relationship_to_camera), pattern (scene vague-word ban, ID key formats), minLength/minItems, propertyNames, const. This is everything vanilla JSON Schema CAN express, and it is genuinely checked by a real validator (ajv), not hand-written field enumeration.",
+    "cross_item_aggregate": "scripts/validate.js's hand-written layer -- the real, runnable enforcement of: axiom 1 (persona_ref/scene_ref referential integrity -- the ref string must match an actual key in personas/scenes, not just the right format, which is all ajv's pattern keyword can check), axiom 2 (authority_evidence_quote / audience_pain_quote / script_span_quote must be literal substrings of source_script -- a cross-field comparison JSON Schema cannot express at all), and axiom 4 (zero-orphan coverage -- every defined persona/scene key must be referenced by >=1 pairing). Run 'node scripts/validate.js --selftest' for the built-in regression suite (10 checks: 3 real evals pass, unknown persona_ref fails, unknown scene_ref fails, paraphrased evidence quote fails, orphan scene fails, injected additionalProperty fails via ajv, invalid enum fails via ajv, hedge-marker quote with no disclosure fails, same quote with disclosure passes, refutation-framed reversal with no listed hedge marker passes cleanly -- a documented known gap, not a bug).",
+    "authority_hedge_mitigation": "Axiom 2's literal-substring check proves a quote was copied verbatim, never that its meaning in the persona field matches its meaning in source_script -- a self-doubting/hedged sentence (e.g. 'if you don't believe me' / 如果你不信我) is a valid substring and can be used backwards as a false authority anchor. This is a semantic-understanding problem, not fixable by more string/regex/schema layers. scripts/validate.js's checkAuthorityHedgeRisk adds: a closed list of hedge/self-doubt phrases scanned ONLY in authority_evidence_quote; a hit requires a matching meta.warnings disclosure (persona id + 'hedge'/'自我怀疑') or the bundle FAILs. This converts the counterexample from a silent pass into a mandatory-disclosure failure -- it does NOT detect reversal via refutation/sarcasm framing, translation, or any phrasing outside the closed list. --selftest check 10/10 is a real regression test that intentionally documents this remaining gap (0 errors on a refutation-framed reversal), not a claim that it's fixed. See axioms.md #2 for the full writeup.",
+    "note": "Same class of schema/script split as 100x-search-query's metadata.json documents, now with the structural half actually delegated to a real validator rather than reimplemented by hand."
+  },
+  "input_contract": {
+    "class_a_required": ["source_script"],
+    "class_b_optional_soft_degrade": [],
+    "class_c_upstream_optional_silent_skip": ["segments (from 100x-segment, if it exists)"],
+    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). Input is described informally here and in workflow.md Phase 1. No class-B soft-degrade fields -- source_script is the only input this skill needs; there is no optional secondary field with a 3-level degrade like 100x-search-query's core_benefit."
+  },
+  "output_contract": "schema.json (PersonaSceneBundle, self-contained in this skill)",
+  "requires_data": [
+    "taxonomy.script_blueprint_authority_pain_modules",
+    "taxonomy.scene_library_field_schema",
+    "taxonomy.persona_library_field_schema"
+  ],
+  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus at inference time. 'taxonomy.script_blueprint_authority_pain_modules' records that persona field design (authority_basis/audience_fit) was informed by modules 2 (Authority) and 3 (Pain) of the script blueprint. 'taxonomy.scene_library_field_schema' and 'taxonomy.persona_library_field_schema' record that the scene_item/persona_item field shapes were informed by taxonomy templates -- field names only. No corpus/table content is stored in this repo.",
+  "ported_from": {
+    "private_source_skill": null,
+    "private_source_paths": [],
+    "adaptation_summary": "Synthesizes judgment-design style, structured field shapes, and persona-signal categories for physical video-scene and persona modeling. See sources.md for design decisions."
+  },
+  "language_scope": {
+    "output_language": "structured fields are bilingual by design: identity_label/authority_basis/audience_fit/delivery_style/scene descriptive fields are Chinese (for downstream Chinese-speaking production teams), while *_evidence_quote/*_pain_quote/script_span_quote are always literal excerpts in the source_script's original language (checked as exact substrings, never translated or paraphrased -- axiom 2).",
+    "input_language": "source_script may be in any language the production team writes scripts in; evidence-quote substring checks are language-agnostic (plain string containment)."
+  },
+  "banned_terms_ref": "SKILL.md#禁用词",
+  "eval_policy": "evals/ contains synthetic/fictional products and personas only. No real transcript text, account name, product name, or Feishu link may appear in this skill's files."
+}

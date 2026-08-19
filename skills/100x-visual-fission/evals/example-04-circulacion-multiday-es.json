@@ -1,0 +1,56 @@
+{
+  "product_name": "leg circulation support sachet (synthetic example, based on a real Spanish-language ad's day-by-day narrative, not a real product)",
+  "category": "循环/腿部保健品",
+  "source_material_note": "Derived from the narrative ARC (three explicit milestones -- ~24 hours, ~1 week, day 14 -- not the literal wording) of a real Spanish-language hat-graded TikTok ad transcript reviewed during this skill's build (see sources.md for the line reference; no transcript text is reproduced here). Text-only degraded Class A path (workflow.md Phase 1 step 5) -- identity anchors below are synthetic archetypes, not vision-reversed from any real photo.",
+  "constants": {
+    "person_identity_anchor": "woman in her 40s, wavy shoulder-length hair, home cardigan",
+    "scene_identity_anchor": "bedroom nightstand with a glass of water, warm bedside lamp light",
+    "product_identity_anchor": "small red-orange sachet packet with a plain leaf logo"
+  },
+  "variables": [
+    { "dimension": "pose", "name": "leg posture", "observed_values": ["pressing own calf while seated", "standing and stretching freely"], "range_description": "a seated self-massage pose in the early frame vs. a free standing stretch pose in the later frames" }
+  ],
+  "media_plan": {
+    "structure": "multi_day",
+    "frame_count": 4,
+    "frames": [
+      { "role": "day", "day_index": 1, "visual_action": "sitting on the edge of the bed, gently pressing own calf, mild wincing expression", "uses_first_frame_as_reference": false },
+      { "role": "day", "day_index": 7, "visual_action": "using frame 1 as reference, standing up from the bed more easily, relaxed expression, no wincing", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 10, "visual_action": "using frame 1 as reference, walking across the room normally, neutral relaxed posture", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 14, "visual_action": "using frame 1 as reference, standing confidently by the window stretching both arms overhead, bright expression, rest of the room unchanged", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "source ad cites three explicit milestones (~24 hours, ~1 week, day 14); a 4th interim frame (day 10) was interpolated solely to satisfy this skill's multi_day minimum of 4 frames -- disclosed in meta.warnings, it is not itself a claim taken from the source copy."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "medium shot, seated",
+      "character_prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan",
+      "scene_prompt": "bedroom nightstand with a glass of water, warm bedside lamp light",
+      "action_prompt": "sitting on the edge of the bed, medium shot, person-hero composition",
+      "combined_prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan, bedroom nightstand with a glass of water, warm bedside lamp light, small red-orange sachet packet with a plain leaf logo, sitting on the edge of the bed, medium shot, person-hero composition",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "close-up, standing",
+      "character_prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan",
+      "scene_prompt": "bedroom nightstand with a glass of water, warm bedside lamp light",
+      "action_prompt": "standing near the window, close-up on upper body, product resting on the nightstand in frame, product-hero composition",
+      "combined_prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan, bedroom nightstand with a glass of water, warm bedside lamp light, small red-orange sachet packet with a plain leaf logo, standing near the window close-up on upper body, product resting on the nightstand in frame, product-hero composition",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 1, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan, bedroom nightstand with a glass of water, warm bedside lamp light, small red-orange sachet packet with a plain leaf logo, sitting on the edge of the bed, gently pressing own calf, mild wincing expression, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 7, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan, bedroom nightstand with a glass of water, warm bedside lamp light, small red-orange sachet packet with a plain leaf logo, using frame 1 as reference, standing up from the bed more easily, relaxed expression, no wincing, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 3, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 10, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan, bedroom nightstand with a glass of water, warm bedside lamp light, small red-orange sachet packet with a plain leaf logo, using frame 1 as reference, walking across the room normally, neutral relaxed posture, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 4, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 14, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her 40s, wavy shoulder-length hair, home cardigan, bedroom nightstand with a glass of water, warm bedside lamp light, small red-orange sachet packet with a plain leaf logo, using frame 1 as reference, standing confidently by the window stretching both arms overhead, bright expression, rest of the room unchanged, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "multi_day",
+    "generated_by": "100x-visual-fission",
+    "warnings": ["day_index 10 帧为插值补充，源文案只明确提到约24小时/一周/第14天三个时间点，第10天不是原文案里的独立断言"]
+  }
+}

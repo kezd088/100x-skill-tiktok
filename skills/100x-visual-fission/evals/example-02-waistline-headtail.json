@@ -1,0 +1,53 @@
+{
+  "product_name": "waistline support capsule (synthetic example, based on a real ad's simple before/after narrative, not a real product)",
+  "category": "塑形/减脂保健品",
+  "source_material_note": "Derived from the narrative SHAPE (a simple two-point before/after comparison, not the literal wording) of a real English-language hat-graded TikTok ad transcript reviewed during this skill's build (see sources.md for the line reference; no transcript text is reproduced here). Text-only degraded Class A path (workflow.md Phase 1 step 5) -- identity anchors below are synthetic archetypes, not vision-reversed from any real photo.",
+  "constants": {
+    "person_identity_anchor": "middle-aged woman, shoulder-length brown hair, casual home cardigan",
+    "scene_identity_anchor": "home living room in front of a full-length mirror, soft afternoon window light",
+    "product_identity_anchor": "white capsule bottle with a plain sage-green label"
+  },
+  "variables": [
+    { "dimension": "camera", "name": "framing", "observed_values": ["medium full-body shot", "close-up on hands holding product"], "range_description": "medium full-body mirror shot vs. tight close-up on the hands presenting the product" },
+    { "dimension": "composition", "name": "focus", "observed_values": ["person-hero", "product-hero"], "range_description": "person is the visual focus in one, the product bottle is the visual focus in the other" }
+  ],
+  "media_plan": {
+    "structure": "head_tail",
+    "frame_count": 2,
+    "frames": [
+      { "role": "head", "day_index": null, "visual_action": "standing side-on in front of the mirror, one hand resting on a slightly rounded midsection, neutral tired expression", "uses_first_frame_as_reference": false },
+      { "role": "tail", "day_index": null, "visual_action": "using frame 1 as reference, same side-on pose, waistline visibly more defined, relaxed confident expression, rest of the room unchanged", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "source ad is a simple two-point before/after comparison ('first day' vs. '15th day' in the original copy), with no intermediate day markers cited, so a two-frame head_tail plan matches the narrative without inventing an intermediate stage the copy never mentioned."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "medium mirror shot, person-hero",
+      "character_prompt": "middle-aged woman, shoulder-length brown hair, casual home cardigan",
+      "scene_prompt": "home living room in front of a full-length mirror, soft afternoon window light",
+      "action_prompt": "standing side-on in front of the mirror, medium full-body framing, person-hero composition",
+      "combined_prompt": "middle-aged woman, shoulder-length brown hair, casual home cardigan, home living room in front of a full-length mirror, soft afternoon window light, white capsule bottle with a plain sage-green label, standing side-on in front of the mirror, medium full-body framing, person-hero composition",
+      "axis_tags": ["camera", "composition"]
+    },
+    {
+      "id": 2,
+      "variant_label": "close-up on hands, product-hero",
+      "character_prompt": "middle-aged woman, shoulder-length brown hair, casual home cardigan",
+      "scene_prompt": "home living room in front of a full-length mirror, soft afternoon window light",
+      "action_prompt": "hands holding the capsule bottle close to camera, close-up framing, product-hero composition",
+      "combined_prompt": "middle-aged woman, shoulder-length brown hair, casual home cardigan, home living room in front of a full-length mirror, soft afternoon window light, white capsule bottle with a plain sage-green label, hands holding the capsule bottle close to camera, close-up framing, product-hero composition",
+      "axis_tags": ["camera", "composition", "pose"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "head", "day_index": null, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "middle-aged woman, shoulder-length brown hair, casual home cardigan, home living room in front of a full-length mirror, soft afternoon window light, white capsule bottle with a plain sage-green label, standing side-on in front of the mirror, one hand resting on a slightly rounded midsection, neutral tired expression, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "tail", "day_index": null, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "middle-aged woman, shoulder-length brown hair, casual home cardigan, home living room in front of a full-length mirror, soft afternoon window light, white capsule bottle with a plain sage-green label, using frame 1 as reference, same side-on pose, waistline visibly more defined, relaxed confident expression, rest of the room unchanged, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "head_tail",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "source_script": "Six weeks ago I couldn't do a single pull-up. This band clips onto any doorframe in about ten seconds and gives you assisted resistance for pull-ups, rows, and stretches. I use it every morning before work and every night before bed. My arms and back feel stronger every single week. It folds flat so it travels with you anywhere. Thousands of people are using this exact band right now to build their first pull-up. It's not a gimmick, it's just smart resistance training you can do at home.",
+  "source_language_note": "source copy: en (synthetic example, not a real ad script)",
+  "target_region": "mx",
+  "register_profile": "default",
+  "localized_script": "Hace seis semanas no podía hacer ni una dominada. Esta banda se engancha en cualquier marco de puerta en diez segundos y te da resistencia asistida para dominadas, remo y estiramientos. La uso cada mañana y cada noche, y mis brazos y espalda se sienten más fuertes cada semana. Se dobla plana y viaja contigo a cualquier lado. Miles de personas la están usando ahora mismo para lograr su primera dominada.",
+  "meta": {
+    "generated_by": "100x-localize",
+    "compression_ratio": 0.823,
+    "warnings": [
+      "为满足公理1压缩上限，删减了源文案结尾'It's not a gimmick, it's just smart resistance training you can do at home.'这句自我辩护式重复表述，核心信息（起效时间线/使用频率/效果）已保留"
+    ]
+  }
+}

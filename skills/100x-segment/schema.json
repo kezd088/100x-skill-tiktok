@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-segment/SegmentBundle.json",
+  "title": "SegmentBundle",
+  "description": "Output contract for 100x-segment. Self-contained in this skill (this repo has no shared cross-skill schemas/ yet). Text-only script in -> three independent cut layers out: L1 segments[] (paragraph-logic units tagged by the 10 positional modules of the DR script blueprint, plus a top-level archetype tag), L2 shots[] (predicted shot_purpose per group of segments, reusing the standard 7-value enum), L3 breath marks (inline '‖'/'·' annotations embedded in each segment's text_annotated field -- an additive overlay on the same text, not a fourth array, following the three independent cut layers framing). NOTE: vanilla JSON Schema draft-07 can enforce per-item shape (enum membership, non-empty strings, integer bounds, array minItems/uniqueItems) but CANNOT enforce cross-field/cross-item logic: (a) text_annotated with all '‖'/'·' marks stripped must equal raw_text character-for-character (a same-object cross-field comparison), (b) every shots[].segment_refs entry must reference a real segments[].segment_id and every segment_id must be covered by >=1 shot (referential integrity + zero-orphan coverage across two arrays), (c) segment_id/shot_id must be sequential starting at 1 in array order (requires comparing a field's value to its own array index, which schema has no access to), (d) the actual breath-mark PLACEMENT rules (sentence-end/comma/contrastive-conjunction/run-length-cap/filler-word/em-dash/price-emphasis) require parsing text_annotated into runs and reasoning about surrounding words -- a character-level aggregate parse, not a single-pattern match. All four are enforced by scripts/validate.js, which loads this file at runtime for the module/shot_purpose/language enums so the two never drift apart. See axioms.md for the full split.",
+  "type": "object",
+  "required": ["source_text", "language", "archetype", "segments", "shots", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "source_text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Echo of the full input script text, verbatim. Used as the ground truth that segments[].raw_text must be drawn from (axiom 2's integrity check compares against this indirectly via each segment's raw_text)."
+    },
+    "language": {
+      "type": "string",
+      "enum": ["en", "es"],
+      "description": "ISO 639-1 code of the script's spoken language. v1 scope lock (axioms.md #4 / SKILL.md known limitation): the breath-mark placement rules (one-breath word/syllable caps, filler-word list, contrastive-conjunction list) are only defined for English and Spanish. A script in any other language is out of scope for this skill in v1, not silently degraded -- see workflow.md Phase 1 class-A handling."
+    },
+    "archetype": {
+      "type": "string",
+      "pattern": "^([A-G])(\\+(?!\\1)[A-G])?$",
+      "description": "One of the 7 script-blueprint archetypes (A-G, see taxonomy source in sources.md), alone or as 'PRIMARY+SECONDARY' (e.g. 'G+E') per the blueprint's own mixed-archetype convention: primary skeleton first, secondary technique second, and the two letters must differ. The regex uses a backreference to reject 'X+X' -- verified empirically, not just asserted."
+    },
+    "segments": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/segment_item" },
+      "description": "L1: paragraph-logic units in narrative order. Sequential segment_id starting at 1 is enforced by scripts/validate.js (schema cannot compare a field to its own array index)."
+    },
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/shot_item" },
+      "description": "L2: predicted shot purposes. Deliberately NOT required to be 1:1 with segments -- a single segment (e.g. one staged_timeline paragraph spanning Day 1/7/14) may predict multiple shots, and multiple short segments may collapse into one shot's segment_refs. Referential integrity and zero-orphan segment coverage are enforced by scripts/validate.js, not by this schema."
+    },
+    "meta": {
+      "type": "object",
+      "required": ["generated_by"],
+      "additionalProperties": true,
+      "properties": {
+        "generated_by": { "const": "100x-segment" },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Non-fatal flags, e.g. a breath-mark run-length cap violation kept as best-effort, or a soft self-check miss (axioms.md / workflow.md rework rules)."
+        },
+        "eval_note": {
+          "type": "string",
+          "description": "Free-text annotation, e.g. marking an evals/ bundle as a synthetic example. Not part of any axiom; additionalProperties:true on meta exists precisely so extensible notes like this don't require a schema change (same design as 100x-search-query's meta.warnings/topic_angle)."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "segment_item": {
+      "type": "object",
+      "required": ["segment_id", "module", "raw_text", "text_annotated"],
+      "additionalProperties": false,
+      "properties": {
+        "segment_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based, sequential in array order (axiom 1's 'C5-style' rule, enforced by scripts/validate.js)."
+        },
+        "module": {
+          "type": "string",
+          "enum": ["hook", "authority", "pain", "mechanism", "staged_timeline", "dosage", "risk_reversal", "scarcity", "price_anchor", "cta"],
+          "description": "10 of the 11 blueprint modules -- 'localization' (module 11) is deliberately excluded because it is a cross-cutting style dimension threaded through every module, not a standalone positional paragraph (axioms.md #1)."
+        },
+        "raw_text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "This segment's literal slice of source_text, character-for-character, with zero breath marks. Ground truth for axiom 2's integrity check."
+        },
+        "text_annotated": {
+          "type": "string",
+          "minLength": 1,
+          "description": "raw_text with inline '‖' (strong breath) / '·' (weak breath) markers ADDED -- never deletes, reorders, or rewords anything. Format/placement correctness (no leading/trailing/doubled marks, sentence-end/comma/contrastive-conjunction/run-cap/filler-word/em-dash/price rules) is enforced by scripts/validate.js's placement-parsing pass, not by a schema pattern here -- see this schema's top-level description for why a single regex was rejected as unreadable/fragile for this rule set."
+        }
+      }
+    },
+    "shot_item": {
+      "type": "object",
+      "required": ["shot_id", "segment_refs", "shot_purpose"],
+      "additionalProperties": false,
+      "properties": {
+        "shot_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based, sequential in array order (enforced by scripts/validate.js, same reasoning as segment_id)."
+        },
+        "segment_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 },
+          "description": "segment_id values (from segments[]) this shot's predicted purpose covers. Referential integrity (every value must exist in segments[]) is enforced by scripts/validate.js, not by this schema -- vanilla JSON Schema cannot check one array's values against another array's values."
+        },
+        "shot_purpose": {
+          "type": "string",
+          "enum": ["hook", "build", "reveal", "demo", "social_proof", "cta", "transition"],
+          "description": "Standard 7-value shot_purpose enum. This skill predicts purpose from text alone -- no visual_description/camera_language/audio_plan fields, because those require actually seeing the video (out of scope, text-only input -- SKILL.md known limitation)."
+        }
+      }
+    }
+  }
+}

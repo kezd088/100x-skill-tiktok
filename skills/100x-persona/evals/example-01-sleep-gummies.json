@@ -1,0 +1,53 @@
+{
+  "source_script": "I've been a night-shift ICU nurse for eleven years, and I used to think being wired at 2am was just part of the job. If you're a shift worker who lies there staring at the ceiling after a twelve-hour shift, you know exactly what I mean. Week one I started taking one of these magnesium gummies before bed and just felt a little less jittery. By week two I was actually falling asleep within twenty minutes instead of lying awake for an hour. I keep the jar right on my bathroom counter next to the sink so I never forget it after I wash my face at midnight. On my day off I toss a few in my bag and take them on the break room couch before my nap between shifts. No prescription, no weird aftertaste, just one gummy before you lie down.",
+  "personas": {
+    "PERSONA_NIGHT_NURSE": {
+      "identity_label": "十一年经验夜班ICU护士（synthetic example, not a real person）",
+      "authority_basis": "以长期夜班一线工作经历建立同理型信任，不是权威认证型说服",
+      "authority_evidence_quote": "I've been a night-shift ICU nurse for eleven years",
+      "audience_fit": "轮班工作、下班后难以入睡的倒班人群",
+      "audience_pain_quote": "If you're a shift worker who lies there staring at the ceiling after a twelve-hour shift",
+      "delivery_style": "第一人称经验分享，平实口语，带具体周数进展",
+      "relationship_to_camera": "direct-to-camera",
+      "appearance_note": "居家便服，非工作制服镜头"
+    }
+  },
+  "scenes": {
+    "SCENE_BATHROOM_MIDNIGHT": {
+      "scene_name": "睡前卫生间洗漱台",
+      "trigger_moment": "深夜下班回家洗完脸准备睡觉时",
+      "location": "自家卫生间",
+      "micro_coordinate": "水槽旁的洗漱台面上放着瓶子",
+      "visual_props": ["软糖瓶子", "洗漱杯", "毛巾架"],
+      "atmosphere": "昏黄灯光、安静的深夜居家节奏"
+    },
+    "SCENE_BREAK_ROOM": {
+      "scene_name": "医院休息室小憩",
+      "trigger_moment": "两班之间的休息室小睡前",
+      "location": "医院员工休息室",
+      "micro_coordinate": "坐在休息室沙发上，包放在旁边",
+      "visual_props": ["休息室沙发", "随身包", "软糖瓶子"],
+      "atmosphere": "日光灯下略显疲惫但放松的间隙感"
+    }
+  },
+  "pairings": [
+    {
+      "pairing_id": "PAIR_MIDNIGHT_ROUTINE",
+      "script_span_quote": "I keep the jar right on my bathroom counter next to the sink",
+      "persona_ref": "PERSONA_NIGHT_NURSE",
+      "scene_ref": "SCENE_BATHROOM_MIDNIGHT",
+      "rationale": "台词描述的是睡前洗漱后的固定动作，卫生间洗漱台场景直接对应，强化真实生活痕迹"
+    },
+    {
+      "pairing_id": "PAIR_SHIFT_BREAK",
+      "script_span_quote": "take them on the break room couch before my nap between shifts",
+      "persona_ref": "PERSONA_NIGHT_NURSE",
+      "scene_ref": "SCENE_BREAK_ROOM",
+      "rationale": "台词点名休息室沙发和两班之间小睡，场景需与倒班职业身份的真实工作环境一致"
+    }
+  ],
+  "meta": {
+    "generated_by": "100x-persona",
+    "warnings": []
+  }
+}

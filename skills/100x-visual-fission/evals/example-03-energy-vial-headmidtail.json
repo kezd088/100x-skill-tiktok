@@ -1,0 +1,55 @@
+{
+  "product_name": "energy vial supplement (synthetic example, based on a real ad's unboxing-and-drink demo, not a real product)",
+  "category": "抗衰老/精力保健品",
+  "source_material_note": "Derived from the narrative SHAPE (a single continuous unboxing-then-drink demo with a same-day energy callback, not the literal wording) of a real English-language hat-graded TikTok ad transcript reviewed during this skill's build (see sources.md for the line reference; no transcript text is reproduced here). Text-only degraded Class A path (workflow.md Phase 1 step 5) -- identity anchors below are synthetic archetypes, not vision-reversed from any real photo. The source ad's unvisualizable internal-health/anti-aging mechanism claims are intentionally NOT carried into the frames below -- only the physically demonstrable unboxing/drinking action and a plausible energy-level expression change are kept.",
+  "constants": {
+    "person_identity_anchor": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top",
+    "scene_identity_anchor": "bathroom counter with a single vanity mirror light, morning routine setting",
+    "product_identity_anchor": "small glass vial with a snap-off top packaged in a plain paper box"
+  },
+  "variables": [
+    { "dimension": "pose", "name": "hand action", "observed_values": ["reaching for the box", "snapping the vial open and sipping"], "range_description": "static reach-for-product pose vs. an active two-hand unboxing-and-drink action" },
+    { "dimension": "composition", "name": "focus", "observed_values": ["person-hero", "product-hero"], "range_description": "the person's expression is the visual focus in one set, the vial/box is the visual focus in the other" }
+  ],
+  "media_plan": {
+    "structure": "head_mid_tail",
+    "frame_count": 3,
+    "frames": [
+      { "role": "head", "day_index": null, "visual_action": "tired expression, dull under-eye area, reaching for the vial box on the counter", "uses_first_frame_as_reference": false },
+      { "role": "mid", "day_index": null, "visual_action": "using frame 1 as reference, hands snapping open the vial top and sipping through the individual straw, focused expression", "uses_first_frame_as_reference": true },
+      { "role": "tail", "day_index": null, "visual_action": "using frame 1 as reference, brighter expression, more alert posture, same counter and lighting unchanged", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "source ad is a single continuous unboxing-and-drink demo with a same-day 'day 3' energy callback rather than a multi-day progression, so a 3-frame head_mid_tail plan (setup -> action -> result) fits the described action better than a day-indexed sequence."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "person-hero, static reach",
+      "character_prompt": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top",
+      "scene_prompt": "bathroom counter with a single vanity mirror light, morning routine setting",
+      "action_prompt": "reaching for the vial box on the counter, medium shot, person-hero composition",
+      "combined_prompt": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top, bathroom counter with a single vanity mirror light, morning routine setting, small glass vial with a snap-off top packaged in a plain paper box, reaching for the vial box on the counter, medium shot, person-hero composition",
+      "axis_tags": ["pose", "composition"]
+    },
+    {
+      "id": 2,
+      "variant_label": "product-hero, active unboxing",
+      "character_prompt": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top",
+      "scene_prompt": "bathroom counter with a single vanity mirror light, morning routine setting",
+      "action_prompt": "hands snapping open the vial top and sipping through the straw, close-up on hands and vial, product-hero composition",
+      "combined_prompt": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top, bathroom counter with a single vanity mirror light, morning routine setting, small glass vial with a snap-off top packaged in a plain paper box, hands snapping open the vial top and sipping through the straw, close-up on hands and vial, product-hero composition",
+      "axis_tags": ["pose", "composition", "camera"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "head", "day_index": null, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top, bathroom counter with a single vanity mirror light, morning routine setting, small glass vial with a snap-off top packaged in a plain paper box, tired expression, dull under-eye area, reaching for the vial box on the counter, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "mid", "day_index": null, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top, bathroom counter with a single vanity mirror light, morning routine setting, small glass vial with a snap-off top packaged in a plain paper box, using frame 1 as reference, hands snapping open the vial top and sipping through the individual straw, focused expression, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 3, "source_prompt_set_id": 1, "frame_role": "tail", "day_index": null, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her mid-30s, straight dark hair in a low bun, cream loungewear top, bathroom counter with a single vanity mirror light, morning routine setting, small glass vial with a snap-off top packaged in a plain paper box, using frame 1 as reference, brighter expression, more alert posture, same counter and lighting unchanged, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "head_mid_tail",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "100x-localize",
+  "name": "100x-localize",
+  "version": "1.3.0",
+  "author": "100x",
+  "layer": "L2-creative-generation",
+  "step": "2c-localize",
+  "type": "generative",
+  "status": "v1.0",
+  "summary": "Source ad script (any source language) in -> Mexican-Spanish-default localized script out, with a mandatory compression check against literal-translation length inflation and a real-corpus-aligned register default.",
+  "validation": {
+    "structural_and_per_item": "schema.json (JSON Schema draft-07), executed by ajv (devDependency declared in package.json, run 'npm install' first) inside scripts/validate.js -- enforces required/type/additionalProperties:false/enum (target_region, register_profile)/pattern, including two conditional pattern checks fully expressible in vanilla JSON Schema: axiom 3's universal tú-only ban on localized_script (always active, case-insensitive in every position -- not just a leading-capital-letter special case) and axiom 2's compliance-conservative banned-phrase ban (active only when register_profile=='compliance-conservative', wired via allOf/if/then, also case-insensitive, whitespace-run-tolerant, and accent-insensitive on its 3 accented phrases so a doubled space/tab/newline or a dropped written accent between words can't bypass it). This is everything vanilla JSON Schema draft-07 can express for this skill's output shape -- it cannot strip a zero-width/invisible Unicode character before matching, which is why scripts/validate.js's secondaryPatternCheck exists as described below.",
+    "cross_item_aggregate": "scripts/validate.js hand-written layer -- the real, runnable enforcement of axiom 1 (compression ratio: len(localized_script)/len(source_script) must be <=1.10 and >=0.5 -- JSON Schema cannot compare the length of one string field against another field's length, only against a fixed number), axiom 4 (fabricated-authority-claim proxy check: scanning localized_script for a closed set of authority/certification tokens absent from source_script, normalizing dotted/spaced-out acronym spellings -- both ALL-CAPS and lower/mixed-case dot-glued spellings like 'f.d.a.' -- back to 'fda' first, and stripping diacritics from both fields before comparing so an accent-dropped spelling like 'clinicamente probado' is treated the same as the accented form -- a cross-field content comparison JSON Schema cannot express at all), and axiom 2/3's secondaryPatternCheck re-test: it re-runs schema.json's own patterns after stripping a small set of zero-width/invisible Unicode format characters (U+200B/U+200C/U+200D/U+FEFF/U+2060) first, which is the actual catch for that specific bypass class since JSON Schema's pattern keyword has no preprocessing step. These are cross-field comparisons, not cross-item aggregates over an array (this skill's output has no per-item arrays), but the same 'schema.json structurally cannot express this' logic applies -- see axioms.md and scripts/validate.js's header comment for the full split. Run 'node scripts/validate.js --selftest' for the built-in regression suite (25 checks: 3 real evals/ files plus 22 fixed adversarial/regression checks covering axiom 1 ceiling/floor, axiom 2 conditional ban (fail/pass/paraphrase-pass/ALL-CAPS/doubled-whitespace/accent-stripped/documented-comma-variant), axiom 3 usted/vosotros (including ALL-CAPS and zero-width-space obfuscation), axiom 4 fabricated/carried-over/obfuscated-acronym (ALL-CAPS and lowercase dotted)/accent-stripped authority claims, and ajv's additionalProperties/enum enforcement). Known residual gaps (disclosed, not silently missing): axiom 2/3's schema-level regex handles precomposed accented characters and a fixed 5-codepoint invisible-character set, not decomposed Unicode combining-mark sequences or the full space of invisible/format characters -- see axioms.md TODO."
+  },
+  "input_contract": {
+    "class_a_required_as_user_input": ["source_script"],
+    "class_b_optional_soft_degrade": ["target_region", "register_profile"],
+    "class_c_upstream_optional_silent_skip": ["persona_scene_bundle (100x-persona, if it exists)", "search_query_bundle (100x-search-query, if it exists)"],
+    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). Input is described informally here and in workflow.md Phase 1. class_b fields both have documented defaults (target_region defaults to 'mx', register_profile defaults to 'default') rather than a 3-level degrade requiring a follow-up question, since both have a safe, disclosed fallback -- see workflow.md Phase 1 step 3."
+  },
+  "output_contract": "schema.json (LocalizationBundle, self-contained in this skill)",
+  "requires_data": [
+    "corpus.hat_graded_transcripts_es",
+    "corpus.hat_graded_transcripts_en",
+    "prompts.es_style_guide",
+    "taxonomy.script_module_library"
+  ],
+  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus at inference time. 'corpus.hat_graded_transcripts_es/en' record that the transcript-length statistics that ground axiom 1 (compression ratio calibrated against reference corpus length distribution) and the hat_level distribution that grounds axiom 2's default-register decision are calibrated against reference transcript corpora. No transcript text or raw corpus counts are stored in this repo. 'prompts.es_style_guide' records that axioms 2/3's Spanish-register rules and profiles/compliance-conservative.md are adapted from Spanish style guide specifications, which self-disclose they are language-adaptation specs, not empirical conclusions from viral samples -- this skill treats it accordingly (conservative bans are demoted to an optional profile, not the default). 'taxonomy.script_module_library' records that awareness of the Hook/Agitate/Solution/Trust/CTA module taxonomy informed workflow.md's guidance to preserve a source script's module skeleton during localization.",
+  "ported_from": {
+    "private_source_skill": null,
+    "private_source_paths": [
+      "prompts/西语口播风格规范.md",
+      "taxonomy/脚本模块库.md"
+    ],
+    "adaptation_summary": "Built from scratch. Axioms 2/3's Spanish-register rules are adapted from Spanish oral style guidelines. Axiom 1 (compression ceiling/floor) is an original judgment grounded in a statistical comparison of reference transcript corpora (aggregate stats only, no transcript text copied). Axiom 4's closed authority-token list is an original selection scoped to style guide examples plus adjacent categories. The module library taxonomy informed workflow.md context."
+  },
+  "language_scope": {
+    "output_language": "localized_script is always Spanish (Mexico-default register per axiom 3; v1 supports target_region 'mx' or 'generic-latam' only -- Spain/Argentina-specific conjugation is out of scope, see axioms.md TODO).",
+    "input_language": "source_script may be in any language the upstream script-writing step produced (typically English or Chinese in this pipeline); axiom 1's compression check and axiom 4's authority-token check both operate on plain string content and are language-agnostic in mechanism, though axiom 4's token list itself is English/Spanish-oriented (see scripts/validate.js AUTHORITY_TOKENS)."
+  },
+  "banned_terms_ref": "SKILL.md#禁用词",
+  "eval_policy": "evals/ contains synthetic/fictional ad copy only, written fresh for this build (not verbatim corpus text) though informed by the tone/structure patterns observed in reference corpus dry-runs (no transcript text reproduced). No real account name, product name, or Feishu link may appear in this skill's files."
+}

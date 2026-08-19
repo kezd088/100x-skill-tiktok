@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-prompt-compose/ComposedPromptBundle.json",
+  "title": "ComposedPromptBundle",
+  "description": "Output contract for 100x-prompt-compose. One chosen template (from templates.json, 14 ids) + filled variables in -> one rendered, model-ready generation prompt out. Self-contained in this skill (no shared cross-skill schemas/ in this repo yet). NOTE (same split as 100x-search-query/100x-persona): vanilla JSON Schema draft-07 can enforce per-item shape (enums, required fields, additionalProperties, the reference-lock value/status pattern, the scene no-lighting-word pattern) but CANNOT (a) look up templates.json to verify rendered_body is a byte-for-byte reconstruction of the chosen template's body (axiom 1 -- needs an external file), (b) verify a 'reference_reuse' ref_number was actually established earlier (axiom 2 -- needs cross-array numeric set membership), or (c) scan against the per-model banned-word lists / duration caps documented in profiles/veo.md and profiles/seedance.md (axiom 4 -- a model-conditional word-list scan, kept in scripts/validate.js by the same convention 100x-search-query uses for its platform keyword-density tables, not duplicated into this schema). Those three are enforced by scripts/validate.js.",
+  "type": "object",
+  "required": ["template_id", "category", "variables_used", "rendered_body", "model", "video_unit", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "template_id": {
+      "type": "string",
+      "enum": [
+        "IMG-01-product-lock", "IMG-02-persona-whitebg", "IMG-03-8grid", "IMG-04-cover-hook", "IMG-05-before-after",
+        "VID-A-efficacy-stack", "VID-B-dual-track", "VID-C-before-after", "VID-D-talking-share", "VID-E-role-pov",
+        "VID-F-dark-humor", "VID-G-immersive-job", "PART-HOOK", "PART-CTA"
+      ],
+      "description": "Must match a real id in templates.json. This enum is the authoritative id list; scripts/validate.js's --selftest cross-checks it against templates.json's own ids to catch drift if a template is ever added/removed without updating this schema."
+    },
+    "template_name": {
+      "type": "string",
+      "description": "Optional echo of templates.json's template.name, for human readability only."
+    },
+    "category": {
+      "type": "string",
+      "enum": ["图片", "视频", "通用件"],
+      "description": "Must match the chosen template's own category in templates.json (script cross-checks; schema can only constrain to the 3-value enum, not to 'the specific value templates.json declares for this template_id')."
+    },
+    "variables_used": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string" },
+      "patternProperties": {
+        "^(scene|scenes|place|rooms)$": {
+          "type": "string",
+          "pattern": "^(?!.*(明亮阳光|柔和灯光|柔光|暖光|冷光|逆光|顶光|侧光|自然光|摄影棚灯光|补光灯|bright sunlight|soft light|soft lighting|warm light|warm lighting|cool lighting|natural light|backlit|studio light|studio lighting|golden hour|ring light|softbox)).+$",
+          "description": "Axiom 3: scene-bearing variables (templates.json variable_glossary: scene/scenes/place/rooms) must not describe lighting -- lighting is controlled exclusively by realism_suffix (templates.json meta.hard_rules #4). Weather words are fine. This closed lighting-word list is authoritative here; scripts/validate.js reads this exact pattern back from this file instead of hand-copying it, mirroring 100x-persona's micro_coordinate vague-word design. 'natural light' (the direct English translation of the Chinese '自然光' entry) is included on this list alongside the Chinese keyword, maintaining symmetric coverage for English prompts."
+        }
+      },
+      "description": "Map of template.variables[].key -> filled value, for the chosen template_id. Required (non-optional) keys are exactly templates.json's variables[] entries whose label does NOT contain '(可选)'; this per-template required-set check needs an external file lookup (templates.json) so it lives in scripts/validate.js's referential check, not here."
+    },
+    "conditional_clauses": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Optional. Resolved values of templates.json's per-template conditional[] fields (e.g. IMG-02's problem_clause, IMG-05's layout_desc, PART-HOOK's hook_clause), for auditability. scripts/validate.js recomputes these independently from templates.json + variables_used as part of the axiom-1 reconstruction check."
+    },
+    "rendered_body": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Axiom 1: must be byte-for-byte equal to templates.json's template.body with every {key} placeholder substituted (variables_used + resolved conditional_clauses + realism_suffix[suffix_key]), including the effect_library/hook_library bracket-expansion special cases for VID-A/VID-F/PART-HOOK documented in templates.json meta.render_notes. This already includes the realism_suffix text (it is an inline {realism_suffix} token inside body, not appended separately). Reconstruction requires reading templates.json, which this schema cannot do -- enforced by scripts/validate.js."
+    },
+    "reference_locks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entity", "ref_number", "status", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "entity": { "type": "string", "enum": ["产品", "人物"] },
+          "ref_number": { "type": "integer", "minimum": 1 },
+          "status": { "type": "string", "enum": ["first_lock", "reference_reuse"] },
+          "value": { "type": "string", "minLength": 1 }
+        },
+        "if": {
+          "properties": { "status": { "const": "reference_reuse" } },
+          "required": ["status"]
+        },
+        "then": {
+          "properties": {
+            "value": {
+              "pattern": "^参考图\\d+(产品|人物)$",
+              "description": "Axiom 2 format half (schema-checkable): a reference_reuse entry's value must be exactly the '参考图N产品/人物' shorthand, never a redescription. Whether N was actually established earlier (referential integrity) needs meta.existing_refs_input / earlier reference_locks entries, which is a cross-field lookup schema.json cannot express -- see scripts/validate.js checkReferenceLockIntegrity."
+            }
+          }
+        },
+        "else": {
+          "properties": {
+            "value": {
+              "not": { "pattern": "^参考图\\d+(产品|人物)$" },
+              "description": "Axiom 2 format half: a first_lock entry must contain real descriptive content, not the reference shorthand (that shorthand is reserved for entities already established in a prior compose call)."
+            }
+          }
+        }
+      },
+      "description": "Optional. Present only for templates whose variables include a lock-establishing field (product_desc/persona in IMG-01/IMG-02) or a lock-referencing field (product_lock/persona_ref). Empty/absent for templates with no lock semantics (e.g. VID-B, VID-E, VID-G, PART-HOOK, PART-CTA)."
+    },
+    "model": {
+      "description": "Video model wrapper choice. Must be null when category != '视频'. Must be one of the 3 known wrappers when category == '视频' (see 'category-model consistency' conditional below).",
+      "anyOf": [
+        { "type": "null" },
+        { "type": "string", "enum": ["veo", "seedance", "即创"] }
+      ]
+    },
+    "video_unit": {
+      "description": "Must be null when category != '视频' or model is null. Must be an object when category == '视频' (see conditional below). Per-model duration cap / banned-word / trailing-phrase compliance (axiom 4) is enforced by scripts/validate.js against profiles/veo.md and profiles/seedance.md's documented constants -- not duplicated into this schema, same convention 100x-search-query uses for its platform density word lists.",
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["duration_seconds", "final_prompt_wrapped"],
+          "additionalProperties": false,
+          "properties": {
+            "duration_seconds": { "type": ["number", "null"] },
+            "final_prompt_wrapped": { "type": "string", "minLength": 1 },
+            "narrative_shot_type": {
+              "type": "string",
+              "enum": ["情绪", "痛点", "产品", "场景", "对比", "转折", "CTA"],
+              "description": "Required only when model == '即创' (script-checked): the 7 narrative-shot categories from templates.json model_wrappers.即创. This skill holds no source material for 即创's duration cap or banned-word list -- known limitation, see SKILL.md."
+            }
+          }
+        }
+      ]
+    },
+    "meta": {
+      "type": "object",
+      "required": ["generated_by"],
+      "additionalProperties": true,
+      "properties": {
+        "generated_by": { "const": "100x-prompt-compose" },
+        "existing_refs_input": {
+          "type": "object",
+          "properties": {
+            "产品": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+            "人物": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
+          },
+          "description": "Optional class-C echo of the ref numbers already established in prior compose calls this session (upstream context). Absent/empty means this call treats every lock-bearing variable as first_lock."
+        },
+        "established_refs_after": {
+          "type": "object",
+          "properties": {
+            "产品": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+            "人物": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
+          },
+          "description": "This call's self-reported union of existing_refs_input plus any new first_lock ref_numbers created this call. scripts/validate.js verifies this union is arithmetically correct (axiom 2)."
+        },
+        "model_choice_source": {
+          "type": "string",
+          "enum": ["user_specified", "default_first_hint"]
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "category-model consistency: image/通用件 templates never carry a model wrapper; video templates always do.",
+      "if": {
+        "properties": { "category": { "const": "视频" } },
+        "required": ["category"]
+      },
+      "then": {
+        "properties": {
+          "model": { "enum": ["veo", "seedance", "即创"] },
+          "video_unit": { "type": "object" }
+        },
+        "required": ["model", "video_unit"]
+      },
+      "else": {
+        "properties": {
+          "model": { "type": "null" },
+          "video_unit": { "type": "null" }
+        }
+      }
+    }
+  ]
+}

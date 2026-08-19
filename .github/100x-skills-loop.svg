@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
+  <title id="title">100x-skill-tiktok flow</title>
+  <desc id="desc">Creative inputs converge into a governed skill framework (axioms, schema, validator), then expand into validated structured outputs, with new knowledge atoms feeding back.</desc>
+
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2B7FFF"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#A2A29E"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="460" fill="#F4F4F2"/>
+  <rect x="24" y="24" width="1152" height="412" rx="14" fill="#FFFFFF" stroke="#DEDEDB"/>
+
+  <g fill="#666662" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="700">
+    <text x="80" y="82">INPUT</text>
+    <text x="546" y="82">SKILL FRAMEWORK</text>
+    <text x="1038" y="82">OUTPUT</text>
+  </g>
+
+  <g fill="#777773" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" font-weight="600">
+    <text x="80" y="136">script</text>
+    <text x="80" y="200">product card</text>
+    <text x="80" y="264">persona card</text>
+  </g>
+
+  <g fill="none" stroke="#D6D6D2" stroke-width="1.5">
+    <path d="M148 132 C248 132 268 218 382 218"/>
+    <path d="M148 196 C258 196 286 224 382 224"/>
+    <path d="M148 260 C258 260 286 236 382 236"/>
+  </g>
+
+  <g>
+    <circle cx="116" cy="132" r="9" fill="#FFFFFF" stroke="#171716" stroke-width="2"/>
+    <circle cx="116" cy="196" r="9" fill="#FFFFFF" stroke="#171716" stroke-width="2"/>
+    <circle cx="116" cy="260" r="9" fill="#FFFFFF" stroke="#171716" stroke-width="2"/>
+    <circle cx="116" cy="132" r="3" fill="#2B7FFF"/>
+    <circle cx="116" cy="196" r="3" fill="#2B7FFF"/>
+    <circle cx="116" cy="260" r="3" fill="#2B7FFF"/>
+  </g>
+
+  <g fill="#FFFFFF" stroke="#A2A29E" stroke-width="1.5">
+    <rect x="382" y="201" width="34" height="34" rx="7"/>
+    <rect x="438" y="201" width="34" height="34" rx="7"/>
+    <rect x="494" y="201" width="34" height="34" rx="7"/>
+  </g>
+  <g fill="#171716">
+    <circle cx="399" cy="218" r="3.5"/>
+    <circle cx="455" cy="218" r="3.5"/>
+    <circle cx="511" cy="218" r="3.5"/>
+  </g>
+  <path d="M416 218 H438 M472 218 H494 M528 218 H546" fill="none" stroke="#171716" stroke-width="1.5"/>
+  <g fill="#A2A29E" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" font-weight="600" text-anchor="middle">
+    <text x="399" y="256">axioms</text>
+    <text x="455" y="256">schema</text>
+    <text x="511" y="256">ajv</text>
+  </g>
+
+  <g transform="translate(632 230)">
+    <circle r="94" fill="#F6F6F3" stroke="#D6D6D2"/>
+    <circle r="70" fill="#FFFFFF" stroke="#A2A29E" stroke-width="1.5"/>
+    <circle r="42" fill="#EFF5FF" stroke="#2B7FFF" stroke-width="2"/>
+    <circle r="10" fill="#2B7FFF"/>
+
+    <!-- 7 planned skills around the hub: 2 filled = built and P2-passed, 5 hollow = planned -->
+    <g>
+      <circle cx="0" cy="-62" r="4.5" fill="#171716"/>
+      <circle cx="55" cy="-33" r="4.5" fill="#171716"/>
+      <circle cx="61" cy="26" r="4.5" fill="none" stroke="#D6D6D2" stroke-width="1.5"/>
+      <circle cx="16" cy="61" r="4.5" fill="none" stroke="#D6D6D2" stroke-width="1.5"/>
+      <circle cx="-34" cy="54" r="4.5" fill="none" stroke="#D6D6D2" stroke-width="1.5"/>
+      <circle cx="-61" cy="11" r="4.5" fill="none" stroke="#D6D6D2" stroke-width="1.5"/>
+      <circle cx="-45" cy="-45" r="4.5" fill="none" stroke="#D6D6D2" stroke-width="1.5"/>
+    </g>
+    <g fill="none" stroke="#D6D6D2">
+      <path d="M0 -42 V-58"/>
+      <path d="M33 -25 L47 -30"/>
+      <path d="M38 15 L54 23"/>
+      <path d="M12 39 L15 55"/>
+      <path d="M-23 35 L-30 49"/>
+      <path d="M-40 7 L-56 10"/>
+      <path d="M-31 -29 L-41 -41"/>
+    </g>
+  </g>
+
+  <path d="M726 230 H806" fill="none" stroke="#2B7FFF" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+
+  <g fill="none" stroke="#D6D6D2" stroke-width="1.5">
+    <path d="M814 230 C884 230 908 160 1028 160"/>
+    <path d="M814 230 C884 230 908 300 1028 300"/>
+  </g>
+  <g>
+    <rect x="1028" y="142" width="36" height="36" rx="8" fill="#171716"/>
+    <rect x="1028" y="282" width="36" height="36" rx="8" fill="#171716"/>
+    <path d="M1038 160 H1054 M1046 152 V168" stroke="#FFFFFF" stroke-width="1.5"/>
+    <path d="M1038 300 H1054 M1038 305 H1050" stroke="#FFFFFF" stroke-width="1.5"/>
+  </g>
+  <g fill="#777773" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" font-weight="600">
+    <text x="1000" y="200" text-anchor="end">search queries</text>
+    <text x="1000" y="340" text-anchor="end">persona + scene</text>
+  </g>
+
+  <path d="M1046 348 C1046 396 918 402 730 402 H304 C184 402 116 370 116 344"
+        fill="none" stroke="#A2A29E" stroke-width="1.5" stroke-dasharray="5 7" marker-end="url(#arrow-muted)"/>
+  <circle cx="814" cy="402" r="4" fill="#2B7FFF"/>
+  <circle cx="632" cy="402" r="4" fill="#2B7FFF"/>
+  <circle cx="450" cy="402" r="4" fill="#2B7FFF"/>
+  <text x="730" y="424" fill="#777773" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" font-weight="600" text-anchor="middle">new low-confidence atoms feed back to the private knowledge base</text>
+</svg>

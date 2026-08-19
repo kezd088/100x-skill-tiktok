@@ -1,0 +1,53 @@
+{
+  "product_name": "circulation support capsules (synthetic example, based on a real English-language ad's before/after narrative, not a real product)",
+  "category": "循环保健品",
+  "source_material_note": "Derived from the narrative arc of a real English-language hat-graded TikTok ad transcript (V000615) reviewed in this validation run. Text-only degraded Class A path. The source ad's explicit mechanism claims ('blood vessels have already turned into a wall of concrete', 'your little guy pitching a tent') have been intentionally rewritten into photographable posture/circulation-visible cues, per axiom 4.",
+  "constants": {
+    "person_identity_anchor": "man late 30s, salt-and-pepper short beard, wearing a plain charcoal hoodie and dark jeans",
+    "scene_identity_anchor": "minimalist living room corner with a grey fabric sofa and a floor lamp casting soft warm light",
+    "product_identity_anchor": "small white supplement bottle with a dark blue ribbed cap and a clean sans-serif label"
+  },
+  "variables": [
+    { "dimension": "camera", "name": "framing", "observed_values": ["medium shot three-quarter body", "close-up on hands holding bottle"], "range_description": "mid-distance body-language shot vs tight product-in-hand detail shot" },
+    { "dimension": "pose", "name": "posture", "observed_values": ["seated leaning back on sofa", "standing with relaxed shoulders"], "range_description": "low-energy seated posture vs upright standing relaxed posture" }
+  ],
+  "media_plan": {
+    "structure": "head_tail",
+    "frame_count": 2,
+    "frames": [
+      { "role": "head", "day_index": null, "visual_action": "seated on the sofa leaning back, holding the bottle passively at lap level, tired heavy-lidded expression", "uses_first_frame_as_reference": false },
+      { "role": "tail", "day_index": null, "visual_action": "using frame 1 as reference, standing upright beside the sofa, holding the bottle at chest height with an active engaged grip, alert refreshed expression, rest of the living room unchanged", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "source ad contrasts exactly two states ('Within 24 hours, your circulation can start improving' -> before, and 'After seven days, your energy and size will level up' -> after), with no intermediate transition action described, so a clean two-frame head_tail plan matches without inventing a mid-step the copy never stated."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "medium shot, seated on sofa",
+      "character_prompt": "man late 30s, salt-and-pepper short beard, wearing a plain charcoal hoodie and dark jeans",
+      "scene_prompt": "minimalist living room corner with a grey fabric sofa and a floor lamp casting soft warm light",
+      "action_prompt": "seated on the sofa, holding the supplement bottle at lap level, medium three-quarter-body framing",
+      "combined_prompt": "man late 30s, salt-and-pepper short beard, wearing a plain charcoal hoodie and dark jeans, minimalist living room corner with a grey fabric sofa and a floor lamp casting soft warm light, small white supplement bottle with a dark blue ribbed cap and a clean sans-serif label, seated on the sofa holding the bottle at lap level, medium three-quarter-body framing",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "close-up hands, product on sofa arm",
+      "character_prompt": "man late 30s, salt-and-pepper short beard, wearing a plain charcoal hoodie and dark jeans",
+      "scene_prompt": "minimalist living room corner with a grey fabric sofa and a floor lamp casting soft warm light",
+      "action_prompt": "close-up on hands with the supplement bottle resting on the sofa arm, flat-lay product-hero composition",
+      "combined_prompt": "man late 30s, salt-and-pepper short beard, wearing a plain charcoal hoodie and dark jeans, minimalist living room corner with a grey fabric sofa and a floor lamp casting soft warm light, small white supplement bottle with a dark blue ribbed cap and a clean sans-serif label, close-up on hands with the bottle resting on the sofa arm, flat-lay product-hero composition",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "head", "day_index": null, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "man late 30s, salt-and-pepper short beard, wearing a plain charcoal hoodie and dark jeans, minimalist living room corner with a grey fabric sofa and a floor lamp casting soft warm light, small white supplement bottle with a dark blue ribbed cap and a clean sans-serif label, seated on the sofa leaning back, holding the bottle passively at lap level, tired heavy-lidded expression, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "tail", "day_index": null, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "man late 30s, salt-and-pepper short beard, wearing a plain charcoal hoodie and dark jeans, minimalist living room corner with a grey fabric sofa and a floor lamp casting soft warm light, small white supplement bottle with a dark blue ribbed cap and a clean sans-serif label, using frame 1 as reference, standing upright beside the sofa, holding the bottle at chest height with an active engaged grip, alert refreshed expression, rest of the living room unchanged, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "head_tail",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

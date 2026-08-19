@@ -1,0 +1,56 @@
+{
+  "source_script": "I used to lie awake scrolling for an hour before I could even feel sleepy. I started taking one gummy about thirty minutes before bed and most nights now I'm actually drowsy by the time I finish brushing my teeth. Honestly falling asleep now feels about as easy as flipping a light switch. A sleep coach I followed mentioned that the dose of L-theanine in these is on the higher end of what she usually sees recommended. A bottle costs about the same as two coffees and lasts three weeks.",
+  "meta": {
+    "generated_by": "100x-exaggerate",
+    "hat_level": "whitehat",
+    "market": "通用",
+    "calibration_note": "whitehat base ceiling is mild regardless of market -- all three techniques used here (time_compression_hyperbole/analogy_scale_hyperbole/authority_absolutism_hyperbole) are capped at mild, well under what a blackhat/grayhat bundle would allow",
+    "warnings": [
+      "synthetic example, not a real product (evals/ only)"
+    ]
+  },
+  "exaggeration_beats": [
+    {
+      "beat_id": "EXG_01",
+      "script_span_quote": "most nights now I'm actually drowsy by the time I finish brushing my teeth",
+      "technique": "time_compression_hyperbole",
+      "label_cn": "轻度速效",
+      "intensity": "mild",
+      "rationale": "入睡速度的变化描述克制，未给出具体分钟数或夸张速效承诺，符合whitehat上限"
+    },
+    {
+      "beat_id": "EXG_02",
+      "script_span_quote": "falling asleep now feels about as easy as flipping a light switch",
+      "technique": "analogy_scale_hyperbole",
+      "label_cn": "轻度类比",
+      "intensity": "mild",
+      "rationale": "用开关灯做类比，克制版本的类比放大，未使用夸张到失真的物体类比（如\"秒睡\"式极端类比），符合whitehat上限"
+    },
+    {
+      "beat_id": "EXG_03",
+      "script_span_quote": "the dose of L-theanine in these is on the higher end of what she usually sees recommended",
+      "technique": "authority_absolutism_hyperbole",
+      "label_cn": "轻度权威",
+      "intensity": "mild",
+      "rationale": "借助睡眠教练的相对性描述（\"偏高\"而非\"最高\"/\"唯一有效\"），是克制版本的权威借用"
+    }
+  ],
+  "contrast_beats": [
+    {
+      "beat_id": "CTR_01",
+      "contrast_type": "state_before_after",
+      "label_cn": "入睡前后",
+      "anchor_quote_a": "I used to lie awake scrolling for an hour before I could even feel sleepy",
+      "anchor_quote_b": "most nights now I'm actually drowsy by the time I finish brushing my teeth",
+      "rationale": "长时间清醒刷手机与刷完牙就犯困的状态形成温和但清晰的前后落差"
+    },
+    {
+      "beat_id": "CTR_02",
+      "contrast_type": "value_price",
+      "label_cn": "性价比反差",
+      "anchor_quote_a": "about the same as two coffees",
+      "anchor_quote_b": "lasts three weeks",
+      "rationale": "用两杯咖啡的日常花费做参照，反衬三周用量的持续价值，未使用任何折扣/稀缺话术"
+    }
+  ]
+}

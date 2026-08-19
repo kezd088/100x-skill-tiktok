@@ -1,0 +1,43 @@
+{
+  "id": "100x-segment",
+  "name": "100x-segment",
+  "version": "1.0.0",
+  "author": "100x",
+  "layer": "L1-script-decomposition",
+  "step": "1-segment",
+  "type": "generative",
+  "status": "v1.0",
+  "summary": "Plain-text EN/ES voiceover script in -> three independent cut layers out: L1 paragraph-logic segments (10 blueprint modules + 7-archetype tag), L2 predicted shot_purpose (reuses standard 7-value enum), L3 inline breath-mark ('strong'/'weak') annotations embedded in each segment's text.",
+  "validation": {
+    "structural_and_per_item": "schema.json (JSON Schema draft-07), actually EXECUTED by ajv (devDependency declared in package.json, run 'npm install' first) inside scripts/validate.js -- enforces required fields, type, additionalProperties:false, enum (module/shot_purpose/language), pattern (archetype format via a backreference that rejects 'X+X'), minLength/minItems, uniqueItems. This is everything vanilla JSON Schema CAN express.",
+    "cross_item_aggregate": "scripts/validate.js's hand-written layer -- the real, runnable enforcement of: axiom 2's text_annotated<->raw_text integrity (same-object cross-field comparison, marks must only ADD characters), axiom 3's breath-mark placement rules (parsing text_annotated into runs around its own marks and reasoning about the words on either side -- sentence-end/em-dash/contrastive-conjunction/comma priority order, one-breath word/syllable cap, mark-glued-to-a-word format check, plus two soft non-blocking heuristics for filler-word follow-up and price/number pre-mark suppression), and axiom 4's two aggregate checks: sequential segment_id/shot_id (a field-value-equals-its-own-array-index check schema has no access to) and shots<->segments referential integrity + zero-orphan coverage (cross-array). Run 'node scripts/validate.js --selftest' for the built-in regression suite (21 checks: schema-facts sanity, all shipped evals/ files, ajv additionalProperties/enum/pattern counterexamples, and one counterexample per hand-written aggregate rule including abbreviation-exclusion, zero-space-glue, and the two soft-warning checks).",
+    "note": "Same schema/script split discipline as 100x-search-query and 100x-persona (ajv 8.x, e.instancePath, new Ajv({allErrors:true,strict:false})) -- this skill deliberately does not introduce a third ajv-wiring convention."
+  },
+  "input_contract": {
+    "class_a_required": ["source_text"],
+    "class_b_optional_soft_degrade": [],
+    "class_c_upstream_optional_silent_skip": [],
+    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). source_text is the only input this skill needs -- like 100x-persona (and unlike 100x-search-query's core_benefit/target_audience/brand_tone 3-level degrade), every signal needed for module/archetype/shot_purpose/breath-mark generation is derivable from source_text itself, so there is no class-B field to soft-degrade. class_c is currently empty because no upstream skill producing a persona/product-brief style artifact exists yet in this repo; workflow.md documents the silent-skip contract for when one does. `language` is NOT a user-supplied input field -- it is detected from source_text and constrained to a closed en/es enum (workflow.md Phase 1 'language scope' step), because axiom 3/4's breath-mark rule tables (contrastive conjunctions, filler words, one-breath caps) are only defined for those two languages in v1."
+  },
+  "output_contract": "schema.json (SegmentBundle, self-contained in this skill)",
+  "requires_data": [
+    "taxonomy.script_blueprint_11_module_7_archetype",
+    "taxonomy.storyboard_shot_purpose_enum"
+  ],
+  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus or taxonomy file at inference time. 'taxonomy.script_blueprint_11_module_7_archetype' records that segments[].module's 10-value enum and the top-level archetype's 7-value + mixed-archetype format were derived from standard script blueprints (11 modules, module 11 'Localization' deliberately excluded as a cross-cutting style dimension -- see axioms.md #1 and sources.md). 'taxonomy.storyboard_shot_purpose_enum' records that shots[].shot_purpose reuses standard 7-value enum (hook/build/reveal/demo/social_proof/cta/transition). No private data is stored in this repo.",
+  "methodology_origin": {
+    "source_components": [
+      "Storyboard methodology structure",
+      "Hook framework concepts",
+      "Script blueprint (11 modules and 7 archetypes)",
+      "Breath mark rule specifications"
+    ],
+    "adaptation_summary": "Clean, self-contained implementation combining script decomposition methodology, standard module/archetype taxonomy, standard shot purpose enums, and deterministic breath-mark placement rules. Cleaned of external private paths."
+  },
+  "language_scope": {
+    "output_language": "segments[].module, archetype, and shots[].shot_purpose are closed-enum English snake_case tokens regardless of script language. segments[].raw_text/text_annotated preserve the script's own original language verbatim (breath marks are additive annotations, never translated).",
+    "input_language": "v1 hard scope lock: source_text must be detected as English or Spanish (axioms.md #3's breath-mark rule tables -- contrastive conjunctions, filler words, one-breath word/syllable caps -- are only defined for en/es). A script in any other language, or code-switched to the point the dominant language can't be determined, is out of scope in v1 and is rejected outright (workflow.md Phase 1), not silently degraded."
+  },
+  "banned_terms_ref": "SKILL.md#禁用词",
+  "eval_policy": "evals/ contains synthetic/fictional scripts only. No real transcript text, account name, product name, or Feishu link may appear in this skill's files."
+}

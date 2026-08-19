@@ -1,0 +1,39 @@
+{
+  "id": "100x-prompt-compose",
+  "name": "100x-prompt-compose",
+  "version": "1.2.0",
+  "author": "100x",
+  "layer": "L2-creative-generation",
+  "step": "6-prompt-model",
+  "type": "generative",
+  "status": "v1.2",
+  "summary": "Template id (or requirement description) + variables in -> literally-rendered, model-wrapped (Veo/Seedance/即创) generation prompt out, for feeding a target image or video model.",
+  "validation": {
+    "structural_and_per_item": "schema.json (JSON Schema draft-07) -- enforces template_id enum, category enum, additionalProperties, the reference_locks status<->value pattern (if/then), the scene/scenes/place/rooms no-lighting-word pattern (patternProperties), and the category<->model/video_unit nullity conditional. This is everything vanilla JSON Schema CAN express.",
+    "cross_item_aggregate": "scripts/validate.js -- the real, runnable enforcement of axiom 1 (rendered_body must be a byte-for-byte reconstruction of templates.json's template.body with {key} substitution, plus a scan rejecting internal UNRESOLVED_* sentinel strings that a missing hook_type/effect_formula/layout would otherwise leak through -- requires reading an external file and knowledge of the sentinel-producing code path, which schema.json cannot do), axiom 2 (reference_locks referential integrity -- a reference_reuse entry's ref_number must exist in meta.existing_refs_input or an earlier first_lock in the same bundle, PLUS an independent scan of EVERY string-valued variables_used entry (not just product_lock/persona_ref) for the same '参考图N产品/人物' claim even when reference_locks[] is left empty, cross-checked against both existing_refs_input and reference_locks[] itself -- a three-way cross-field lookup schema.json cannot express), and axiom 4 (per-model duration cap / banned-word list / required trailing phrase, documented in profiles/veo.md and profiles/seedance.md and kept as JS constants rather than duplicated into schema.json, same convention as 100x-search-query's platform keyword-density tables). Run 'node scripts/validate.js --selftest' for the built-in regression suite (16 checks: schema/templates.json id-enum drift guard, 3 real end-to-end passes across image/veo/seedance, axiom1 paraphrase rejection, 2 axiom2 referential-integrity rejections, 1 ajv scene-lighting-word rejection, 2 axiom4 veo rejections, 1 axiom4 seedance trailing-phrase-exclusion-scope proof, 1 axiom2 variables_used-claim-without-reference_locks-entry rejection, 2 axiom1 unresolved-sentinel-leak rejections for PART-HOOK/VID-A, 1 ajv scene-lighting-word English/Chinese-asymmetry rejection for 'natural light', 1 axiom2 variables_used-claim scan broadened beyond the product_lock/persona_ref key-name whitelist to any string-valued key)."
+  },
+  "input_contract": {
+    "class_a_required_as_user_input": ["template_id (or a requirement description that uniquely matches one template)", "the chosen template's non-optional variables (variables[].label not containing '(可选)')"],
+    "class_b_optional_soft_degrade": ["variables[].label containing '(可选)'", "model (for 视频 templates only -- asked once, defaults to model_hint[0] if unanswered)"],
+    "class_c_upstream_optional_silent_skip": ["existing_refs_input (product/persona lock numbers established by a prior compose call)"],
+    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). Input is described informally here and in workflow.md Phase 1, not enforced by a separate input JSON Schema file."
+  },
+  "output_contract": "schema.json (ComposedPromptBundle, self-contained in this skill)",
+  "requires_data": [
+    "taxonomy.prompt_template_library_14",
+    "skill_pack.veo_axioms",
+    "skill_pack.seedance_axioms"
+  ],
+  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus at inference time. 'taxonomy.prompt_template_library_14' documents the 14-template library ported into templates.json. 'skill_pack.veo_axioms' and 'skill_pack.seedance_axioms' record the model-wrapper specifications in profiles/veo.md and profiles/seedance.md.",
+  "ported_from": {
+    "private_source_skill": null,
+    "private_source_paths": [],
+    "adaptation_summary": "Synthesizes the 14-template prompt library (templates.json) with target model wrapper profiles (profiles/veo.md, profiles/seedance.md). The 4 axioms in axioms.md provide structural validation, reference-lock integrity, scene lighting control, and duration/banned-word checks. Full details in sources.md."
+  },
+  "language_scope": {
+    "output_language": "rendered_body is Chinese (matches templates.json's own body text, which is authored in Chinese for a Chinese-speaking production/creative team); dialogue-bearing variables (line_en/line_open/line_rec/line) must be American-casual English per templates.json meta.hard_rules #5, regardless of the source material's language -- this is not an exception this skill invented, it is the template library's own hard rule.",
+    "input_language": "source product/persona/scene material may be in any language (tested against en + es corpus samples); dialogue variables must still be translated/rewritten into English before rendering, per the rule above."
+  },
+  "banned_terms_ref": "SKILL.md#禁用词",
+  "eval_policy": "evals/ contains synthetic/fictional products only, each marked '(synthetic example, not a real product)'. No real transcript text, account name, product name, or Feishu link may appear in this skill's files."
+}

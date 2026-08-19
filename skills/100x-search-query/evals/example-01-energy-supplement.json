@@ -1,0 +1,63 @@
+{
+  "product_name": "daily energy support powder (synthetic example, not a real product)",
+  "category": "保健品",
+  "queries": {
+    "pinterest": [
+      {"q":"desk energy routine aesthetic","intent_cn":"情绪认同:办公桌活力状态画面","stage":"Appeal"},
+      {"q":"afternoon slump self care ideas","intent_cn":"场景灵感:下午疲惫自护参考","stage":"Appeal"},
+      {"q":"productive morning routine ideas","intent_cn":"情绪认同:高效晨间生活画面","stage":"Appeal"},
+      {"q":"clean girl energy routine","intent_cn":"情绪认同:极简活力生活方式","stage":"Appeal"},
+      {"q":"office desk setup aesthetic","intent_cn":"场景灵感:办公桌陈列画面","stage":"Aware"},
+      {"q":"energy drink alternative flatlay","intent_cn":"视觉参考:能量饮品替代拍摄","stage":"Act"},
+      {"q":"healthy productivity mood board","intent_cn":"情绪认同:健康高效生活画面","stage":"Appeal"},
+      {"q":"work from home routine ideas","intent_cn":"场景灵感:居家办公流程参考","stage":"Aware"},
+      {"q":"energy boost self care vibe","intent_cn":"情绪认同:精力提升生活氛围","stage":"Appeal"},
+      {"q":"minimalist desk aesthetic ideas","intent_cn":"场景灵感:极简办公桌画面","stage":"Appeal"},
+      {"q":"morning energy routine inspo","intent_cn":"情绪认同:晨间活力灵感图","stage":"Appeal"},
+      {"q":"supplement flatlay minimal styling","intent_cn":"视觉参考:极简补剂拍摄陈列","stage":"Act"},
+      {"q":"busy mom energy routine mood","intent_cn":"身份认同:忙碌母亲活力画面","stage":"Aware"},
+      {"q":"focus and energy self care ideas","intent_cn":"场景灵感:专注力自护参考","stage":"Appeal"},
+      {"q":"healthy energy lifestyle aesthetic","intent_cn":"身份认同:健康活力生活画面","stage":"Advocate"}
+    ],
+    "tiktok": [
+      {"q":"#energytiktok","intent_cn":"泛用:精力话题聚合","stage":"Aware"},
+      {"q":"#afternoonslump","intent_cn":"泛用:下午疲惫话题聚合","stage":"Ask"},
+      {"q":"#energyhack","intent_cn":"情绪:提神技巧梗","stage":"Appeal"},
+      {"q":"#productivitytiktok","intent_cn":"泛用:效率话题聚合","stage":"Appeal"},
+      {"q":"#energypowder","intent_cn":"泛用:能量粉话题聚合","stage":"Advocate"},
+      {"q":"#coffeealternative","intent_cn":"泛用:咖啡替代话题聚合","stage":"Aware"},
+      {"q":"#focussupport","intent_cn":"泛用:专注支持话题聚合","stage":"Appeal"},
+      {"q":"#supplementshelf","intent_cn":"陈列:补剂收纳展示热门","stage":"Act"},
+      {"q":"#energyroutine","intent_cn":"情绪:精力日常话题","stage":"Appeal"},
+      {"q":"honest review energy powder","intent_cn":"购买前:找真实使用测评","stage":"Ask"},
+      {"q":"does this energy powder actually work","intent_cn":"购买前:效果真实性验证","stage":"Ask"},
+      {"q":"tiktok made me buy this energy drink","intent_cn":"种草:被种草购买链路","stage":"Advocate"},
+      {"q":"morning energy routine grwm","intent_cn":"场景:晨间准备流程展示","stage":"Act"},
+      {"q":"energy powder storytime","intent_cn":"叙事:精力变化故事内容","stage":"Ask"},
+      {"q":"dayinmylife energy routine","intent_cn":"生活方式:日常活力记录","stage":"Appeal"}
+    ],
+    "reddit": [
+      {"q":"why am i so tired every afternoon","intent_cn":"共鸣:下午疲惫求认同","stage":"Aware"},
+      {"q":"how to fix afternoon energy crash","intent_cn":"方法求解:午后精力下滑方案","stage":"Ask"},
+      {"q":"anyone else hit a wall at 3pm","intent_cn":"共鸣:下午撞墙期求认同","stage":"Aware"},
+      {"q":"best natural energy supplement reddit","intent_cn":"决策前:靠谱能量粉求证","stage":"Ask"},
+      {"q":"energy powder vs coffee for focus","intent_cn":"对比:能量粉与咖啡选择","stage":"Ask"},
+      {"q":"is an energy supplement worth it","intent_cn":"决策:是否值得购买讨论","stage":"Ask"},
+      {"q":"help with afternoon energy crash","intent_cn":"求助:午后精力下滑方案","stage":"Ask"},
+      {"q":"recommend a natural energy powder","intent_cn":"求推荐:天然能量粉","stage":"Ask"},
+      {"q":"does it work energy powder focus","intent_cn":"验证:专注效果真实性讨论","stage":"Ask"},
+      {"q":"should i cut caffeine for energy powder","intent_cn":"决策前:戒咖啡替代讨论","stage":"Ask"},
+      {"q":"why does my energy crash after lunch","intent_cn":"共鸣:午后精力骤降求解","stage":"Aware"},
+      {"q":"how long until energy powder kicks in","intent_cn":"预期管理:见效周期求解","stage":"Ask"},
+      {"q":"anyone else quit coffee for energy powder","intent_cn":"共鸣:戒咖啡经验分享","stage":"Advocate"},
+      {"q":"energy powder side effects experience","intent_cn":"风险确认:副作用讨论","stage":"Ask"},
+      {"q":"afternoon fatigue daily struggle","intent_cn":"痛点:午后疲惫日常困扰","stage":"Aware"}
+    ]
+  },
+  "meta": {
+    "based_on_5a": "Ask+Aware",
+    "generated_by": "100x-search-query",
+    "topic_angle": "pain-driven",
+    "warnings": []
+  }
+}

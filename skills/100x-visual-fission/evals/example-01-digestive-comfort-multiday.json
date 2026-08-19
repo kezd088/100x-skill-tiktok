@@ -1,0 +1,61 @@
+{
+  "product_name": "digestive comfort softgel (synthetic example, based on a real ad's day-by-day narrative structure, not a real product)",
+  "category": "肠道消化保健品",
+  "source_material_note": "Derived from the narrative ARC (day-by-day claim shape, not the literal wording) of a real English-language hat-graded TikTok ad transcript reviewed during this skill's build (see sources.md for the line reference; no transcript text is reproduced here). No reference images existed for this test, so this is the degraded text-only Class A path (workflow.md Phase 1 step 5): person/scene identity anchors below are synthetic archetypes invented for this eval, not vision-reversed from any real photo. The source ad's literal internal-mechanism claim is intentionally NOT carried into the frames below -- it is abstracted into a genuinely photographable bloating/posture change, which is the concrete case axiom 4 exists to force.",
+  "constants": {
+    "person_identity_anchor": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top",
+    "scene_identity_anchor": "small apartment bedroom with a full-length mirror, soft morning window light",
+    "product_identity_anchor": "white softgel bottle with a plain green leaf label"
+  },
+  "variables": [
+    { "dimension": "camera", "name": "framing", "observed_values": ["medium full-body shot", "close-up on midsection"], "range_description": "medium full-body establishing shot vs. tight close-up on the midsection where the visible change is happening" },
+    { "dimension": "pose", "name": "stance", "observed_values": ["side-on mirror stance", "front-on relaxed stance"], "range_description": "side profile for silhouette comparison vs. front-facing relaxed stance for a natural check-in feel" }
+  ],
+  "media_plan": {
+    "structure": "multi_day",
+    "frame_count": 6,
+    "frames": [
+      { "role": "day", "day_index": 1, "visual_action": "standing side-on in front of the mirror, slight midsection puffiness, mild tired expression, morning routine clothing", "uses_first_frame_as_reference": false },
+      { "role": "day", "day_index": 3, "visual_action": "using frame 1 as reference, same side-on stance, waistband sitting slightly looser, neutral expression", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 5, "visual_action": "using frame 1 as reference, noticeably less midsection puffiness, more relaxed shoulders", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 7, "visual_action": "using frame 1 as reference, flatter midsection silhouette, subtle smile", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 10, "visual_action": "using frame 1 as reference, energetic morning stretch pose, no visible midsection puffiness", "uses_first_frame_as_reference": true },
+      { "role": "day", "day_index": 14, "visual_action": "using frame 1 as reference, confident front-on mirror check, flat relaxed midsection, bright expression, rest of the room unchanged", "uses_first_frame_as_reference": true }
+    ],
+    "structure_justification": "source ad narrates an explicit day-by-day arc (day 1 / day 3 / day 5 / day 7 / day 10 / day 14 cited in the original copy as separate milestones), so a 6-frame multi_day plan matches those 6 cited points one-to-one without inventing or dropping any of them."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "medium full-body, side-on",
+      "character_prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top",
+      "scene_prompt": "small apartment bedroom with a full-length mirror, soft morning window light",
+      "action_prompt": "standing side-on in front of the mirror, holding the softgel bottle at waist height, medium full-body framing",
+      "combined_prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, standing side-on in front of the mirror holding the bottle at waist height, medium full-body framing",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "close-up midsection, front-on",
+      "character_prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top",
+      "scene_prompt": "small apartment bedroom with a full-length mirror, soft morning window light",
+      "action_prompt": "front-on relaxed stance, close-up on midsection with the softgel bottle resting on the dresser in frame, product-hero composition",
+      "combined_prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, front-on relaxed stance close-up on midsection, bottle resting on the dresser in frame, product-hero composition",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 1, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, standing side-on in front of the mirror, slight midsection puffiness, mild tired expression, morning routine clothing, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 3, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, using frame 1 as reference, same side-on stance, waistband sitting slightly looser, neutral expression, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 3, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 5, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, using frame 1 as reference, noticeably less midsection puffiness, more relaxed shoulders, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 4, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 7, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, using frame 1 as reference, flatter midsection silhouette, subtle smile, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 5, "source_prompt_set_id": 1, "frame_role": "day", "day_index": 10, "camera_variant": "B", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, using frame 1 as reference, energetic morning stretch pose, no visible midsection puffiness, ring-light lighting, neutral color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 6, "source_prompt_set_id": 2, "frame_role": "day", "day_index": 14, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "woman in her early 30s, shoulder-length wavy auburn hair, plain grey loungewear top, small apartment bedroom with a full-length mirror, soft morning window light, white softgel bottle with a plain green leaf label, using frame 1 as reference, confident front-on mirror check, flat relaxed midsection, bright expression, rest of the room unchanged, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "multi_day",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

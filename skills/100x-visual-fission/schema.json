@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-visual-fission/VisualFissionBundle.json",
+  "title": "VisualFissionBundle",
+  "description": "Output contract for 100x-visual-fission. Self-contained in this skill (no shared cross-skill schemas/ in this repo yet). Locked person/scene/product identity in -> a media-fission plan (which frame-structure: single_frame/head_tail/head_mid_tail/multi_day) + N distinct prompt_sets (VTP step 04) + camera-preset x aspect-ratio fission_variants per frame (VTP step 06) + one fixed negative_prompt constant (VTP step 07, reproduced from the framework doc). NOTE (same split as 100x-search-query/100x-persona): vanilla JSON Schema draft-07 -- even with if/then/const, which this file uses aggressively for the many FIXED deterministic tables VTP defines (camera-variant A/B/C -> lighting/color keywords, aspect_ratio -> resolution, media structure -> frame_count) -- structurally CANNOT express: (a) an array's length must equal a sibling numeric field (frames.length === media_plan.frame_count), (b) ordering/sequence constraints across array items (frame roles must appear in the right order; multi_day day_index must be strictly ascending and distinct; and which day-role frame counts as the reference-anchor 'first' frame is whichever one has the smallest day_index in the array -- day_index is a real source-narrative day number, not a re-indexed 1..N placeholder, so this cannot be reduced to a per-item day_index==1 check),(c) referential integrity from one array's foreign-key-shaped string/int back to another array's actual defined keys (fission_variants[].source_prompt_set_id must be a real prompt_sets[].id; frame_role/day_index must be a real media_plan.frames[] entry), (d) coverage/zero-orphan checks (every planned frame must be referenced by >=1 fission_variant), (e) cross-field byte-equality between two DIFFERENT array branches (every fission_variant's prompt_json.negative_prompt must equal the top-level negative_prompt), (f) case-insensitive content screening against a curated word list (the axiom-4 unvisualizable-claim scan). All six are enforced by scripts/validate.js, which loads this file at runtime so the two never drift apart. See axioms.md for the full split.",
+  "type": "object",
+  "required": ["product_name", "category", "constants", "variables", "media_plan", "prompt_sets", "fission_variants", "negative_prompt", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "product_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Echo of the input product/persona name. Must not be a real customer/brand identifier when used in this repo's evals/ (synthetic only)."
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Generic taxonomy category (e.g. 保健品/家居/美妆个护/3C/通用), never a customer-specific category dictionary entry."
+    },
+    "source_material_note": {
+      "type": "string",
+      "description": "Optional. Discloses whether the person/scene references behind `constants` were real vision-reversed JSON (VTP steps 01/02) or a degraded text-only description (no images available). Does not change the output contract -- see workflow.md Phase 1 class-A degrade path."
+    },
+    "constants": {
+      "type": "object",
+      "required": ["person_identity_anchor", "scene_identity_anchor", "product_identity_anchor"],
+      "additionalProperties": true,
+      "properties": {
+        "person_identity_anchor": { "$ref": "#/definitions/identity_anchor" },
+        "scene_identity_anchor": { "$ref": "#/definitions/identity_anchor" },
+        "product_identity_anchor": { "$ref": "#/definitions/identity_anchor" }
+      },
+      "description": "Axiom 1 identity lock. These three anchors are the 'constants' half of VTP step 03 (extract-common): they must read as a real, specific description (schema bans a closed set of vague placeholders, see identity_anchor), and scripts/validate.js checks they appear as a literal case-insensitive substring inside EVERY prompt_sets[].combined_prompt and EVERY fission_variants[].prompt_json.prompt -- the actual, runnable enforcement of 'constants never change across a fission branch', which is the whole point of calling this axis a constant."
+    },
+    "variables": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/variable_item" },
+      "description": "The 'variables' half of VTP step 03 (extract-common), at leaf-field granularity -- e.g. dimension:camera, name:'framing', observed_values:['close-up','medium shot']."
+    },
+    "media_plan": { "$ref": "#/definitions/media_plan" },
+    "prompt_sets": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/definitions/prompt_set_item" },
+      "description": "VTP step 04 (generate-variants) output: N distinct prompt sets, each tagged with >=2 axis_tags. scripts/validate.js checks all combined_prompt values are pairwise distinct (no copy-paste duplicate) and that every one contains the three constants.* identity anchors."
+    },
+    "fission_variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/fission_variant_item" },
+      "description": "VTP step 06 (meta-prompt) output, extended with the media-fission axis (axiom 2): each item renders ONE prompt_set at ONE media_plan frame, under ONE fixed camera_variant (A/B/C, VTP's original 3-preset table) and ONE aspect_ratio. scripts/validate.js checks referential integrity (source_prompt_set_id and frame_role/day_index must point at real entries), zero-orphan frame coverage, and negative_prompt byte-equality against the top-level constant."
+    },
+    "negative_prompt": {
+      "const": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+      "description": "VTP step 07 (negative-prompt). The content is reproduced from the framework documentation section 'negative prompt怎么写'; fixed constant, user cannot edit (axiom 4)."
+    },
+    "meta": {
+      "type": "object",
+      "required": ["based_on_media_structure", "generated_by"],
+      "additionalProperties": true,
+      "properties": {
+        "based_on_media_structure": {
+          "$ref": "#/definitions/media_structure_enum",
+          "description": "Must equal media_plan.structure -- schema.json cannot express this top-level-to-nested-field equality (cross-field), scripts/validate.js checks it."
+        },
+        "generated_by": { "const": "100x-visual-fission" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "definitions": {
+    "media_structure_enum": {
+      "enum": ["single_frame", "head_tail", "head_mid_tail", "multi_day"],
+      "description": "Axiom 2 (media fission). single_frame = 1 frame (no stacking). head_tail = 2 frames (首尾, quick before/after). head_mid_tail = 3 frames (首中尾, effect-stacking with a mid transition action). multi_day = 4-8 frames (数日见效, sequential day-by-day progression). Source: 功效堆叠与多帧结构.md."
+    },
+    "frame_role_enum": { "enum": ["head", "mid", "tail", "day"] },
+    "camera_variant_enum": {
+      "enum": ["A", "B", "C"],
+      "description": "VTP's original fixed 3-preset table (vtp_prompts_06-meta-prompt.md 'Variant Definitions'): A=35mm/eye-level/medium/natural-window/warm, B=50mm/low-angle/medium/ring-light/neutral, C=85mm/high-angle/close-up/overcast-natural/muted. Not expanded in media fission -- axiom 2 adds the media_structure axis ON TOP of this table, it does not replace or add a 4th camera preset."
+    },
+    "aspect_ratio_enum": { "enum": ["9:16", "4:5", "1:1"] },
+    "identity_anchor": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^(?!.*(某处|某人|某个地方|随便|待定|不确定|TBD|tbd|somewhere|Somewhere|SOMEWHERE|anywhere|Anywhere|ANYWHERE|unspecified|Unspecified|UNSPECIFIED|placeholder|Placeholder|PLACEHOLDER|generic|Generic|GENERIC)).{3,}$",
+      "description": "Must not be a closed-set vague placeholder (reuses 100x-persona axiom-3's vague-word-ban technique, applied here to identity anchors instead of scene coordinates). JSON Schema draft-07 `pattern` has no case-insensitive flag, so every banned English word is enumerated in all three forms actually seen in real generation output (lower/Title/ALL-CAPS) -- an earlier version of this pattern only listed lower/Title-Case and let e.g. 'GENERIC'/'ANYWHERE'/'PLACEHOLDER'/'SOMEWHERE' (all-caps) through undetected; fixed by adding the missing ALL-CAPS form for every word in the list."
+    },
+    "variable_item": {
+      "type": "object",
+      "required": ["dimension", "name", "observed_values", "range_description"],
+      "additionalProperties": false,
+      "properties": {
+        "dimension": { "enum": ["camera", "pose", "composition"] },
+        "name": { "type": "string", "minLength": 1 },
+        "observed_values": { "type": "array", "minItems": 2, "items": { "type": "string", "minLength": 1 } },
+        "range_description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "frame_item": {
+      "type": "object",
+      "required": ["role", "day_index", "visual_action", "uses_first_frame_as_reference"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "$ref": "#/definitions/frame_role_enum" },
+        "day_index": { "type": ["integer", "null"], "minimum": 1 },
+        "visual_action": { "type": "string", "minLength": 1 },
+        "uses_first_frame_as_reference": { "type": "boolean" }
+      },
+      "allOf": [
+        { "if": { "properties": { "role": { "const": "day" } }, "required": ["role"] }, "then": { "properties": { "day_index": { "type": "integer", "minimum": 1 } } } },
+        { "if": { "properties": { "role": { "enum": ["head", "mid", "tail"] } }, "required": ["role"] }, "then": { "properties": { "day_index": { "type": "null" } } } },
+        { "if": { "properties": { "role": { "const": "head" } }, "required": ["role"] }, "then": { "properties": { "uses_first_frame_as_reference": { "const": false } } } },
+        { "if": { "properties": { "role": { "enum": ["mid", "tail"] } }, "required": ["role"] }, "then": { "properties": { "uses_first_frame_as_reference": { "const": true } } } }
+      ],
+      "description": "uses_first_frame_as_reference operationalizes 功效堆叠与多帧结构.md's key rule '尾图务必写(使用首图作为参考)...其余保持不变' -- every frame after the first must lock back to frame 1. For role:head this schema fixes the value directly (const false). For role:day (multi_day), which frame counts as 'first' is NOT hardcoded to day_index==1 here -- day_index holds the REAL source-narrative day number (e.g. a source that only ever mentions day 3/7/14/30 must keep those literal numbers, never a re-indexed 1..N placeholder), so 'first' means whichever day-role frame has the SMALLEST day_index in the array, which may not be 1. Determining that requires comparing day_index across every frame in the array -- a cross-item comparison vanilla JSON Schema cannot express (no keyword can single out 'the array item with the minimum value of field X'). The rule is enforced entirely by scripts/validate.js's dayFrameFirstReferenceCheck."
+    },
+    "media_plan": {
+      "type": "object",
+      "required": ["structure", "frame_count", "frames", "structure_justification"],
+      "additionalProperties": false,
+      "properties": {
+        "structure": { "$ref": "#/definitions/media_structure_enum" },
+        "frame_count": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "frames": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/definitions/frame_item" } },
+        "structure_justification": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must point back to a timeline/narrative cue in the input (axiom 2). Known gap: schema can only force a digit to be cited when structure=multi_day (see allOf below); it cannot verify the digit genuinely reflects the source narrative and not a fabricated one -- see axioms.md #2 TODO."
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "structure": { "const": "single_frame" } }, "required": ["structure"] }, "then": { "properties": { "frame_count": { "const": 1 } } } },
+        { "if": { "properties": { "structure": { "const": "head_tail" } }, "required": ["structure"] }, "then": { "properties": { "frame_count": { "const": 2 } } } },
+        { "if": { "properties": { "structure": { "const": "head_mid_tail" } }, "required": ["structure"] }, "then": { "properties": { "frame_count": { "const": 3 } } } },
+        { "if": { "properties": { "structure": { "const": "multi_day" } }, "required": ["structure"] }, "then": { "properties": { "frame_count": { "minimum": 4, "maximum": 8 }, "structure_justification": { "pattern": ".*[0-9].*" } } } }
+      ]
+    },
+    "prompt_set_item": {
+      "type": "object",
+      "required": ["id", "variant_label", "character_prompt", "scene_prompt", "action_prompt", "combined_prompt", "axis_tags"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "variant_label": { "type": "string", "minLength": 1 },
+        "character_prompt": { "type": "string", "minLength": 1 },
+        "scene_prompt": { "type": "string", "minLength": 1 },
+        "action_prompt": { "type": "string", "minLength": 1 },
+        "combined_prompt": { "type": "string", "minLength": 1 },
+        "axis_tags": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "enum": ["camera", "pose", "composition"] },
+          "description": "Self-declared axes this prompt_set deliberately varies on (VTP step 04's 'each must vary on 2+ axes' rule)."
+        }
+      }
+    },
+    "fission_variant_item": {
+      "type": "object",
+      "required": ["id", "source_prompt_set_id", "frame_role", "day_index", "camera_variant", "aspect_ratio", "prompt_json"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "source_prompt_set_id": { "type": "integer", "minimum": 1 },
+        "frame_role": { "$ref": "#/definitions/frame_role_enum" },
+        "day_index": { "type": ["integer", "null"], "minimum": 1 },
+        "camera_variant": { "$ref": "#/definitions/camera_variant_enum" },
+        "aspect_ratio": { "$ref": "#/definitions/aspect_ratio_enum" },
+        "prompt_json": {
+          "type": "object",
+          "required": ["prompt", "negative_prompt", "resolution"],
+          "additionalProperties": false,
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?=.*shot on iPhone)(?=.*visible pores)(?=.*natural skin texture)(?=.*minor imperfections)(?=.*photorealistic).+$",
+              "description": "Must contain VTP step 06's fixed realism suffix (all 5 substrings, any order). Axiom 4's unvisualizable-claim word ban is NOT checked here (case-insensitive scan is not practically expressible as a vanilla-regex pattern without an unreadable per-letter case-alternation) -- scripts/validate.js does that check."
+            },
+            "negative_prompt": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Must byte-equal the top-level negative_prompt const -- schema.json cannot express cross-branch field equality to a sibling top-level property from inside an array item, scripts/validate.js checks it."
+            },
+            "resolution": { "enum": ["1080x1920", "1080x1350", "1080x1080"] }
+          }
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "frame_role": { "const": "day" } }, "required": ["frame_role"] }, "then": { "properties": { "day_index": { "type": "integer", "minimum": 1 } } } },
+        { "if": { "properties": { "frame_role": { "enum": ["head", "mid", "tail"] } }, "required": ["frame_role"] }, "then": { "properties": { "day_index": { "type": "null" } } } },
+        { "if": { "properties": { "aspect_ratio": { "const": "9:16" } }, "required": ["aspect_ratio"] }, "then": { "properties": { "prompt_json": { "properties": { "resolution": { "const": "1080x1920" } } } } } },
+        { "if": { "properties": { "aspect_ratio": { "const": "4:5" } }, "required": ["aspect_ratio"] }, "then": { "properties": { "prompt_json": { "properties": { "resolution": { "const": "1080x1350" } } } } } },
+        { "if": { "properties": { "aspect_ratio": { "const": "1:1" } }, "required": ["aspect_ratio"] }, "then": { "properties": { "prompt_json": { "properties": { "resolution": { "const": "1080x1080" } } } } } },
+        { "if": { "properties": { "camera_variant": { "const": "A" } }, "required": ["camera_variant"] }, "then": { "properties": { "prompt_json": { "properties": { "prompt": { "pattern": "(?=.*\\bnatural-window\\b)(?=.*\\bwarm\\b)" } } } } } },
+        { "if": { "properties": { "camera_variant": { "const": "B" } }, "required": ["camera_variant"] }, "then": { "properties": { "prompt_json": { "properties": { "prompt": { "pattern": "(?=.*\\bring-light\\b)(?=.*\\bneutral\\b)" } } } } } },
+        { "if": { "properties": { "camera_variant": { "const": "C" } }, "required": ["camera_variant"] }, "then": { "properties": { "prompt_json": { "properties": { "prompt": { "pattern": "(?=.*\\bovercast-natural\\b)(?=.*\\bmuted\\b)" } } } } } }
+      ],
+      "description": "resolution is locked to aspect_ratio (VTP 06's Resolution Map) and prompt must literally reflect its camera_variant's fixed lighting/color-grading keywords (VTP 06's Variant Definitions table) -- all via if/then, since both are fixed deterministic lookup tables schema.json CAN express. Each keyword lookahead is wrapped in \\b word boundaries: an earlier version used bare substring lookaheads ((?=.*natural-window)(?=.*warm)), which a longer unrelated word could satisfy without containing the actual keyword as a whole word (e.g. 'natural-windowsill nearby, warmth in her smile' satisfied the old A-variant pattern via substring containment even though neither 'natural-window' nor 'warm' appears as its own token) -- fixed by requiring each keyword to appear as a bounded whole word/phrase, not merely as a substring of a longer word."
+    }
+  }
+}

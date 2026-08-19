@@ -1,0 +1,1988 @@
+app:
+  name: "100x-tiktok Step2 · 人设×夸张反差×场景生成器"
+  description: "TikTok/UGC 脚本原文输入，产出：grounded-creative 人物设定（检索2-3条真实人设方法论作为约束和引用依据，禁止模板填空，人物必须逐字引用真实检索到的方法论名并说明理由）→ 夸张手法+反差点（复用 100x-exaggerate 闭集技法/反差类型/市场帽度天花板）→ 场景设计（场景跟着人设走，state_before_after 反差强制≥2个前后场景，机位限定6选1闭集）。每一阶段生成后立即机器校验，未通过不进入下一阶段，失败输出逐条具体原因。"
+  icon: "🎬"
+  icon_type: emoji
+  icon_background: "#DCEEFB"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.2.11@REPLACE_WITH_REAL_HASH_AFTER_IMPORT
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods: [local_file, remote_url]
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: [local_file, remote_url]
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    viewport: { x: 0, y: 0, zoom: 0.15 }
+    nodes:
+      # ---------------------------------------------------------------
+      # 0. START
+      # ---------------------------------------------------------------
+      - id: start
+        type: custom
+        position: { x: 40, y: 300 }
+        positionAbsolute: { x: 40, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 166
+        data:
+          title: "接收脚本 + 校准输入"
+          type: start
+          selected: false
+          variables:
+            - label: "脚本/文案原文 source_script（必填，不接视频文件）"
+              variable: source_script
+              type: paragraph
+              required: true
+              max_length: 50000
+            - label: "帽度等级 hat_level（可选，缺失按三级降级处理，默认 grayhat）"
+              variable: hat_level
+              type: select
+              required: false
+              options: [blackhat, grayhat, whitehat]
+            - label: "目标市场 market（可选，如 美区 / US / 西语区 / 通用）"
+              variable: market
+              type: text-input
+              required: false
+              max_length: 200
+
+      # ---------------------------------------------------------------
+      # 1. 帽度/市场三级降级 —— 逐字复用 100x-exaggerate.dify.yml 的 calibrate_ceiling
+      # ---------------------------------------------------------------
+      - id: calibrate_ceiling
+        type: custom
+        position: { x: 320, y: 300 }
+        positionAbsolute: { x: 320, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "Phase 1 · hat_level/market 三级降级"
+          type: code
+          selected: false
+          code_language: python3
+          code: |
+            def main(hat_level_in: str, market_in: str) -> dict:
+                # 100x-exaggerate workflow.md Phase 1 "类别B（软性，三级降级）":
+                #   1. 两者都提供 -> 直接用
+                #   2. 只提供 hat_level，缺 market -> 不追问；market 按公理3的保守默认处理
+                #   3. 两者都缺 -> hat_level 内联推断为 grayhat；market 同样按保守默认
+                # "market 给了、hat_level 缺"是插值组合（原表未显式列出），处理方式与
+                # 100x-exaggerate.dify.yml 的 calibrate_ceiling 完全一致，逐字复用其逻辑。
+                valid_hats = {"blackhat", "grayhat", "whitehat"}
+                warnings = []
+
+                hat_level = (hat_level_in or "").strip().lower()
+                market = (market_in or "").strip()
+
+                if hat_level and hat_level not in valid_hats:
+                    warnings.append(
+                        f'hat_level "{hat_level_in}" 不在 blackhat/grayhat/whitehat 闭集内，'
+                        f'已忽略并按未提供处理'
+                    )
+                    hat_level = ""
+
+                if hat_level and market:
+                    effective_hat_level = hat_level
+                    effective_market = market
+                elif hat_level and not market:
+                    effective_hat_level = hat_level
+                    effective_market = ""
+                    warnings.append(
+                        "market 未提供，emotion_reaction_hyperbole 已按保守默认收紧至 "
+                        "moderate（axioms.md 公理3）"
+                    )
+                elif not hat_level and market:
+                    effective_hat_level = "grayhat"
+                    effective_market = market
+                    warnings.append(
+                        "hat_level 未提供，已按 grayhat 推断；market 按用户提供值使用"
+                        "（三级降级表未显式列出这一组合，按公理3机制自然外推，详见 notes.md）"
+                    )
+                else:
+                    effective_hat_level = "grayhat"
+                    effective_market = ""
+                    warnings.append(
+                        "hat_level/market 均未提供，已按 grayhat + 保守市场默认推断"
+                        "（workflow.md Phase 1 类别B降级规则）"
+                    )
+
+                return {
+                    "effective_hat_level": effective_hat_level,
+                    "effective_market": effective_market,
+                    "warnings": warnings,
+                }
+          variables:
+            - value_selector: [start, hat_level]
+              variable: hat_level_in
+            - value_selector: [start, market]
+              variable: market_in
+          outputs:
+            effective_hat_level:
+              type: string
+            effective_market:
+              type: string
+            warnings:
+              type: array[string]
+
+      # ---------------------------------------------------------------
+      # 2. 检索 2-3 条真实人设方法论（占位 dataset_id，需人工重连，见 notes.md）
+      # ---------------------------------------------------------------
+      - id: kb_retrieve_persona_patterns
+        type: custom
+        position: { x: 600, y: 300 }
+        positionAbsolute: { x: 600, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 110
+        data:
+          title: "检索真实人设方法论（占位 dataset_id，需人工重连）"
+          type: knowledge-retrieval
+          selected: false
+          dataset_ids:
+            - "REPLACE_WITH_DATASET_ID"
+          query_variable_selector: [start, source_script]
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            top_k: 3
+            reranking_enable: false
+            score_threshold_enabled: false
+            score_threshold: 0
+          metadata_filtering_mode: disabled
+
+      # ---------------------------------------------------------------
+      # 3. Stage A · 人物设定生成 —— grounded-creative + citation（核心机制）
+      # ---------------------------------------------------------------
+      - id: llm_generate_persona
+        type: custom
+        position: { x: 880, y: 300 }
+        positionAbsolute: { x: 880, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 98
+        data:
+          title: "Stage A · 生成人物设定（grounded-creative + 引用）"
+          type: llm
+          selected: false
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.5
+          prompt_template:
+            - id: "c1a2e300-0001-4000-9000-000000000001"
+              role: system
+              text: |
+                你是这条 TikTok/UGC 广告脚本流水线的"人物设定生成器"（Step 2 第一阶段）。
+
+                【核心机制——请完整理解后再生成，这是本次设计的关键，不是可以跳过的背景说明】
+                下面 context 里是本次检索到的 2-3 条"人设方法论"，来自真实观察到的短视频人设
+                手法库，每条都包含 PATTERN_NAME / 心理机制 / 适用条件 / 何时避免使用 / 合规
+                风险。这些方法论的作用是【圈定和约束】你的创作，不是给你一段可以照抄填空的
+                成品文案：
+                - 正确做法：读懂某条方法论的心理机制和模式形状，判断它是否适合眼前这条脚本，
+                  然后用这条脚本自己的产品细节、场景、语气，全新写一段【这条脚本专属】的人物
+                  设定，让它真实地体现同一种心理机制。可以只用一条方法论，也可以对同一个人物
+                  合理混合借鉴两条方法论并在 rationale 里说明为什么混合。
+                - 错误做法（本次明确禁止）：把方法论"方法论模式"段落的文案原样抄进任何输出
+                  字段、只把产品名换掉当作"生成"、或者忽略方法论直接凭空捏造人物。
+                - 每个人物必须在 grounded_in 字段里明确引用你参考的 1 条或多条方法论，且
+                  pattern_name 必须【逐字复制】自 context 里某条方法论开头
+                  "PATTERN_NAME: xxx" 那一行的 xxx 部分——不能自己翻译、简化、意译或臆造一个
+                  名字。下游会拿这个字符串去检索结果原文里做逐字匹配校验，编造或改写过的引用
+                  会直接判失败（这是"引用必须真实存在于检索结果"的机械校验，不是走过场）。
+                - 每条方法论都带有 AVOID_WHEN（什么情况下不该用这个模式）和 COMPLIANCE_RISKS
+                  （合规风险提示）。你写的人物设定不应该撞进你自己引用的那条方法论明确警告过
+                  的场景——如果你确实觉得某种程度的关键词重叠不可避免且有正当理由，就在
+                  risk_self_check 字段里写清楚理由，不要留空指望没人发现，下游会重新扫描
+                  一遍你引用的方法论的 AVOID_WHEN/COMPLIANCE_RISKS 文本和你写的人物字段之间
+                  是否有可疑的字面重叠。
+
+                【复用自 100x-persona 的既有规则，原样保留，不因为本次改机制就放松】
+                - authority_evidence_quote 和 audience_pain_quote 必须是用户提供的
+                  source_script 里逐字出现的一段话——大小写不敏感子串匹配，但不许改写、不许
+                  概括、不许翻译、不许替换同义词。下游会用 quote in source_script 做逐字
+                  校验，任何复述都会判失败。
+                - authority_basis 不要求正式资质，"产后亲身经历"这类同理型信任一样合法，但
+                  引文本身必须真实存在于原文。
+                - relationship_to_camera 只能是这 5 个闭集枚举值之一：direct-to-camera /
+                  confessional / testimonial-witness / voice-over / duo-dialogue。
+                - 【自我怀疑短语自检】如果你选的 authority_evidence_quote 命中下面这个闭集
+                  短语表（不区分大小写子串匹配），必须把 hedge_self_flagged 设为 true 并在
+                  hedge_note 说明为什么仍选它，否则下游直接判失败：
+                  英文：if you don't believe me / you don't have to believe me / don't take
+                  my word for it / i'm not sure / i am not sure / i don't know if / maybe
+                  i'm wrong / i could be wrong / who knows / not 100% sure / i doubt
+                  中文：如果你不信我 / 你可以不信 / 不管你信不信 / 信不信由你 / 我不确定 /
+                  我也不知道 / 也许我 / 谁知道呢 / 说实话我也没底
+
+                【产出规模】
+                按脚本里实际能反推出的说话人数量产出 1 到 N 个人物，不强行凑数量，也不要
+                漏掉脚本里明显存在的第二个说话人（如第三方见证混剪型脚本）。
+
+                严格只输出下面这个 JSON 对象，不要 Markdown 代码围栏，不要任何解释文字：
+                {
+                  "personas": [
+                    {
+                      "identity_label": "...",
+                      "authority_basis": "...",
+                      "authority_evidence_quote": "...",
+                      "audience_fit": "...",
+                      "audience_pain_quote": "...",
+                      "delivery_style": "...",
+                      "relationship_to_camera": "direct-to-camera|confessional|testimonial-witness|voice-over|duo-dialogue",
+                      "appearance_note": "...",
+                      "grounded_in": [
+                        {"pattern_name": "<逐字复制自 context 里的 PATTERN_NAME: 一行>", "rationale": "..."}
+                      ],
+                      "hedge_self_flagged": false,
+                      "hedge_note": null,
+                      "risk_self_check": null
+                    }
+                  ]
+                }
+            - id: "c1a2e300-0001-4000-9000-000000000002"
+              role: user
+              text: |
+                参考方法论（本次检索到的 2-3 条真实人设模式，见下方 context；逐字引用请用
+                它们各自的 PATTERN_NAME 行）：
+                {{#context#}}
+
+                脚本原文（source_script，所有引文必须能在这段原文里逐字找到）：
+                {{#start.source_script#}}
+
+                请按 system 提示中的规则，输出本条脚本的 personas JSON，只输出 JSON。
+          context:
+            enabled: true
+            variable_selector: [kb_retrieve_persona_patterns, result]
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+
+      # ---------------------------------------------------------------
+      # 4. Stage A 校验 —— 引用真实性 + avoid_when/compliance_risks 启发式 + 证据子串 + 结构
+      # ---------------------------------------------------------------
+      - id: code_validate_persona
+        type: custom
+        position: { x: 1160, y: 300 }
+        positionAbsolute: { x: 1160, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 90
+        data:
+          title: "校验人物：引用真实性+证据子串+结构"
+          type: code
+          selected: false
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            RELATIONSHIP_ENUM = {
+                "direct-to-camera", "confessional", "testimonial-witness",
+                "voice-over", "duo-dialogue",
+            }
+            REQUIRED_PERSONA_FIELDS = [
+                "identity_label", "authority_basis", "authority_evidence_quote",
+                "audience_fit", "audience_pain_quote", "delivery_style",
+                "relationship_to_camera", "grounded_in",
+            ]
+            OPTIONAL_PERSONA_FIELDS = ["appearance_note", "hedge_self_flagged", "hedge_note", "risk_self_check"]
+            ALLOWED_PERSONA_FIELDS = set(REQUIRED_PERSONA_FIELDS) | set(OPTIONAL_PERSONA_FIELDS)
+            ALLOWED_GROUNDED_IN_FIELDS = {"pattern_name", "rationale"}
+
+            # 逐字复用 100x-persona v1.2 checkAuthorityHedgeRisk 的闭集短语表。
+            HEDGE_MARKERS = [
+                "if you don't believe me", "you don't have to believe me",
+                "don't take my word for it", "i'm not sure", "i am not sure",
+                "i don't know if", "maybe i'm wrong", "i could be wrong", "who knows",
+                "not 100% sure", "i doubt",
+                "如果你不信我", "你可以不信", "不管你信不信", "信不信由你", "我不确定",
+                "我也不知道", "也许我", "谁知道呢", "说实话我也没底",
+            ]
+
+            # 以下是本次集成新写的 compliance-heuristic 关键词切分规则，不是照搬任何源
+            # skill——100x-persona/100x-exaggerate 都没有"引用的方法论 avoid_when 是否被
+            # 违反"这条检查，因为独立版 100x-persona 根本不存在方法论检索这个机制。
+            STOPWORDS = {
+                "的", "和", "与", "或", "不", "是", "了", "在", "一个", "这个", "那个",
+                "when", "with", "and", "the", "for", "that", "this",
+            }
+            TOKEN_SPLIT_RE = re.compile(r"[，。、,\.\s\(\)（）:：;；/]+")
+            AVOID_WHEN_RE = re.compile(r"^AVOID_WHEN:\s*(.*)$", re.MULTILINE)
+            COMPLIANCE_RISKS_RE = re.compile(r"^COMPLIANCE_RISKS:\s*(.*)$", re.MULTILINE)
+
+
+            def _err(errors, tag, msg):
+                errors.append(f"[{tag}] {msg}")
+
+
+            def _tokenize_risk_phrase(phrase):
+                tokens = [t.strip() for t in TOKEN_SPLIT_RE.split(phrase) if t.strip()]
+                out = []
+                for t in tokens:
+                    if t.lower() in STOPWORDS:
+                        continue
+                    is_ascii = all(ord(c) < 128 for c in t)
+                    if is_ascii and len(t) < 3:
+                        continue
+                    if not is_ascii and len(t) < 2:
+                        continue
+                    out.append(t)
+                return out
+
+
+            def _chunk_text(item):
+                # Dify 1.16.0 api/core/workflow/nodes/knowledge_retrieval/retrieval.py 的
+                # Source 模型字段（已对照官方源码逐字核对，非猜测）：metadata/title/files/
+                # content/summary，content 是检索到的分段正文，title 是文档标题。这里做
+                # 防御性兜底，字段缺失时退化到 metadata.document_name。
+                if not isinstance(item, dict):
+                    return str(item or "")
+                title = item.get("title") or ""
+                content = item.get("content") or ""
+                if not title and not content:
+                    meta = item.get("metadata")
+                    if isinstance(meta, dict):
+                        title = meta.get("document_name") or ""
+                return f"{title}\n{content}"
+
+
+            def main(source_script: str, retrieved_result: list, llm_raw: str) -> dict:
+                source_script = source_script or ""
+                errors = []
+                warnings = []
+
+                raw = (llm_raw or "").strip()
+                if raw.startswith("```"):
+                    raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
+                    raw = re.sub(r"```\s*$", "", raw)
+                    raw = raw.strip()
+
+                try:
+                    parsed = json.loads(raw)
+                    if not isinstance(parsed, dict):
+                        raise ValueError("top-level JSON is not an object")
+                except Exception as exc:
+                    return {
+                        "is_valid": "false",
+                        "status": "failed",
+                        "errors": [f"[parse] LLM output is not valid JSON: {exc}"],
+                        "error_count": 1,
+                        "personas": {},
+                        "personas_list": [],
+                        "warnings": warnings,
+                    }
+
+                persona_items = parsed.get("personas")
+                if not isinstance(persona_items, list) or len(persona_items) == 0:
+                    errors.append("[schema:personas] must be a non-empty array of persona objects")
+                    persona_items = []
+
+                retrieved_chunks = [_chunk_text(it) for it in (retrieved_result or [])]
+                retrieved_chunks = [c for c in retrieved_chunks if c.strip()]
+                if not retrieved_chunks:
+                    _err(
+                        errors, "retrieval",
+                        "kb_retrieve_persona_patterns returned 0 candidates -- dataset_id may be "
+                        "unconfigured or the KB seed docs have not been uploaded yet (see notes.md); "
+                        "no citation can be verified as real until real candidates are retrieved",
+                    )
+
+                personas = {}
+                personas_list = []
+                for idx, item in enumerate(persona_items):
+                    pid = f"PERSONA_{idx + 1}"
+                    loc = f"personas[{idx}]({pid})"
+                    if not isinstance(item, dict):
+                        _err(errors, "schema", f"{loc} must be an object")
+                        continue
+
+                    extra = [k for k in item.keys() if k not in ALLOWED_PERSONA_FIELDS]
+                    if extra:
+                        _err(errors, "schema", f"{loc} has unexpected fields (additionalProperties:false): {extra}")
+
+                    for field in REQUIRED_PERSONA_FIELDS:
+                        if field == "grounded_in":
+                            continue
+                        value = item.get(field)
+                        if not isinstance(value, str) or not value.strip():
+                            _err(errors, "schema", f"{loc}.{field} is missing or not a non-empty string")
+
+                    rel = item.get("relationship_to_camera")
+                    if rel is not None and rel not in RELATIONSHIP_ENUM:
+                        _err(errors, "schema", f"{loc}.relationship_to_camera '{rel}' is not one of {sorted(RELATIONSHIP_ENUM)}")
+
+                    grounded_in = item.get("grounded_in")
+                    if not isinstance(grounded_in, list) or len(grounded_in) == 0:
+                        _err(errors, "citation", f"{loc}.grounded_in must be a non-empty array -- every persona must cite >=1 real retrieved pattern")
+                        grounded_in = []
+
+                    cited_pattern_texts = []
+                    for gi_idx, gi in enumerate(grounded_in):
+                        gi_loc = f"{loc}.grounded_in[{gi_idx}]"
+                        if not isinstance(gi, dict):
+                            _err(errors, "schema", f"{gi_loc} must be an object")
+                            continue
+                        gi_extra = [k for k in gi.keys() if k not in ALLOWED_GROUNDED_IN_FIELDS]
+                        if gi_extra:
+                            _err(errors, "schema", f"{gi_loc} has unexpected fields: {gi_extra}")
+                        pname = gi.get("pattern_name")
+                        rationale = gi.get("rationale")
+                        if not isinstance(pname, str) or not pname.strip():
+                            _err(errors, "schema", f"{gi_loc}.pattern_name is missing or not a non-empty string")
+                            pname = None
+                        if not isinstance(rationale, str) or not rationale.strip():
+                            _err(errors, "schema", f"{gi_loc}.rationale is missing or not a non-empty string")
+                        if pname:
+                            matched_chunk = next((c for c in retrieved_chunks if pname in c), None)
+                            if matched_chunk is None:
+                                _err(
+                                    errors, "citation",
+                                    f'{gi_loc}.pattern_name "{pname}" was not found in any retrieved candidate '
+                                    f'from kb_retrieve_persona_patterns -- citation is not real (either '
+                                    f'hallucinated, or paraphrased instead of echoed verbatim from the '
+                                    f'retrieved pattern name)',
+                                )
+                            else:
+                                cited_pattern_texts.append((pname, matched_chunk))
+
+                    aeq = item.get("authority_evidence_quote")
+                    if isinstance(aeq, str) and aeq and aeq not in source_script:
+                        _err(errors, "axiom2", f'{loc}.authority_evidence_quote is not a literal substring of source_script -> "{aeq}"')
+                    apq = item.get("audience_pain_quote")
+                    if isinstance(apq, str) and apq and apq not in source_script:
+                        _err(errors, "axiom2", f'{loc}.audience_pain_quote is not a literal substring of source_script -> "{apq}"')
+
+                    if isinstance(aeq, str):
+                        lowered = aeq.lower()
+                        hedge_hit = next((m for m in HEDGE_MARKERS if m.lower() in lowered), None)
+                        if hedge_hit:
+                            flagged = item.get("hedge_self_flagged") is True
+                            note = item.get("hedge_note")
+                            if not flagged or not isinstance(note, str) or not note.strip():
+                                _err(
+                                    errors, "axiom2-heuristic",
+                                    f'{loc}.authority_evidence_quote contains a closed-list hedge/self-doubt '
+                                    f'marker ("{hedge_hit}") with no matching hedge_self_flagged=true + '
+                                    f'hedge_note disclosure. This heuristic cannot tell whether a semantic '
+                                    f'reversal actually happened, only that this closed-list pattern is present. '
+                                    f'Fix by re-selecting an anchor quote that is not itself a hedge, or setting '
+                                    f'hedge_self_flagged=true with a hedge_note so a human reviews it.',
+                                )
+                            else:
+                                warnings.append(f'{pid}: authority_evidence_quote hedge marker disclosed ({note})')
+
+                    persona_text_concat = " ".join(
+                        str(item.get(f) or "") for f in
+                        ("identity_label", "authority_basis", "audience_fit", "delivery_style", "appearance_note")
+                    ).lower()
+                    risk_note = item.get("risk_self_check")
+                    for pname, chunk in cited_pattern_texts:
+                        avoid_m = AVOID_WHEN_RE.search(chunk)
+                        comp_m = COMPLIANCE_RISKS_RE.search(chunk)
+                        risk_phrases = []
+                        if avoid_m:
+                            risk_phrases.extend(p.strip() for p in avoid_m.group(1).split("|") if p.strip())
+                        if comp_m:
+                            risk_phrases.extend(p.strip() for p in comp_m.group(1).split("|") if p.strip())
+                        matched_tokens = []
+                        for phrase in risk_phrases:
+                            for tok in _tokenize_risk_phrase(phrase):
+                                if tok.lower() in persona_text_concat:
+                                    matched_tokens.append((phrase, tok))
+                        if matched_tokens:
+                            disclosed = isinstance(risk_note, str) and risk_note.strip()
+                            if not disclosed:
+                                example_phrase, example_tok = matched_tokens[0]
+                                _err(
+                                    errors, "compliance-heuristic",
+                                    f'{loc} cites pattern "{pname}" whose avoid_when/compliance_risks text '
+                                    f'contains "{example_phrase}" (matched keyword "{example_tok}"), and this '
+                                    f"persona's own fields contain that same keyword -- possible violation of "
+                                    f'what it cites. This is a lexical/keyword heuristic, not semantic '
+                                    f'understanding (see notes.md for its real limitations). Fix by setting a '
+                                    f'non-empty risk_self_check explaining why this is not actually a violation, '
+                                    f'or by changing the persona so it no longer overlaps.',
+                                )
+                            else:
+                                warnings.append(f'{pid}: compliance-heuristic overlap with cited "{pname}" disclosed ({risk_note})')
+
+                    out_item = {k: v for k, v in item.items() if k in ALLOWED_PERSONA_FIELDS}
+                    personas[pid] = out_item
+                    personas_list.append(dict(out_item, persona_id=pid))
+
+                is_valid = len(errors) == 0
+                return {
+                    "is_valid": "true" if is_valid else "false",
+                    "status": "passed" if is_valid else "failed",
+                    "errors": errors,
+                    "error_count": len(errors),
+                    "personas": personas if is_valid else {},
+                    "personas_list": personas_list if is_valid else [],
+                    "warnings": warnings,
+                }
+          variables:
+            - value_selector: [start, source_script]
+              variable: source_script
+            - value_selector: [kb_retrieve_persona_patterns, result]
+              variable: retrieved_result
+            - value_selector: [llm_generate_persona, text]
+              variable: llm_raw
+          outputs:
+            is_valid:
+              type: string
+            status:
+              type: string
+            errors:
+              type: array[string]
+            error_count:
+              type: number
+            personas:
+              type: object
+            personas_list:
+              type: array[object]
+            warnings:
+              type: array[string]
+
+      # ---------------------------------------------------------------
+      # 5. 人物是否通过校验
+      # ---------------------------------------------------------------
+      - id: if_persona_valid
+        type: custom
+        position: { x: 1440, y: 300 }
+        positionAbsolute: { x: 1440, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+        data:
+          title: "人物是否通过校验"
+          type: if-else
+          selected: false
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: "cond-persona-valid-0001"
+                  variable_selector: [code_validate_persona, is_valid]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+          conditions:
+            - id: "cond-persona-valid-0001"
+              variable_selector: [code_validate_persona, is_valid]
+              comparison_operator: is
+              value: "true"
+              varType: string
+          logical_operator: and
+
+      # ---------------------------------------------------------------
+      # 5f. 失败分支：人物阶段
+      # ---------------------------------------------------------------
+      - id: tpl_fail_persona
+        type: custom
+        position: { x: 1720, y: 560 }
+        positionAbsolute: { x: 1720, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "拼装：人物阶段失败报告"
+          type: template-transform
+          selected: false
+          variables:
+            - variable: errors
+              value_selector: [code_validate_persona, errors]
+            - variable: error_count
+              value_selector: [code_validate_persona, error_count]
+          template: |
+            # Stage A（人物设定）校验未通过（{{ error_count }} 项）
+
+            以下是具体失败项（逐条列出，不是"请重新检查"这类泛化提示）：
+
+            {% for e in errors %}
+            - {{ e }}
+            {% endfor %}
+
+            常见修复方式：
+            - [citation] 引用不存在：grounded_in.pattern_name 必须逐字等于检索结果里某条
+              "PATTERN_NAME: xxx" 的 xxx，不能翻译/简化/编造
+            - [axiom2] 证据锚点问题：authority_evidence_quote / audience_pain_quote 必须是
+              source_script 的逐字子串
+            - [axiom2-heuristic] 命中自我怀疑闭集短语但未披露：设置 hedge_self_flagged=true
+              并写明 hedge_note，或换一句不含怀疑语气的锚点
+            - [compliance-heuristic] 与引用方法论的 avoid_when/compliance_risks 疑似字面
+              重叠但未披露：设置 risk_self_check 说明理由，或调整人物设定避免重叠
+            - [retrieval] 检索结果为空：先确认 kb_retrieve_persona_patterns 的 dataset_id
+              是否已替换为真实数据集且已上传 kb-seed-persona-patterns 里的方法论文档
+
+      - id: end_fail_persona
+        type: custom
+        position: { x: 2000, y: 560 }
+        positionAbsolute: { x: 2000, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 186
+        data:
+          title: "结束：人物阶段未通过"
+          type: end
+          outputs:
+            - variable: status
+              value_selector: [code_validate_persona, status]
+              value_type: string
+            - variable: failing_stage
+              value_selector: [tpl_fail_persona, output]
+              value_type: string
+            - variable: validation_errors
+              value_selector: [code_validate_persona, errors]
+              value_type: array[string]
+            - variable: error_count
+              value_selector: [code_validate_persona, error_count]
+              value_type: number
+            - variable: raw_llm_output
+              value_selector: [llm_generate_persona, text]
+              value_type: string
+
+      # ---------------------------------------------------------------
+      # 6. Stage B · 夸张/反差生成 —— 复用 100x-exaggerate 闭集技法+反差类型，加 persona_ref
+      # ---------------------------------------------------------------
+      - id: llm_generate_exaggerate
+        type: custom
+        position: { x: 1720, y: 300 }
+        positionAbsolute: { x: 1720, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 98
+        data:
+          title: "Stage B · 生成夸张点+反差点（挂 persona_ref）"
+          type: llm
+          selected: false
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.4
+          prompt_template:
+            - id: "c1a2e300-0002-4000-9000-000000000001"
+              role: system
+              text: |
+                你是 100x-exaggerate：TikTok/UGC 脚本的"夸张手法 + 反差点"设计器，现在作为
+                Step2 流水线的第二阶段运行，衔接已经生成好的人物设定之后。
+
+                输入：一段脚本/文案原文（source_script）+ 已确定的 hat_level
+                （blackhat/grayhat/whitehat）+ market（可能是空字符串，表示未指定，需按
+                保守默认处理）+ 已生成的 personas（JSON，key 是 PERSONA_ 开头的 id）。这些
+                输入已经过 Phase 1 三级降级/Stage A 校验处理，直接使用，不要自己再猜测或
+                改写。
+
+                任务：
+                1. 找出脚本里可以标注"夸张技法"的断言/宣称句，为每一条选择最贴近的技法，
+                   不强行凑满5种都出现。
+                2. 找出脚本里可以配对"反差"的两处真实不同表述，为每一条选择最贴近的反差
+                   类型，不强行凑满4种都出现。
+                3. 每条都必须给出逐字摘录（不改写、不概括、不翻译），因为下游会做逐字
+                   子串校验——摘录必须一字不差地作为 source_script 的子串出现，大小写
+                   敏感。
+                4. intensity 是天花板内的选择，不是"能拉多高就拉多高"——一条语气克制的
+                   原文即使天花板允许 aggressive，也可以标 moderate，忠于原文语气优先于
+                   用满配额。
+                5. 【本次集成新增】每条 beat（无论是夸张点还是反差点）都必须设置
+                   persona_ref，引用 personas 里真实存在的一个 key——表示这条 beat 理解为
+                   由哪个人物在说/在场景中呈现。如果只有一个人物，全部 beat 都引用它；如果
+                   有多个人物，按脚本里实际是谁在说这句话来分配，不要随便乱指。
+
+                夸张技法闭集枚举（5选1，只能使用下面这5个英文值，不许自创新词）：
+                - numeric_hyperbole（数字夸张）：用具体夸张数字/金额/件数制造效果感知
+                - time_compression_hyperbole（时间压缩夸张）：把效果压缩进不合常理的
+                  短周期宣称
+                - analogy_scale_hyperbole（类比放大夸张）：用具象事物类比放大/缩小效果
+                - emotion_reaction_hyperbole（情绪反应夸张）：演员/旁观者的夸张情绪反应
+                - authority_absolutism_hyperbole（权威绝对化夸张）：借权威/专家/数据做
+                  近乎无条件的效果断言——只标注脚本里已经存在的宣称，不替脚本编造新的
+                  机构名/认证/头衔
+
+                反差类型闭集枚举（4选1，只能使用下面这4个英文值，不许自创新词）：
+                - state_before_after（状态前后反差）：使用前/后两种状态的落差
+                - tone_register（基调反差）：叙事基调的骤然转换（例如怀疑转笃定、
+                  悬疑恐怖转日常促销）
+                - value_price（价值反差）：参照物/原价与实际价格·价值的落差
+                - warning_vs_promotion（警示反差）：表面警告语气与实际促购意图的反差
+
+                强度天花板（intensity 三档，mild < moderate < aggressive）：
+                - 基线按 hat_level：whitehat=mild，grayhat=moderate，blackhat=aggressive
+                - 额外规则（只对 emotion_reaction_hyperbole 这一个技法生效，其余4个技法
+                  不受此约束）：如果 market 命中"美区/美国/US/USA/United States/America"
+                  这类别名（market 为空字符串时按保守默认视为命中），
+                  emotion_reaction_hyperbole 的天花板收紧到 moderate，即使 hat_level 是
+                  blackhat（基线 aggressive）也不例外。
+                - 你给出的 intensity 只是建议值，下游会用同一套规则重新计算天花板并硬性
+                  拒绝超限的产出，请按此规则自我约束，避免整份产出因一条 beat 超限被打回。
+
+                反差两端要求：anchor_quote_a 与 anchor_quote_b 必须来自脚本里真实不同的
+                两处表述，不能把同一句话抄两遍或稍微改写几个字充数——两端要有真实可感知
+                的落差。
+
+                禁用：
+                - 不编造脚本原文没有的效果/数字/权威背书/认证/见证
+                - 不为了凑数量堆砌 beats，也不强行让5种技法/4种反差类型都出现
+                - 不使用"让我/希望/或许/大概/可能/也许/让我们"这类弱化表达，不使用AI
+                  客服腔调（如 as an AI / I'd be happy to / feel free to）
+
+                若脚本中确实找不到多条可用的夸张/反差落点（例如接近纯参数罗列），仍然
+                只输出你能找到的最贴近项，不要编造；exaggeration_beats 和 contrast_beats
+                下游各要求至少1条，无法留空数组。
+
+                输出格式：只输出一个 JSON 对象，不要 Markdown 代码围栏、不要任何解释
+                文字，不要在 JSON 前后添加任何其他内容。格式：
+                {
+                  "exaggeration_beats": [
+                    {
+                      "beat_id": "EXG_01",
+                      "script_span_quote": "<脚本原文逐字摘录>",
+                      "technique": "<5选1枚举值>",
+                      "label_cn": "<中文短标签，2-6字最佳，硬性上限10字>",
+                      "intensity": "<mild|moderate|aggressive>",
+                      "rationale": "<一句话说明技法+强度选择理由，中文>",
+                      "persona_ref": "PERSONA_..."
+                    }
+                  ],
+                  "contrast_beats": [
+                    {
+                      "beat_id": "CTR_01",
+                      "contrast_type": "<4选1枚举值>",
+                      "label_cn": "<中文短标签，2-6字最佳，硬性上限10字>",
+                      "anchor_quote_a": "<脚本原文逐字摘录A>",
+                      "anchor_quote_b": "<脚本原文逐字摘录B，必须与A不同>",
+                      "rationale": "<一句话说明反差理由，中文>",
+                      "persona_ref": "PERSONA_..."
+                    }
+                  ]
+                }
+                beat_id 格式分别为 EXG_数字 / CTR_数字（如 EXG_01, EXG_02, CTR_01）。
+                label_cn 长度必须在 1-10 个字符之间。exaggeration_beats 和
+                contrast_beats 都至少输出1条。persona_ref 必须是下面提供的 personas 里
+                真实存在的 key，不许杜撰。
+            - id: "c1a2e300-0002-4000-9000-000000000002"
+              role: user
+              text: |
+                脚本原文（source_script）：
+                {{#start.source_script#}}
+
+                已确定的校准输入（Phase 1 已完成三级降级，直接使用，不要自行改变）：
+                - hat_level: {{#calibrate_ceiling.effective_hat_level#}}
+                - market: {{#calibrate_ceiling.effective_market#}}
+
+                已生成的人物设定（personas，JSON，persona_ref 必须引用这里真实存在的 key）：
+                {{#code_validate_persona.personas#}}
+
+                请按 system 提示中的规则，输出本条脚本的 exaggeration_beats +
+                contrast_beats JSON，只输出 JSON。
+          context:
+            enabled: false
+            variable_selector: []
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+
+      # ---------------------------------------------------------------
+      # 7. Stage B 校验 —— 逐字复用 100x-exaggerate 的公理2/3/4 + 结构，加 persona_ref 引用完整性
+      # ---------------------------------------------------------------
+      - id: code_validate_exaggerate
+        type: custom
+        position: { x: 2000, y: 300 }
+        positionAbsolute: { x: 2000, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 90
+        data:
+          title: "校验夸张反差：公理2/3/4+persona_ref引用完整性"
+          type: code
+          selected: false
+          code_language: python3
+          code: |
+            import json
+            import re
+
+
+            def main(source_script: str, hat_level: str, market: str, personas: dict, llm_raw: str) -> dict:
+                # 结构层 + 公理2(逐字子串)/公理3(市场帽度天花板，含v1.1精确分段匹配修正与
+                # v1.2 "-"/"&" 分隔符修正)/公理4(反差非退化) 逐字复用
+                # 100x-exaggerate.dify.yml 的 validate_bundle 节点逻辑，未新增未削弱任何一条
+                # 判据。新增的唯一一条是 [integration-ref]：persona_ref 必须引用本次流水线
+                # 里真实生成的 persona -- 这是本次集成新写的规则，100x-exaggerate 独立版
+                # schema.json 完全不含 persona_ref 字段（见 notes.md）。
+                hat_level = hat_level or ""
+                market = market or ""
+                persona_id_set = set((personas or {}).keys())
+
+                raw = (llm_raw or "").strip()
+                if raw.startswith("```"):
+                    raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
+                    raw = re.sub(r"```\s*$", "", raw)
+                    raw = raw.strip()
+
+                try:
+                    parsed = json.loads(raw)
+                    if not isinstance(parsed, dict):
+                        raise ValueError("top-level JSON is not an object")
+                except Exception as exc:
+                    return {
+                        "is_valid": "false",
+                        "status": "failed",
+                        "errors": [f"[parse] LLM output is not valid JSON: {exc}"],
+                        "error_count": 1,
+                        "exaggeration_beats": [],
+                        "contrast_beats": [],
+                    }
+
+                exaggeration_beats = parsed.get("exaggeration_beats")
+                if not isinstance(exaggeration_beats, list):
+                    exaggeration_beats = []
+                contrast_beats = parsed.get("contrast_beats")
+                if not isinstance(contrast_beats, list):
+                    contrast_beats = []
+
+                errors = []
+
+                EXG_TECHNIQUES = {
+                    "numeric_hyperbole", "time_compression_hyperbole", "analogy_scale_hyperbole",
+                    "emotion_reaction_hyperbole", "authority_absolutism_hyperbole",
+                }
+                CTR_TYPES = {"state_before_after", "tone_register", "value_price", "warning_vs_promotion"}
+                INTENSITIES = {"mild", "moderate", "aggressive"}
+                HAT_LEVELS = {"blackhat", "grayhat", "whitehat"}
+                EXG_ID_RE = re.compile(r"^EXG_[A-Za-z0-9_]+$")
+                CTR_ID_RE = re.compile(r"^CTR_[A-Za-z0-9_]+$")
+                PERSONA_ID_RE = re.compile(r'^PERSONA_[A-Za-z0-9_]+$')
+
+                struct_errors = []
+
+                if not isinstance(source_script, str) or len(source_script) < 1:
+                    struct_errors.append("[schema:source_script] must be a non-empty string")
+                if hat_level not in HAT_LEVELS:
+                    struct_errors.append(f'[schema:meta.hat_level] "{hat_level}" is not one of {sorted(HAT_LEVELS)}')
+
+                if len(exaggeration_beats) < 1:
+                    struct_errors.append("[schema:exaggeration_beats] must be a non-empty array (minItems:1)")
+                else:
+                    exg_required = {"beat_id", "script_span_quote", "technique", "label_cn", "intensity", "rationale", "persona_ref"}
+                    for idx, item in enumerate(exaggeration_beats):
+                        loc = f"exaggeration_beats[{idx}]"
+                        if not isinstance(item, dict):
+                            struct_errors.append(f"[schema:{loc}] must be an object")
+                            continue
+                        missing = exg_required - set(item.keys())
+                        if missing:
+                            struct_errors.append(f"[schema:{loc}] missing required field(s): {sorted(missing)}")
+                        extra = set(item.keys()) - exg_required
+                        if extra:
+                            struct_errors.append(f"[schema:{loc}] additionalProperties not allowed: {sorted(extra)}")
+                        beat_id = item.get("beat_id")
+                        if not isinstance(beat_id, str) or not EXG_ID_RE.match(beat_id):
+                            struct_errors.append(f'[schema:{loc}.beat_id] "{beat_id}" does not match pattern ^EXG_[A-Za-z0-9_]+$')
+                        quote = item.get("script_span_quote")
+                        if not isinstance(quote, str) or len(quote) < 1:
+                            struct_errors.append(f"[schema:{loc}.script_span_quote] must be a non-empty string")
+                        technique = item.get("technique")
+                        if technique not in EXG_TECHNIQUES:
+                            struct_errors.append(f'[schema:{loc}.technique] "{technique}" is not one of {sorted(EXG_TECHNIQUES)}')
+                        label_cn = item.get("label_cn")
+                        if not isinstance(label_cn, str) or not (1 <= len(label_cn) <= 10):
+                            struct_errors.append(f"[schema:{loc}.label_cn] must be a string of length 1-10")
+                        intensity = item.get("intensity")
+                        if intensity not in INTENSITIES:
+                            struct_errors.append(f'[schema:{loc}.intensity] "{intensity}" is not one of {sorted(INTENSITIES)}')
+                        rationale = item.get("rationale")
+                        if not isinstance(rationale, str) or len(rationale) < 1:
+                            struct_errors.append(f"[schema:{loc}.rationale] must be a non-empty string")
+                        pref = item.get("persona_ref")
+                        if not isinstance(pref, str) or not PERSONA_ID_RE.match(pref):
+                            struct_errors.append(f'[schema:{loc}.persona_ref] "{pref}" does not match ^PERSONA_[A-Za-z0-9_]+$')
+
+                if len(contrast_beats) < 1:
+                    struct_errors.append("[schema:contrast_beats] must be a non-empty array (minItems:1)")
+                else:
+                    ctr_required = {"beat_id", "contrast_type", "label_cn", "anchor_quote_a", "anchor_quote_b", "rationale", "persona_ref"}
+                    for idx, item in enumerate(contrast_beats):
+                        loc = f"contrast_beats[{idx}]"
+                        if not isinstance(item, dict):
+                            struct_errors.append(f"[schema:{loc}] must be an object")
+                            continue
+                        missing = ctr_required - set(item.keys())
+                        if missing:
+                            struct_errors.append(f"[schema:{loc}] missing required field(s): {sorted(missing)}")
+                        extra = set(item.keys()) - ctr_required
+                        if extra:
+                            struct_errors.append(f"[schema:{loc}] additionalProperties not allowed: {sorted(extra)}")
+                        beat_id = item.get("beat_id")
+                        if not isinstance(beat_id, str) or not CTR_ID_RE.match(beat_id):
+                            struct_errors.append(f'[schema:{loc}.beat_id] "{beat_id}" does not match pattern ^CTR_[A-Za-z0-9_]+$')
+                        contrast_type = item.get("contrast_type")
+                        if contrast_type not in CTR_TYPES:
+                            struct_errors.append(f'[schema:{loc}.contrast_type] "{contrast_type}" is not one of {sorted(CTR_TYPES)}')
+                        label_cn = item.get("label_cn")
+                        if not isinstance(label_cn, str) or not (1 <= len(label_cn) <= 10):
+                            struct_errors.append(f"[schema:{loc}.label_cn] must be a string of length 1-10")
+                        qa = item.get("anchor_quote_a")
+                        if not isinstance(qa, str) or len(qa) < 1:
+                            struct_errors.append(f"[schema:{loc}.anchor_quote_a] must be a non-empty string")
+                        qb = item.get("anchor_quote_b")
+                        if not isinstance(qb, str) or len(qb) < 1:
+                            struct_errors.append(f"[schema:{loc}.anchor_quote_b] must be a non-empty string")
+                        rationale = item.get("rationale")
+                        if not isinstance(rationale, str) or len(rationale) < 1:
+                            struct_errors.append(f"[schema:{loc}.rationale] must be a non-empty string")
+                        pref = item.get("persona_ref")
+                        if not isinstance(pref, str) or not PERSONA_ID_RE.match(pref):
+                            struct_errors.append(f'[schema:{loc}.persona_ref] "{pref}" does not match ^PERSONA_[A-Za-z0-9_]+$')
+
+                errors.extend(struct_errors)
+
+                if not struct_errors:
+                    script = source_script
+
+                    for item in exaggeration_beats:
+                        if item.get("script_span_quote") not in script:
+                            errors.append(f"[axiom2] {item.get('beat_id')}: script_span_quote is not a literal substring of source_script")
+                        pref = item.get("persona_ref")
+                        if pref not in persona_id_set:
+                            errors.append(f'[integration-ref] {item.get("beat_id")}: persona_ref "{pref}" does not exist among this run\'s generated personas')
+                    for item in contrast_beats:
+                        if item.get("anchor_quote_a") not in script:
+                            errors.append(f"[axiom2] {item.get('beat_id')}: anchor_quote_a is not a literal substring of source_script")
+                        if item.get("anchor_quote_b") not in script:
+                            errors.append(f"[axiom2] {item.get('beat_id')}: anchor_quote_b is not a literal substring of source_script")
+                        pref = item.get("persona_ref")
+                        if pref not in persona_id_set:
+                            errors.append(f'[integration-ref] {item.get("beat_id")}: persona_ref "{pref}" does not exist among this run\'s generated personas')
+
+                    def normalize(s):
+                        return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+                    for item in contrast_beats:
+                        if normalize(item.get("anchor_quote_a")) == normalize(item.get("anchor_quote_b")):
+                            errors.append(f"[axiom4] {item.get('beat_id')}: anchor_quote_a and anchor_quote_b are the same quote (normalized) -- no real contrast gap")
+
+                    INTENSITY_RANK = {"mild": 1, "moderate": 2, "aggressive": 3}
+                    BASE_CEILING_BY_HAT_LEVEL = {"whitehat": 1, "grayhat": 2, "blackhat": 3}
+                    US_MARKET_ALIASES = {"美区", "美国", "us", "usa", "united states", "america"}
+                    MARKET_SEGMENT_SPLIT_RE = re.compile(r"[,，、;；|&()（）/-]+")
+
+                    def is_us_market(market_str):
+                        raw_m = market_str or ""
+                        segments = [seg.strip().lower() for seg in MARKET_SEGMENT_SPLIT_RE.split(raw_m) if seg.strip()]
+                        return any(seg in US_MARKET_ALIASES for seg in segments)
+
+                    def emotion_ceiling_for_market(market_str):
+                        has_market = isinstance(market_str, str) and market_str.strip() != ""
+                        if not has_market:
+                            return INTENSITY_RANK["moderate"]
+                        return INTENSITY_RANK["moderate"] if is_us_market(market_str) else INTENSITY_RANK["aggressive"]
+
+                    base_ceiling = BASE_CEILING_BY_HAT_LEVEL.get(hat_level)
+                    if base_ceiling:
+                        for item in exaggeration_beats:
+                            item_rank = INTENSITY_RANK.get(item.get("intensity"))
+                            ceiling = base_ceiling
+                            if item.get("technique") == "emotion_reaction_hyperbole":
+                                ceiling = min(ceiling, emotion_ceiling_for_market(market))
+                            if item_rank is not None and item_rank > ceiling:
+                                ceiling_label = [k for k, v in INTENSITY_RANK.items() if v == ceiling][0]
+                                market_note = (
+                                    f' / market "{market}"'
+                                    if market
+                                    else " / market unspecified (conservative default applied)"
+                                )
+                                errors.append(
+                                    f'[axiom3] {item.get("beat_id")}: intensity '
+                                    f'"{item.get("intensity")}" exceeds calibration ceiling '
+                                    f'"{ceiling_label}" for technique "{item.get("technique")}" '
+                                    f'under hat_level "{hat_level}"{market_note}'
+                                )
+
+                is_valid = len(errors) == 0
+                return {
+                    "is_valid": "true" if is_valid else "false",
+                    "status": "passed" if is_valid else "failed",
+                    "errors": errors,
+                    "error_count": len(errors),
+                    "exaggeration_beats": exaggeration_beats if is_valid else [],
+                    "contrast_beats": contrast_beats if is_valid else [],
+                }
+          variables:
+            - value_selector: [start, source_script]
+              variable: source_script
+            - value_selector: [calibrate_ceiling, effective_hat_level]
+              variable: hat_level
+            - value_selector: [calibrate_ceiling, effective_market]
+              variable: market
+            - value_selector: [code_validate_persona, personas]
+              variable: personas
+            - value_selector: [llm_generate_exaggerate, text]
+              variable: llm_raw
+          outputs:
+            is_valid:
+              type: string
+            status:
+              type: string
+            errors:
+              type: array[string]
+            error_count:
+              type: number
+            exaggeration_beats:
+              type: array[object]
+            contrast_beats:
+              type: array[object]
+
+      # ---------------------------------------------------------------
+      # 8. 夸张反差是否通过校验
+      # ---------------------------------------------------------------
+      - id: if_exaggerate_valid
+        type: custom
+        position: { x: 2280, y: 300 }
+        positionAbsolute: { x: 2280, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+        data:
+          title: "夸张反差是否通过校验"
+          type: if-else
+          selected: false
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: "cond-exagg-valid-0001"
+                  variable_selector: [code_validate_exaggerate, is_valid]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+          conditions:
+            - id: "cond-exagg-valid-0001"
+              variable_selector: [code_validate_exaggerate, is_valid]
+              comparison_operator: is
+              value: "true"
+              varType: string
+          logical_operator: and
+
+      # ---------------------------------------------------------------
+      # 8f. 失败分支：夸张反差阶段
+      # ---------------------------------------------------------------
+      - id: tpl_fail_exaggerate
+        type: custom
+        position: { x: 2560, y: 560 }
+        positionAbsolute: { x: 2560, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "拼装：夸张反差阶段失败报告"
+          type: template-transform
+          selected: false
+          variables:
+            - variable: errors
+              value_selector: [code_validate_exaggerate, errors]
+            - variable: error_count
+              value_selector: [code_validate_exaggerate, error_count]
+          template: |
+            # Stage B（夸张反差）校验未通过（{{ error_count }} 项）
+
+            {% for e in errors %}
+            - {{ e }}
+            {% endfor %}
+
+            常见修复方式：
+            - [schema:*] 结构类问题：检查必填字段/闭集枚举/beat_id 格式
+            - [axiom2] 锚点类问题：确认引文是脚本原文的逐字子串，不是概括或翻译
+            - [axiom3] 强度超限：按 hat_level/market 决定的天花板降低 intensity，不要改
+              technique
+            - [axiom4] 反差退化：为 anchor_quote_b（或 _a）换一处脚本里真正不同的表述
+            - [integration-ref] persona_ref 不存在：只能引用 Stage A 真实生成的 PERSONA_
+              id，不能杜撰
+
+      - id: end_fail_exaggerate
+        type: custom
+        position: { x: 2840, y: 560 }
+        positionAbsolute: { x: 2840, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 186
+        data:
+          title: "结束：夸张反差阶段未通过"
+          type: end
+          outputs:
+            - variable: status
+              value_selector: [code_validate_exaggerate, status]
+              value_type: string
+            - variable: failing_stage
+              value_selector: [tpl_fail_exaggerate, output]
+              value_type: string
+            - variable: validation_errors
+              value_selector: [code_validate_exaggerate, errors]
+              value_type: array[string]
+            - variable: error_count
+              value_selector: [code_validate_exaggerate, error_count]
+              value_type: number
+            - variable: raw_llm_output
+              value_selector: [llm_generate_exaggerate, text]
+              value_type: string
+
+      # ---------------------------------------------------------------
+      # 9. Stage C · 场景生成 —— 场景跟着人设走 + 反差感知（state_before_after 强制2场景）
+      # ---------------------------------------------------------------
+      - id: llm_generate_scene
+        type: custom
+        position: { x: 2560, y: 300 }
+        positionAbsolute: { x: 2560, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 98
+        data:
+          title: "Stage C · 生成场景（跟人设走+感知反差节拍）"
+          type: llm
+          selected: false
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.45
+          prompt_template:
+            - id: "c1a2e300-0003-4000-9000-000000000001"
+              role: system
+              text: |
+                你是这条 TikTok/UGC 广告脚本流水线的"场景设计器"（Step 2 第三阶段，衔接
+                人物设定与夸张/反差设计之后）。
+
+                【核心原则一："场景跟着人设走"】
+                每个 scene 必须绑定一个 persona_ref（引用下面 personas 里真实存在的一个
+                key）——场景的视角、机位、道具都应该服务于"这是谁在拍"，不是脱离人物凭空
+                设计一个场景。
+
+                【核心原则二：场景要吸收夸张/反差节拍的信息】
+                - 如果某条 contrast_beats 的 contrast_type 是 state_before_after（状态
+                  前后反差），你必须为它设计至少 2 个不同的 scene，分别代表"前"和"后"
+                  两种状态（不同的 trigger_moment / micro_coordinate / atmosphere，不能
+                  用同一个场景描述硬凑两段），并且这 2 个（或更多）scene 都要在
+                  contrast_refs 里引用这条 beat 的 beat_id——下游会机械核对这一点，只给
+                  1 个场景会直接判失败。
+                - 其余三种反差类型（tone_register / value_price / warning_vs_promotion）
+                  没有场景数量下限，可以引用 0 条或多条 contrast_refs，按脚本实际情况
+                  判断，不强求呼应。
+
+                场景要基于脚本原文里真实存在的地点/动作/时间线索来设计，不要凭空编造脚本
+                完全没有暗示过的场景。
+
+                【复用自 100x-persona 的既有场景建模规则，原样保留】
+                - trigger_moment：这个场景在人物一天/一生里的什么触发时刻发生，要具体
+                  （如"下班回家换鞋前"），不能是"随时""某个时刻"这类空泛表达。
+                - location：物理地点环境，同样要具体。
+                - micro_coordinate：地点内的具体机位/具体动作坐标，必须比 location 更细
+                  一级（例如"衣柜门把手"而不是重复"衣柜"），不能只是把 location 换个说法
+                  重复一遍。
+                - 【硬性红线，闭集泛化词表】trigger_moment / location / micro_coordinate
+                  三个字段绝对不能出现下面任何一个词：某处、随便、某个地方、某场景、
+                  某个场景、某个地点、某地、某时、待定、TBD、tbd、somewhere、Somewhere、
+                  anywhere、Anywhere。命中任一词下游会直接判失败。
+                - visual_props：至少 2 件画面里会出现的具体物件（通用品类词，不发明具体
+                  品牌/产品名）。
+                - atmosphere：一句话光线/情绪基调。
+
+                【新增：camera_position 闭集机位枚举（6选1，替代自由文本描述）】
+                - rear_camera_pov：手机后置固定/半固定机位，主力机位，用于产品展示、
+                  功效特写
+                - handheld_pov：第一人称手持视角，手部入镜做产品操作特写
+                - handheld_selfie：手持前置自拍，用于口播、产品引入
+                - gopro_pov：身体佩戴式运动视角，带自然抖动，用于场景转换、动作
+                - mirror_selfie：对镜自拍，通常裁掉头部，用于穿搭/身材展示类场景
+                - night_vision：夜视/低光机位，手机手电筒当唯一光源，用于氛围/高对比场景
+                只能使用这 6 个英文枚举值之一，不许自创新值或用自由文本描述机位。
+
+                产出规模：按人物和反差节拍的实际需要产出场景（state_before_after 至少
+                2 个场景/条，其余场景数量按脚本实际场景线索决定，不强行凑数量）。
+
+                严格只输出下面这个 JSON 对象，不要 Markdown 代码围栏，不要任何解释文字：
+                {
+                  "scenes": [
+                    {
+                      "scene_name": "...",
+                      "trigger_moment": "...",
+                      "location": "...",
+                      "micro_coordinate": "...",
+                      "visual_props": ["...", "..."],
+                      "atmosphere": "...",
+                      "camera_position": "rear_camera_pov|handheld_pov|handheld_selfie|gopro_pov|mirror_selfie|night_vision",
+                      "persona_ref": "PERSONA_...",
+                      "contrast_refs": ["CTR_..."],
+                      "rationale": "..."
+                    }
+                  ]
+                }
+                contrast_refs 允许是空数组 []（这个场景不呼应任何特定反差点时），但字段
+                本身必须存在。persona_ref 必须是下面提供的 personas 里真实存在的 key，
+                contrast_refs 里的每个 id 必须是下面提供的 contrast_beats 里真实存在的
+                beat_id，都不许杜撰。
+            - id: "c1a2e300-0003-4000-9000-000000000002"
+              role: user
+              text: |
+                脚本原文（source_script，场景线索需要能从这段原文里找到依据）：
+                {{#start.source_script#}}
+
+                已生成的人物设定（personas，JSON，persona_ref 必须引用这里真实存在的
+                key）：
+                {{#code_validate_persona.personas#}}
+
+                已生成的夸张点（exaggeration_beats，仅供了解语气基调参考，不是引用
+                对象）：
+                {{#code_validate_exaggerate.exaggeration_beats#}}
+
+                已生成的反差点（contrast_beats，JSON，contrast_refs 必须引用这里真实
+                存在的 beat_id；特别注意 contrast_type 是 state_before_after 的条目
+                需要至少 2 个场景覆盖）：
+                {{#code_validate_exaggerate.contrast_beats#}}
+
+                请按 system 提示中的规则，输出本条脚本的 scenes JSON，只输出 JSON。
+          context:
+            enabled: false
+            variable_selector: []
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+
+      # ---------------------------------------------------------------
+      # 10. Stage C 校验 —— 复用 100x-persona 泛化词/道具数量，加机位闭集+引用完整性+零孤儿+2场景规则
+      # ---------------------------------------------------------------
+      - id: code_validate_scene
+        type: custom
+        position: { x: 2840, y: 300 }
+        positionAbsolute: { x: 2840, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 90
+        data:
+          title: "校验场景：泛化词禁+机位+引用完整性+零孤儿"
+          type: code
+          selected: false
+          code_language: python3
+          code: |
+            import json
+            import re
+
+            REQUIRED_SCENE_FIELDS = [
+                "scene_name", "trigger_moment", "location", "micro_coordinate",
+                "visual_props", "atmosphere", "camera_position", "persona_ref",
+                "contrast_refs", "rationale",
+            ]
+            ALLOWED_SCENE_FIELDS = set(REQUIRED_SCENE_FIELDS)
+
+            # 本次集成定义的闭集机位枚举，
+            # 参考 UGC 六大机位分类规范
+            # 的 6 机位分类结构（只借结构，不带具体占比数字）。
+            CAMERA_POSITION_ENUM = {
+                "rear_camera_pov", "handheld_pov", "handheld_selfie",
+                "gopro_pov", "mirror_selfie", "night_vision",
+            }
+
+            # 逐字复用 100x-persona schema.json 的负向前瞻泛化词表（axiom 3）。
+            VAGUE_WORDS = [
+                "某处", "随便", "某个地方", "某场景", "某个场景", "某个地点", "某地", "某时",
+                "待定", "TBD", "tbd", "somewhere", "Somewhere", "anywhere", "Anywhere",
+            ]
+
+            PERSONA_ID_RE = re.compile(r'^PERSONA_[A-Za-z0-9_]+$')
+            CTR_ID_RE = re.compile(r'^CTR_[A-Za-z0-9_]+$')
+
+
+            def _err(errors, tag, msg):
+                errors.append(f"[{tag}] {msg}")
+
+
+            def main(personas: dict, contrast_beats: list, llm_raw: str) -> dict:
+                persona_id_set = set((personas or {}).keys())
+                contrast_by_id = {b.get("beat_id"): b for b in (contrast_beats or []) if isinstance(b, dict)}
+
+                raw = (llm_raw or "").strip()
+                if raw.startswith("```"):
+                    raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
+                    raw = re.sub(r"```\s*$", "", raw)
+                    raw = raw.strip()
+
+                try:
+                    parsed = json.loads(raw)
+                    if not isinstance(parsed, dict):
+                        raise ValueError("top-level JSON is not an object")
+                except Exception as exc:
+                    return {
+                        "is_valid": "false",
+                        "status": "failed",
+                        "errors": [f"[parse] LLM output is not valid JSON: {exc}"],
+                        "error_count": 1,
+                        "scenes": {},
+                        "scenes_list": [],
+                    }
+
+                scene_items = parsed.get("scenes")
+                if not isinstance(scene_items, list) or len(scene_items) == 0:
+                    errors = ["[schema:scenes] must be a non-empty array of scene objects"]
+                    scene_items = []
+                else:
+                    errors = []
+
+                scenes = {}
+                for idx, item in enumerate(scene_items):
+                    sid = f"SCENE_{idx + 1}"
+                    loc = f"scenes[{idx}]({sid})"
+                    if not isinstance(item, dict):
+                        _err(errors, "schema", f"{loc} must be an object")
+                        continue
+
+                    extra = [k for k in item.keys() if k not in ALLOWED_SCENE_FIELDS]
+                    if extra:
+                        _err(errors, "schema", f"{loc} has unexpected fields (additionalProperties:false): {extra}")
+                    missing = [f for f in REQUIRED_SCENE_FIELDS if f not in item]
+                    if missing:
+                        _err(errors, "schema", f"{loc} missing required field(s): {missing}")
+
+                    for field in ("trigger_moment", "location", "micro_coordinate"):
+                        value = item.get(field)
+                        if not isinstance(value, str) or len(value) < 3:
+                            _err(errors, "axiom3-scene", f"{loc}.{field} missing or shorter than minLength:3")
+                            continue
+                        hit = next((w for w in VAGUE_WORDS if w in value), None)
+                        if hit:
+                            _err(errors, "axiom3-scene", f'{loc}.{field} contains a closed-list vague placeholder word "{hit}": "{value}"')
+
+                    props = item.get("visual_props")
+                    if not isinstance(props, list) or len(props) < 2 or not all(isinstance(p, str) and p.strip() for p in props):
+                        _err(errors, "axiom3-scene", f"{loc}.visual_props must be an array of >=2 non-empty strings (minItems:2)")
+
+                    for field in ("scene_name", "atmosphere", "rationale"):
+                        value = item.get(field)
+                        if not isinstance(value, str) or not value.strip():
+                            _err(errors, "schema", f"{loc}.{field} is missing or not a non-empty string")
+
+                    camera = item.get("camera_position")
+                    if camera not in CAMERA_POSITION_ENUM:
+                        _err(errors, "schema", f'{loc}.camera_position "{camera}" is not one of {sorted(CAMERA_POSITION_ENUM)}')
+
+                    pref = item.get("persona_ref")
+                    if not isinstance(pref, str) or not PERSONA_ID_RE.match(pref):
+                        _err(errors, "schema", f'{loc}.persona_ref "{pref}" does not match ^PERSONA_[A-Za-z0-9_]+$')
+                    elif pref not in persona_id_set:
+                        _err(errors, "integration-ref", f'{loc}.persona_ref "{pref}" does not exist among this run\'s generated personas')
+
+                    crefs = item.get("contrast_refs")
+                    if not isinstance(crefs, list):
+                        _err(errors, "schema", f"{loc}.contrast_refs must be an array (can be empty)")
+                        crefs = []
+                    for cref in crefs:
+                        if not isinstance(cref, str) or not CTR_ID_RE.match(cref):
+                            _err(errors, "schema", f'{loc}.contrast_refs contains "{cref}" which does not match ^CTR_[A-Za-z0-9_]+$')
+                        elif cref not in contrast_by_id:
+                            _err(errors, "integration-ref", f'{loc}.contrast_refs references "{cref}" which does not exist among this run\'s generated contrast_beats')
+
+                    out_item = {k: v for k, v in item.items() if k in ALLOWED_SCENE_FIELDS}
+                    scenes[sid] = out_item
+
+                if not errors:
+                    used_personas = {s.get("persona_ref") for s in scenes.values()}
+                    for pid in persona_id_set:
+                        if pid not in used_personas:
+                            _err(errors, "axiom4-zero-orphan", f"{pid} is defined but never referenced by any scene's persona_ref (orphan)")
+
+                    scenes_per_contrast = {}
+                    for sid, s in scenes.items():
+                        for cref in (s.get("contrast_refs") or []):
+                            scenes_per_contrast.setdefault(cref, []).append(sid)
+
+                    for beat_id, beat in contrast_by_id.items():
+                        if beat.get("contrast_type") == "state_before_after":
+                            covering = scenes_per_contrast.get(beat_id, [])
+                            if len(covering) < 2:
+                                _err(
+                                    errors, "integration-before-after",
+                                    f'contrast_beats "{beat_id}" has contrast_type=state_before_after, which '
+                                    f'requires >=2 distinct scenes referencing it in contrast_refs (one '
+                                    f'"before" setting, one "after" setting) -- only {len(covering)} scene(s) '
+                                    f'reference it: {covering}. This is a new rule invented for this '
+                                    f"integration (not present in 100x-persona or 100x-exaggerate "
+                                    f'individually), following the "scene follows persona + contrast '
+                                    f'beats" requirement.',
+                                )
+
+                scenes_list = [dict(v, scene_id=k) for k, v in scenes.items()]
+                is_valid = len(errors) == 0
+                return {
+                    "is_valid": "true" if is_valid else "false",
+                    "status": "passed" if is_valid else "failed",
+                    "errors": errors,
+                    "error_count": len(errors),
+                    "scenes": scenes if is_valid else {},
+                    "scenes_list": scenes_list if is_valid else [],
+                }
+          variables:
+            - value_selector: [code_validate_persona, personas]
+              variable: personas
+            - value_selector: [code_validate_exaggerate, contrast_beats]
+              variable: contrast_beats
+            - value_selector: [llm_generate_scene, text]
+              variable: llm_raw
+          outputs:
+            is_valid:
+              type: string
+            status:
+              type: string
+            errors:
+              type: array[string]
+            error_count:
+              type: number
+            scenes:
+              type: object
+            scenes_list:
+              type: array[object]
+
+      # ---------------------------------------------------------------
+      # 11. 场景是否通过校验
+      # ---------------------------------------------------------------
+      - id: if_scene_valid
+        type: custom
+        position: { x: 3120, y: 300 }
+        positionAbsolute: { x: 3120, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+        data:
+          title: "场景是否通过校验"
+          type: if-else
+          selected: false
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: "cond-scene-valid-0001"
+                  variable_selector: [code_validate_scene, is_valid]
+                  comparison_operator: is
+                  value: "true"
+                  varType: string
+          conditions:
+            - id: "cond-scene-valid-0001"
+              variable_selector: [code_validate_scene, is_valid]
+              comparison_operator: is
+              value: "true"
+              varType: string
+          logical_operator: and
+
+      # ---------------------------------------------------------------
+      # 11f. 失败分支：场景阶段
+      # ---------------------------------------------------------------
+      - id: tpl_fail_scene
+        type: custom
+        position: { x: 3400, y: 560 }
+        positionAbsolute: { x: 3400, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "拼装：场景阶段失败报告"
+          type: template-transform
+          selected: false
+          variables:
+            - variable: errors
+              value_selector: [code_validate_scene, errors]
+            - variable: error_count
+              value_selector: [code_validate_scene, error_count]
+          template: |
+            # Stage C（场景）校验未通过（{{ error_count }} 项）
+
+            {% for e in errors %}
+            - {{ e }}
+            {% endfor %}
+
+            常见修复方式：
+            - [axiom3-scene] 泛化词/道具数量问题：trigger_moment/location/micro_coordinate
+              不许出现闭集泛化词，visual_props 至少2件
+            - [schema] camera_position 不在 6 选 1 闭集内，或字段缺失/多余
+            - [integration-ref] persona_ref / contrast_refs 引用了不存在的 id
+            - [axiom4-zero-orphan] 存在从未被任何场景 persona_ref 引用的人物
+            - [integration-before-after] 某条 state_before_after 反差点只有 <2 个场景
+              覆盖，需要补一个"前"或"后"的对应场景
+
+      - id: end_fail_scene
+        type: custom
+        position: { x: 3680, y: 560 }
+        positionAbsolute: { x: 3680, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 186
+        data:
+          title: "结束：场景阶段未通过"
+          type: end
+          outputs:
+            - variable: status
+              value_selector: [code_validate_scene, status]
+              value_type: string
+            - variable: failing_stage
+              value_selector: [tpl_fail_scene, output]
+              value_type: string
+            - variable: validation_errors
+              value_selector: [code_validate_scene, errors]
+              value_type: array[string]
+            - variable: error_count
+              value_selector: [code_validate_scene, error_count]
+              value_type: number
+            - variable: raw_llm_output
+              value_selector: [llm_generate_scene, text]
+              value_type: string
+
+      # ---------------------------------------------------------------
+      # 12. 成功分支：组装完整 bundle
+      # ---------------------------------------------------------------
+      - id: assemble_bundle
+        type: custom
+        position: { x: 3400, y: 300 }
+        positionAbsolute: { x: 3400, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "组装完整 bundle（人物+夸张反差+场景）"
+          type: code
+          selected: false
+          code_language: python3
+          code: |
+            import json
+
+
+            def main(
+                source_script: str,
+                effective_hat_level: str,
+                effective_market: str,
+                calibrate_warnings: list,
+                personas: dict,
+                persona_warnings: list,
+                exaggeration_beats: list,
+                contrast_beats: list,
+                scenes: dict,
+            ) -> dict:
+                warnings = list(calibrate_warnings or []) + list(persona_warnings or [])
+                bundle = {
+                    "source_script": source_script or "",
+                    "meta": {
+                        "generated_by": "step2-persona-exaggerate-scene",
+                        "hat_level": effective_hat_level or "",
+                        "market": effective_market or "",
+                        "warnings": warnings,
+                    },
+                    "personas": personas or {},
+                    "exaggeration_beats": exaggeration_beats or [],
+                    "contrast_beats": contrast_beats or [],
+                    "scenes": scenes or {},
+                }
+                bundle_json = json.dumps(bundle, ensure_ascii=False, indent=2)
+                personas_list = [dict(v, persona_id=k) for k, v in (personas or {}).items() if isinstance(v, dict)]
+                scenes_list = [dict(v, scene_id=k) for k, v in (scenes or {}).items() if isinstance(v, dict)]
+                return {
+                    "status": "passed",
+                    "bundle": bundle,
+                    "bundle_json": bundle_json,
+                    "personas_list": personas_list,
+                    "scenes_list": scenes_list,
+                }
+          variables:
+            - value_selector: [start, source_script]
+              variable: source_script
+            - value_selector: [calibrate_ceiling, effective_hat_level]
+              variable: effective_hat_level
+            - value_selector: [calibrate_ceiling, effective_market]
+              variable: effective_market
+            - value_selector: [calibrate_ceiling, warnings]
+              variable: calibrate_warnings
+            - value_selector: [code_validate_persona, personas]
+              variable: personas
+            - value_selector: [code_validate_persona, warnings]
+              variable: persona_warnings
+            - value_selector: [code_validate_exaggerate, exaggeration_beats]
+              variable: exaggeration_beats
+            - value_selector: [code_validate_exaggerate, contrast_beats]
+              variable: contrast_beats
+            - value_selector: [code_validate_scene, scenes]
+              variable: scenes
+          outputs:
+            status:
+              type: string
+            bundle:
+              type: object
+            bundle_json:
+              type: string
+            personas_list:
+              type: array[object]
+            scenes_list:
+              type: array[object]
+
+      # ---------------------------------------------------------------
+      # 13. 人类可读 Markdown 摘要
+      # ---------------------------------------------------------------
+      - id: render_summary_md
+        type: custom
+        position: { x: 3680, y: 300 }
+        positionAbsolute: { x: 3680, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "拼装：人类可读 Markdown 摘要"
+          type: template-transform
+          selected: false
+          variables:
+            - variable: hat_level
+              value_selector: [calibrate_ceiling, effective_hat_level]
+            - variable: market
+              value_selector: [calibrate_ceiling, effective_market]
+            - variable: warnings_a
+              value_selector: [calibrate_ceiling, warnings]
+            - variable: warnings_b
+              value_selector: [code_validate_persona, warnings]
+            - variable: personas_list
+              value_selector: [assemble_bundle, personas_list]
+            - variable: exaggeration_beats
+              value_selector: [code_validate_exaggerate, exaggeration_beats]
+            - variable: contrast_beats
+              value_selector: [code_validate_exaggerate, contrast_beats]
+            - variable: scenes_list
+              value_selector: [assemble_bundle, scenes_list]
+          template: |
+            # Step2 输出：人设 × 夸张反差 × 场景
+
+            **帽度（hat_level）**: {{ hat_level }}
+            **市场（market）**: {{ market if market else "未指定（按保守默认处理）" }}
+            {% if warnings_a or warnings_b %}
+            **降级 / 披露记录**：
+            {% for w in warnings_a + warnings_b %}
+            - {{ w }}
+            {% endfor %}
+            {% endif %}
+
+            ## 人物 personas
+            {% for p in personas_list %}
+            ### {{ p.persona_id }} · {{ p.identity_label }}
+            - 权威依据：{{ p.authority_basis }}（原文锚点："{{ p.authority_evidence_quote }}"）
+            - 受众定位：{{ p.audience_fit }}（原文锚点："{{ p.audience_pain_quote }}"）
+            - 语气：{{ p.delivery_style }} / 镜头关系：{{ p.relationship_to_camera }}
+            - 方法论引用：
+            {% for g in p.grounded_in %}
+              - {{ g.pattern_name }}：{{ g.rationale }}
+            {% endfor %}
+
+            {% endfor %}
+            ## 夸张点 exaggeration_beats
+            {% for b in exaggeration_beats %}
+            ### {{ b.beat_id }} · {{ b.label_cn }} （{{ b.technique }} / {{ b.intensity }}，来自 {{ b.persona_ref }}）
+            > {{ b.script_span_quote }}
+
+            理由：{{ b.rationale }}
+
+            {% endfor %}
+            ## 反差点 contrast_beats
+            {% for c in contrast_beats %}
+            ### {{ c.beat_id }} · {{ c.label_cn }} （{{ c.contrast_type }}，来自 {{ c.persona_ref }}）
+            - A 端：{{ c.anchor_quote_a }}
+            - B 端：{{ c.anchor_quote_b }}
+
+            理由：{{ c.rationale }}
+
+            {% endfor %}
+            ## 场景 scenes
+            {% for s in scenes_list %}
+            ### {{ s.scene_id }} · {{ s.scene_name }} （{{ s.camera_position }}，人物 {{ s.persona_ref }}，反差 {{ s.contrast_refs | join(', ') }}）
+            - 触发时刻：{{ s.trigger_moment }}
+            - 地点：{{ s.location }} / 微观坐标：{{ s.micro_coordinate }}
+            - 道具：{{ s.visual_props | join(', ') }}
+            - 氛围：{{ s.atmosphere }}
+            - 理由：{{ s.rationale }}
+
+            {% endfor %}
+
+      # ---------------------------------------------------------------
+      # 14. 成功终稿
+      # ---------------------------------------------------------------
+      - id: end_success
+        type: custom
+        position: { x: 3960, y: 300 }
+        positionAbsolute: { x: 3960, y: 300 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 166
+        data:
+          title: "结束：Step2 bundle 交付"
+          type: end
+          outputs:
+            - variable: status
+              value_selector: [assemble_bundle, status]
+              value_type: string
+            - variable: bundle
+              value_selector: [assemble_bundle, bundle]
+              value_type: object
+            - variable: bundle_json
+              value_selector: [assemble_bundle, bundle_json]
+              value_type: string
+            - variable: summary_markdown
+              value_selector: [render_summary_md, output]
+              value_type: string
+
+    edges:
+      - id: start-source-calibrate_ceiling-target
+        source: start
+        sourceHandle: source
+        target: calibrate_ceiling
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: start, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: calibrate_ceiling-source-kb_retrieve_persona_patterns-target
+        source: calibrate_ceiling
+        sourceHandle: source
+        target: kb_retrieve_persona_patterns
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: knowledge-retrieval, isInIteration: false, isInLoop: false }
+
+      - id: kb_retrieve_persona_patterns-source-llm_generate_persona-target
+        source: kb_retrieve_persona_patterns
+        sourceHandle: source
+        target: llm_generate_persona
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: knowledge-retrieval, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: llm_generate_persona-source-code_validate_persona-target
+        source: llm_generate_persona
+        sourceHandle: source
+        target: code_validate_persona
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_validate_persona-source-if_persona_valid-target
+        source: code_validate_persona
+        sourceHandle: source
+        target: if_persona_valid
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: if_persona_valid-true-llm_generate_exaggerate-target
+        source: if_persona_valid
+        sourceHandle: "true"
+        target: llm_generate_exaggerate
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: if_persona_valid-false-tpl_fail_persona-target
+        source: if_persona_valid
+        sourceHandle: "false"
+        target: tpl_fail_persona
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false }
+
+      - id: tpl_fail_persona-source-end_fail_persona-target
+        source: tpl_fail_persona
+        sourceHandle: source
+        target: end_fail_persona
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: llm_generate_exaggerate-source-code_validate_exaggerate-target
+        source: llm_generate_exaggerate
+        sourceHandle: source
+        target: code_validate_exaggerate
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_validate_exaggerate-source-if_exaggerate_valid-target
+        source: code_validate_exaggerate
+        sourceHandle: source
+        target: if_exaggerate_valid
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: if_exaggerate_valid-true-llm_generate_scene-target
+        source: if_exaggerate_valid
+        sourceHandle: "true"
+        target: llm_generate_scene
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: if_exaggerate_valid-false-tpl_fail_exaggerate-target
+        source: if_exaggerate_valid
+        sourceHandle: "false"
+        target: tpl_fail_exaggerate
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false }
+
+      - id: tpl_fail_exaggerate-source-end_fail_exaggerate-target
+        source: tpl_fail_exaggerate
+        sourceHandle: source
+        target: end_fail_exaggerate
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: llm_generate_scene-source-code_validate_scene-target
+        source: llm_generate_scene
+        sourceHandle: source
+        target: code_validate_scene
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_validate_scene-source-if_scene_valid-target
+        source: code_validate_scene
+        sourceHandle: source
+        target: if_scene_valid
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: if_scene_valid-true-assemble_bundle-target
+        source: if_scene_valid
+        sourceHandle: "true"
+        target: assemble_bundle
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: if_scene_valid-false-tpl_fail_scene-target
+        source: if_scene_valid
+        sourceHandle: "false"
+        target: tpl_fail_scene
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false }
+
+      - id: tpl_fail_scene-source-end_fail_scene-target
+        source: tpl_fail_scene
+        sourceHandle: source
+        target: end_fail_scene
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: assemble_bundle-source-render_summary_md-target
+        source: assemble_bundle
+        sourceHandle: source
+        target: render_summary_md
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: template-transform, isInIteration: false, isInLoop: false }
+
+      - id: render_summary_md-source-end_success-target
+        source: render_summary_md
+        sourceHandle: source
+        target: end_success
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false }

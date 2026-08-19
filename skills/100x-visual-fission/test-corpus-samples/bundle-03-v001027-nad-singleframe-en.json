@@ -1,0 +1,52 @@
+{
+  "product_name": "NAD plus men's complex (synthetic example, based on a real English-language ad's pure-sale-announcement narrative, not a real product)",
+  "category": "男性保健品",
+  "source_material_note": "Derived from the narrative shape of a real English-language hat-graded TikTok ad transcript (V001027) reviewed in this validation run -- the source is a pure urgency-sale announcement with zero effect timeline or before/after contrast. Text-only degraded Class A path.",
+  "constants": {
+    "person_identity_anchor": "man late 20s, short fade haircut, clean-shaven, wearing a fitted black athletic tee",
+    "scene_identity_anchor": "bright home gym corner with a yoga mat on the floor and a water bottle on a wooden shelf",
+    "product_identity_anchor": "sleek matte black supplement tub with a bold metallic silver label and a wide screw cap"
+  },
+  "variables": [
+    { "dimension": "camera", "name": "framing", "observed_values": ["medium shot waist-up", "close-up on product in hand"], "range_description": "mid-distance establishing shot vs tight product-hero shot" },
+    { "dimension": "composition", "name": "product placement", "observed_values": ["product held at chest level centered", "product resting on shelf in foreground"], "range_description": "active hand-held product presentation vs passive shelf-staged product display" }
+  ],
+  "media_plan": {
+    "structure": "single_frame",
+    "frame_count": 1,
+    "frames": [
+      { "role": "head", "day_index": null, "visual_action": "standing confidently in the home gym corner, holding the supplement tub at chest height with both hands, bright engaged smile, product-facing camera presentation", "uses_first_frame_as_reference": false }
+    ],
+    "structure_justification": "source ad is a pure urgency-sale announcement with zero effect timeline, zero before/after contrast, and zero intermediate transition; single_frame matches without inventing a progression the copy never stated."
+  },
+  "prompt_sets": [
+    {
+      "id": 1,
+      "variant_label": "medium shot, product held at chest",
+      "character_prompt": "man late 20s, short fade haircut, clean-shaven, wearing a fitted black athletic tee",
+      "scene_prompt": "bright home gym corner with a yoga mat on the floor and a water bottle on a wooden shelf",
+      "action_prompt": "standing confidently, holding the supplement tub at chest height with both hands, medium waist-up framing, natural front-on pose",
+      "combined_prompt": "man late 20s, short fade haircut, clean-shaven, wearing a fitted black athletic tee, bright home gym corner with a yoga mat on the floor and a water bottle on a wooden shelf, sleek matte black supplement tub with a bold metallic silver label and a wide screw cap, standing confidently holding the tub at chest height with both hands, medium waist-up framing",
+      "axis_tags": ["camera", "pose"]
+    },
+    {
+      "id": 2,
+      "variant_label": "close-up product hero, shelf staging",
+      "character_prompt": "man late 20s, short fade haircut, clean-shaven, wearing a fitted black athletic tee",
+      "scene_prompt": "bright home gym corner with a yoga mat on the floor and a water bottle on a wooden shelf",
+      "action_prompt": "close-up on the supplement tub resting on the wooden shelf, soft blurred figure in background, product-hero composition",
+      "combined_prompt": "man late 20s, short fade haircut, clean-shaven, wearing a fitted black athletic tee, bright home gym corner with a yoga mat on the floor and a water bottle on a wooden shelf, sleek matte black supplement tub with a bold metallic silver label and a wide screw cap, close-up on the tub resting on the wooden shelf with soft blurred figure in background, product-hero composition",
+      "axis_tags": ["camera", "composition"]
+    }
+  ],
+  "fission_variants": [
+    { "id": 1, "source_prompt_set_id": 1, "frame_role": "head", "day_index": null, "camera_variant": "A", "aspect_ratio": "9:16", "prompt_json": { "prompt": "man late 20s, short fade haircut, clean-shaven, wearing a fitted black athletic tee, bright home gym corner with a yoga mat on the floor and a water bottle on a wooden shelf, sleek matte black supplement tub with a bold metallic silver label and a wide screw cap, standing confidently holding the tub at chest height with both hands, bright engaged smile, product-facing camera presentation, natural-window lighting, warm color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } },
+    { "id": 2, "source_prompt_set_id": 2, "frame_role": "head", "day_index": null, "camera_variant": "C", "aspect_ratio": "9:16", "prompt_json": { "prompt": "man late 20s, short fade haircut, clean-shaven, wearing a fitted black athletic tee, bright home gym corner with a yoga mat on the floor and a water bottle on a wooden shelf, sleek matte black supplement tub with a bold metallic silver label and a wide screw cap, close-up on the supplement tub resting on the wooden shelf, soft blurred figure in background, product-hero composition, overcast-natural lighting, muted color grading, shot on iPhone, visible pores, natural skin texture, minor imperfections, photorealistic", "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon", "resolution": "1080x1920" } }
+  ],
+  "negative_prompt": "blurry, low quality, distorted, extra fingers, extra limbs, watermark, cartoon, illustration, anime, 3D render, oversaturated, plastic skin, oversmoothed, stock image feel, ring light, studio lighting, flash, artificial lighting, neon",
+  "meta": {
+    "based_on_media_structure": "single_frame",
+    "generated_by": "100x-visual-fission",
+    "warnings": []
+  }
+}

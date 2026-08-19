@@ -1,0 +1,61 @@
+{
+  "source_script": "Person A: I had my second baby seven months ago and the gym childcare line was longer than my actual workout, so I gave up for a while. Now I loop this band around my bedroom door twice a day while the baby naps and I get through a full set before she wakes up. Person B: I live in a four hundred square foot studio and a squat rack was never happening for me. I hook the same band around my closet door handle right after I get home from work and do rows for ten minutes before I even take my shoes off.",
+  "personas": {
+    "PERSONA_POSTPARTUM_MOM": {
+      "identity_label": "产后七个月的双娃妈妈（synthetic example, not a real person）",
+      "authority_basis": "以近期真实产后带娃健身经历建立同理型信任，非专业资质",
+      "authority_evidence_quote": "I had my second baby seven months ago",
+      "audience_fit": "时间被婴儿作息切碎、难以去健身房的新手妈妈",
+      "audience_pain_quote": "the gym childcare line was longer than my actual workout",
+      "delivery_style": "第一人称经历叙述，直接对比放弃前后的状态",
+      "relationship_to_camera": "testimonial-witness"
+    },
+    "PERSONA_APARTMENT_RENTER": {
+      "identity_label": "居住小户型公寓的上班族（synthetic example, not a real person）",
+      "authority_basis": "以真实居住空间限制建立同理型信任，非专业资质",
+      "authority_evidence_quote": "I live in a four hundred square foot studio",
+      "audience_fit": "居住空间狭小、放不下大型器材的城市租客",
+      "audience_pain_quote": "a squat rack was never happening for me",
+      "delivery_style": "第一人称经历叙述，直接点出空间限制",
+      "relationship_to_camera": "testimonial-witness"
+    }
+  },
+  "scenes": {
+    "SCENE_BEDROOM_DOOR": {
+      "scene_name": "卧室房门间隙训练",
+      "trigger_moment": "婴儿午睡的间隙",
+      "location": "自家卧室",
+      "micro_coordinate": "弹力带绕在卧室门把手上，人站在门前",
+      "visual_props": ["弹力带", "卧室门", "婴儿监视器"],
+      "atmosphere": "安静、抓紧时间的居家氛围"
+    },
+    "SCENE_CLOSET_DOOR": {
+      "scene_name": "下班后衣柜门训练",
+      "trigger_moment": "下班进门换鞋前",
+      "location": "小户型公寓玄关衣柜区",
+      "micro_coordinate": "弹力带绕在衣柜门把手上，通勤包放在地上",
+      "visual_props": ["弹力带", "衣柜门", "通勤包"],
+      "atmosphere": "狭小紧凑、见缝插针的都市感"
+    }
+  },
+  "pairings": [
+    {
+      "pairing_id": "PAIR_MOM_NAPTIME",
+      "script_span_quote": "I loop this band around my bedroom door twice a day while the baby naps",
+      "persona_ref": "PERSONA_POSTPARTUM_MOM",
+      "scene_ref": "SCENE_BEDROOM_DOOR",
+      "rationale": "台词明确点名卧室门和婴儿午睡窗口，场景需与该人物的居家带娃身份一致"
+    },
+    {
+      "pairing_id": "PAIR_RENTER_AFTER_WORK",
+      "script_span_quote": "I hook the same band around my closet door handle right after I get home from work",
+      "persona_ref": "PERSONA_APARTMENT_RENTER",
+      "scene_ref": "SCENE_CLOSET_DOOR",
+      "rationale": "台词点名衣柜门和下班回家的时间点，场景需体现小户型空间限制"
+    }
+  ],
+  "meta": {
+    "generated_by": "100x-persona",
+    "warnings": []
+  }
+}

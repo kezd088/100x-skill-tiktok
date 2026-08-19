@@ -1,0 +1,95 @@
+{
+  "source": {
+    "duration_sec": 24.0,
+    "aspect_ratio": "9:16",
+    "frames_analyzed": 10,
+    "extraction_method": "scene-detect+top-n"
+  },
+  "target_model": "veo",
+  "shots": [
+    {
+      "shot_id": 1,
+      "time_bucket": "0.0-3.0",
+      "shot_purpose": "hook",
+      "camera_note": "static camera, product-hero framing",
+      "prompt_en": "Close-up of a compact grey plastic kitchen chopper gadget sitting on a wooden countertop, morning light from a nearby window, static camera holding the frame, no text, no subtitles, no watermarks",
+      "prompt_zh": "一个灰色塑料迷你厨房切菜器放在木质台面上的特写镜头，晨光从旁边的窗户照入，机位固定不动。"
+    },
+    {
+      "shot_id": 2,
+      "time_bucket": "3.0-8.0",
+      "shot_purpose": "build",
+      "prompt_en": "Two hands press down on the chopper's top handle repeatedly, diced onion pieces visible falling into the clear plastic container below, kitchen counter surface in soft focus behind, overhead natural light, no text, no subtitles, no watermarks",
+      "prompt_zh": "双手反复按压切菜器顶部把手，切碎的洋葱丁掉入下方透明塑料容器中清晰可见，背景厨房台面呈柔焦，顶部自然光。"
+    },
+    {
+      "shot_id": 3,
+      "time_bucket": "8.0-14.0",
+      "shot_purpose": "demo",
+      "prompt_en": "One hand lifts the clear plastic container and pours the freshly diced vegetables into a glass mixing bowl, the empty chopper resting on the counter in the background, bright kitchen light, no text, no subtitles, no watermarks",
+      "prompt_zh": "一只手拿起透明塑料容器，将新鲜切好的蔬菜倒入玻璃搅拌碗中，背景台面上放着已清空的切菜器，厨房光线明亮。"
+    },
+    {
+      "shot_id": 4,
+      "time_bucket": "14.0-19.0",
+      "shot_purpose": "social_proof",
+      "camera_note": "wide static shot, eye-level",
+      "prompt_en": "Wide shot of a family of four sitting around a dining table sharing a meal together, plates of freshly prepared vegetables in the center, warm evening light through a window, relaxed and candid atmosphere, no text, no subtitles, no watermarks",
+      "prompt_zh": "四口之家围坐在餐桌旁一起用餐的远景镜头，桌子中央摆放着刚做好的蔬菜料理，傍晚暖光透过窗户照入，氛围轻松自然。"
+    },
+    {
+      "shot_id": 5,
+      "time_bucket": "19.0-24.0",
+      "shot_purpose": "cta",
+      "prompt_en": "Close-up of the same grey plastic kitchen chopper gadget now clean and placed back on the countertop next to a folded kitchen towel, soft late afternoon light, slow push-in camera movement, no text, no subtitles, no watermarks",
+      "prompt_zh": "同一款灰色塑料厨房切菜器清洗干净后放回台面、旁边放着一条叠好的厨房毛巾的特写镜头，午后柔光，镜头缓慢推近。"
+    }
+  ],
+  "visual_forms": [
+    {
+      "form_type": "product_closeup",
+      "appears_in_shots": [1, 5],
+      "prompt_en": "Close-up of a compact grey plastic kitchen chopper gadget resting on a wooden countertop, natural directional light, static or slow push-in camera, no text, no subtitles, no watermarks",
+      "prompt_zh": "灰色塑料迷你厨房切菜器放在木质台面上的特写镜头，自然定向光，固定或缓慢推近镜头。"
+    },
+    {
+      "form_type": "hands_demo",
+      "appears_in_shots": [2, 3],
+      "prompt_en": "Close-up of hands operating the kitchen chopper gadget and handling the freshly cut vegetables, kitchen counter surface visible in soft focus, bright natural light, no text, no subtitles, no watermarks",
+      "prompt_zh": "双手操作厨房切菜器并处理刚切好的蔬菜的特写镜头，背景厨房台面呈柔焦，明亮自然光。"
+    },
+    {
+      "form_type": "b_roll_lifestyle",
+      "appears_in_shots": [4],
+      "prompt_en": "Wide shot of a family sharing a home-cooked meal together at a dining table, warm natural light, relaxed candid atmosphere, no text, no subtitles, no watermarks",
+      "prompt_zh": "一家人围坐餐桌共享自制餐点的远景镜头，温暖自然光，氛围轻松自然。"
+    }
+  ],
+  "slot_template": {
+    "template_en": "Close-up of a compact {GADGET_COLOR} plastic kitchen chopper dicing {VEGETABLE} on a wooden countertop under {LIGHT_TIME}, followed by {FAMILY_SIZE} sharing the finished dish at a dining table, no text, no subtitles, no watermarks",
+    "template_zh": "一台紧凑的{GADGET_COLOR}塑料厨房切菜器在木质台面上于{LIGHT_TIME}下切碎{VEGETABLE}的特写镜头，随后是{FAMILY_SIZE}围坐餐桌分享成品菜肴的画面。",
+    "slots": [
+      { "name": "GADGET_COLOR", "observed_value": "grey", "candidates": ["grey", "white", "black"] },
+      { "name": "VEGETABLE", "observed_value": "onion", "candidates": ["onion", "carrot", "bell pepper"] },
+      { "name": "LIGHT_TIME", "observed_value": "morning light", "candidates": ["morning light", "late afternoon light", "warm evening light"] },
+      { "name": "FAMILY_SIZE", "observed_value": "a family of four", "candidates": ["a family of four", "a couple", "three roommates"] }
+    ]
+  },
+  "cross_shot_analysis": {
+    "invariants": [
+      { "aspect": "product", "description": "Same grey plastic kitchen chopper gadget appears in the opening and closing close-ups", "holds_in_shots": [1, 5] },
+      { "aspect": "scene", "description": "Same kitchen counter setting anchors the opening, demo, and closing shots", "holds_in_shots": [1, 2, 3, 5] }
+    ],
+    "varying_axes": [
+      { "axis": "location", "observed_values": ["kitchen counter", "dining table"] },
+      { "axis": "camera", "observed_values": ["static close-up", "wide shot", "slow push-in"] },
+      { "axis": "action", "observed_values": ["chopping vegetables", "pouring ingredients", "sharing a meal"] }
+    ]
+  },
+  "meta": {
+    "generated_by": "100x-video-reverse",
+    "frames_source": "evals/_fixtures/example-03-kitchen-gadget-demo-es/frames-meta.json",
+    "warnings": ["受 scene-detect+top-n 抽帧上限影响，个别镜头内的次要动作细节可能未被抽样帧完整捕捉，frames_analyzed 不代表逐帧穷举"],
+    "note": "合成样例，用于 100x-video-reverse 的 schema/公理校验测试。产品、人物、场景、frames_source 路径均为虚构，不对应任何真实品牌、真实账号或真实视频。场景设定为西语市场投放素材，但按公理3要求 prompt_en 严格保持纯英文；prompt_zh 是给中文运营团队看的中文对照文本，不是西语。target_model=veo，5 镜头覆盖 hands_demo + product_closeup + b_roll_lifestyle 三种画面形态。"
+  }
+}

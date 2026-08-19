@@ -1,0 +1,44 @@
+{
+  "id": "100x-exaggerate",
+  "name": "100x-exaggerate",
+  "version": "1.2.0",
+  "author": "100x",
+  "layer": "L2-creative-generation",
+  "step": "3.3-exaggerate-contrast",
+  "type": "generative",
+  "status": "v1.2",
+  "summary": "Script draft text in -> exaggeration-technique beats (closed 5-value enum) + contrast-pairing beats (closed 4-value enum) out, each anchored to a literal quote in the script and capped by a market/hat-level calibration ceiling, for punching up a TikTok/UGC script without tipping into implausible territory.",
+  "validation": {
+    "structural_and_per_item": "schema.json (JSON Schema draft-07), executed by ajv (devDependency declared in package.json, run 'npm install' first) inside scripts/validate.js -- enforces required fields, additionalProperties:false, enum membership (technique/contrast_type/intensity/hat_level), ID pattern (beat_id), minLength/minItems. This is everything vanilla JSON Schema CAN express, same ajv wiring as 100x-search-query (ajv 8.x, e.instancePath, new Ajv({allErrors:true, strict:false})) -- not the ajv6 wiring 100x-persona historically used.",
+    "cross_item_aggregate": "scripts/validate.js's hand-written layer -- the real, runnable enforcement of: axiom 2 (script_span_quote/anchor_quote_a/anchor_quote_b must be literal substrings of source_script, a cross-field string-containment check schema.json cannot express at all), axiom 3 (an exaggeration beat's intensity must not exceed the calibration ceiling implied by meta.hat_level + meta.market -- a lookup-table function of two sibling string fields, not expressible as any schema keyword), and axiom 4 (a contrast beat's anchor_quote_a and anchor_quote_b must not be the same quote doing double duty as both ends -- JSON Schema has no keyword to compare two sibling string properties). Run 'node scripts/validate.js --selftest' for the built-in regression suite (8 checks: 3 real evals/ files pass, an injected extra field fails via ajv additionalProperties, an out-of-enum technique and an out-of-enum contrast_type each fail via ajv enum (3a/3b), a fabricated quote fails axiom 2, a degenerate contrast pair fails axiom 4, an over-ceiling emotion_reaction_hyperbole beat under blackhat+美区 fails axiom 3, the same beat under 5 non-US markets passes axiom 3 as a regression guard proving the ceiling is a real per-market computation and not a substring-collision false positive, and the same beat under 2 market strings that join a real US alias with another value via '-'/'&' still fails axiom 3 as a regression guard proving delimiter handling works).",
+    "note": "This skill was built with the ajv-based validator from the start (no hand-rolled structural checker phase to fix later) -- it directly reuses the 100x-search-query ajv8 wiring ('结构层校验统一用 ajv... 不要先手写再被验证者挑出漏洞才补')."
+  },
+  "input_contract": {
+    "class_a_required": ["source_script"],
+    "class_b_optional_soft_degrade": ["hat_level", "market"],
+    "class_c_upstream_optional_silent_skip": [],
+    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). Input is described informally here and in workflow.md Phase 1. class_c is empty by design: unlike 100x-persona's optional segment_ref, this skill declares NO schema field that references another skill's output (no persona_ref/scene_ref-equivalent) -- if the user supplies upstream persona/scene context it may be woven into a beat's free-text rationale, but nothing in schema.json depends on it existing, keeping this skill fully decoupled. hat_level/market missing does not block generation -- workflow.md Phase 1 has a documented 3-level default (both given / hat_level only / neither given), never a silent unverifiable guess -- see workflow.md and axioms.md axiom 3."
+  },
+  "output_contract": "schema.json (ExaggerationContrastBundle, self-contained in this skill)",
+  "requires_data": [
+    "taxonomy.creative_beat_dictionary_v3_3",
+    "taxonomy.script_structure_formula_library",
+    "corpus.labeled_transcripts"
+  ],
+  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus at inference time. 'taxonomy.creative_beat_dictionary_v3_3' records that the 5 exaggeration techniques and 4 contrast types in axioms.md #1 were derived from creative beat dictionary categories and visual-type strength tables (including the explicit US calibration note that grounds axiom 3). 'taxonomy.script_structure_formula_library' records that tone_register's grounding (dual A/B-roll and black-comedy-reversal structures) came from the A-G script structure formula library. 'corpus.labeled_transcripts' records that the technique enum and calibration ceiling were cross-checked against reference transcript corpora during calibration. No corpus content or dictionary row content is stored in this repo.",
+  "ported_from": {
+    "private_source_skill": null,
+    "private_source_paths": [
+      "taxonomy/词典06_创意画面桥段词典_完整版.md",
+      "taxonomy/脚本结构公式库·A-G七型与效果公式.md",
+      "cases/实战案例精解·四套标杆脚本.md"
+    ],
+    "adaptation_summary": "Built from scratch: the 3-phase workflow structure follows standard creative generation and verification patterns (input classes A/B/C, per-item self-check, batch self-check, rework tiers), while the exaggeration-technique and contrast-type enumerations themselves, and the market/hat-level calibration ceiling, are derived from creative beat categories, US calibration notes, and reference corpus signal frequency statistics. Full derivation in sources.md."
+  },
+  "language_scope": {
+    "output_language": "structured fields (technique/contrast_type/intensity/hat_level enums, label_cn) are fixed English enum values + short Chinese labels by design; script_span_quote/anchor_quote_a/anchor_quote_b are always literal excerpts in the source_script's original language (checked as exact substrings, never translated or paraphrased -- axiom 2); rationale is Chinese.",
+    "input_language": "source_script may be in any language the production team writes scripts in; tested against en + es real corpus; the substring-anchoring checks are language-agnostic (plain string containment)."
+  },
+  "banned_terms_ref": "SKILL.md#禁用词",
+  "eval_policy": "evals/ contains synthetic/fictional products only. No real transcript text, account name, product name, or Feishu link may appear in this skill's files. The 6-row real-corpus manual verification run (3 EN + 3 ES) was built and validated only in this session's out-of-repo scratchpad directory; its raw transcript text was never written into this repo."
+}

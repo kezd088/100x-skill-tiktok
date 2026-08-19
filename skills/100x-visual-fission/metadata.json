@@ -1,0 +1,51 @@
+{
+  "id": "100x-visual-fission",
+  "name": "100x-visual-fission",
+  "version": "1.1.0",
+  "author": "100x",
+  "layer": "L2-creative-generation",
+  "step": "5-visual-fission",
+  "type": "generative",
+  "status": "v1.0",
+  "summary": "Locked person/scene/product reference (VTP reversed JSON or text description) + product brief in -> a media-fission prompt matrix out: single-frame/head-tail/head-mid-tail/multi-day frame structures x VTP's fixed A/B/C camera/lighting/color-grading presets, with one fixed negative-prompt constant, for bulk UGC image-prompt production.",
+  "validation": {
+    "structural_and_per_item": "schema.json (JSON Schema draft-07) -- enforces required/additionalProperties/enum/pattern/const, plus if/then for several FIXED deterministic lookup tables VTP defines (media_plan.structure -> frame_count, aspect_ratio -> resolution, camera_variant -> lighting/color keywords in the prompt). This is everything vanilla JSON Schema CAN express, including fixed table lookups via if/then, not just per-field shape.",
+    "cross_item_aggregate": "scripts/validate.js -- the real, runnable enforcement of what if/then and const structurally cannot reach: frames.length must equal media_plan.frame_count (frameCountMatchesArrayLength), frame role ordering + multi_day day_index strict-ascending-distinct (frameSequenceCheck), which day-role frame is the reference-anchor 'first' frame -- whichever has the SMALLEST day_index, not whichever has day_index==1, since day_index holds the real source-narrative day number (dayFrameFirstReferenceCheck), the axiom-1 identity-lock substring check across prompt_sets/fission_variants (identityLockCheck), prompt_sets pairwise textual distinctness (promptSetsDistinctCheck), fission_variants referential integrity to prompt_sets ids and media_plan.frames entries (fissionReferentialIntegrityCheck), zero-orphan frame coverage (frameCoverageCheck), negative_prompt byte-equality across every fission_variant vs. the top-level const (negativePromptConsistencyCheck), meta.based_on_media_structure vs. media_plan.structure equality (metaConsistencyCheck), and the axiom-4 case-insensitive, word-boundary-matched unvisualizable-claim word scan (unvisualizableClaimCheck, using wordMatch with word boundaries to prevent false positives on words like 'cure' inside 'secure'/'manicure'). Loads schema.json at runtime so the two files can't silently drift. Run 'node scripts/validate.js --selftest' for the built-in regression suite (16 checks: 6 real evals/ files, identity-lock violation, duplicate prompt_sets, frame_count/array-length mismatch, frame-sequence-out-of-order, unknown source_prompt_set_id, orphan frame, altered negative_prompt, an unvisualizable-claim phrase, ajv additionalProperties, ajv enum, multi_day day_index never citing day 1 (3/7/14/30) correctly passing, wrong reference-anchor flag on the minimum-day_index frame, a benign word merely containing 'cure' not false-positiving, an ALL-CAPS vague placeholder correctly rejected, a camera-keyword substring trick correctly rejected).",
+    "note": "Same schema/script split as 100x-search-query (ajv8, e.instancePath, new Ajv({allErrors:true, strict:false})) and 100x-persona -- validate.js uses ajv from the start rather than a hand-rolled structural checker. Validates schema.json structure, multi_day reference-anchor logic, identity_anchor pattern, camera_variant keyword patterns (\\b-bounded), and unvisualizable-claim scan."
+  },
+  "input_contract": {
+    "class_a_required": ["references (>=2 items, VTP person/scene-reverse JSON or a text-description degrade)", "product_brief"],
+    "class_b_optional_soft_degrade": ["aspect_ratios_wanted (default ['9:16'])", "variant_count (default 2, a VTP-04 user-chosen parameter, not a structural axiom)"],
+    "class_c_upstream_optional_silent_skip": ["100x-persona PersonaSceneBundle (if present, supplies constants.person_identity_anchor/scene_identity_anchor directly, skipping Phase 1 reversal)"],
+    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). Input is described informally here and in workflow.md Phase 1, not enforced by a separate input JSON Schema file. references[] needing >=2 items is a workflow.md Phase 1 rule (extract-common needs >=2 items to diff), not something schema.json (which only governs the OUTPUT contract) can enforce."
+  },
+  "output_contract": "schema.json (VisualFissionBundle, self-contained in this skill)",
+  "requires_data": [
+    "corpus.labeled_transcripts",
+    "taxonomy.category_generic",
+    "vtp.camera_preset_table",
+    "vtp.negative_prompt_constant"
+  ],
+  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus or an external table at inference time. 'corpus.labeled_transcripts' records that axioms/workflow were validated by hand against the reference transcript corpus (EN + ES) during this skill's build (see sources.md); no corpus content is stored in this repo except as de-sensitized, synthetic-marked evals/ derivatives. 'taxonomy.category_generic' is the generic category enum referenced informally in workflow.md (this repo's taxonomies/ directory is not populated yet -- TODO). 'vtp.camera_preset_table' and 'vtp.negative_prompt_constant' record that the fixed A/B/C camera/lighting/color-grading table and the fixed negative-prompt string are reproduced from VTP reference documentation and the negative-prompt section -- both are baked into schema.json/validate.js as constants, not fetched at runtime.",
+  "ported_from": {
+    "private_source_skill": null,
+    "private_source_paths": [
+      "sop/反推方法论·四类反推与VTP七步.md",
+      "schemas/vtp_prompts_01-person-reverse.md",
+      "schemas/vtp_prompts_02-scene-reverse.md",
+      "prompts/vtp_prompts_03-extract-common.md",
+      "prompts/vtp_prompts_04-generate-variants.md",
+      "prompts/vtp_prompts_05-translate-to-cn.md",
+      "prompts/vtp_prompts_06-meta-prompt.md",
+      "sop/功效堆叠与多帧结构.md",
+      "sop/出片SOP·从产品到成片.md"
+    ],
+    "adaptation_summary": "VTP's 7-step pipeline (01/02 reverse, 03 extract-common, 04 generate-variants, 05 translate-cn, 06 meta-prompt, 07 negative-prompt) forms this skill's Phase 2 skeleton. 'Media fission' (the single_frame/head_tail/head_mid_tail/multi_day structure axis layered on top of VTP's original camera/lighting/color-grading-only fission) is an original extension -- see axioms.md's opening note and axiom 2 for the precise difference. Full traceability in sources.md."
+  },
+  "language_scope": {
+    "output_language": "prompt-bearing fields (constants.*, prompt_sets[].*_prompt, fission_variants[].prompt_json.prompt, negative_prompt) are en-only, no exceptions -- these feed image-generation models per VTP's design (mirrors 100x-search-query's axiom-1-style language lock, applied here to generation prompts instead of search queries). product_name/category/meta.warnings/media_plan.structure_justification may be Chinese for human operators, matching workflow.md's own Chinese prose.",
+    "input_language": "references[]/product_brief may be in any language the source ad copy or reference material uses; tested against real en + es corpus; output prompt language is unaffected."
+  },
+  "banned_terms_ref": "SKILL.md#禁用词",
+  "eval_policy": "evals/ contains synthetic/fictional products and persons only, including 6 examples derived from real English/Spanish hat-graded ad-transcript corpus lines read during this skill's build -- each is de-sensitized (no verbatim transcript text, no real product/brand/account name, no real reference photo) and marked 'synthetic example, based on a real ad's ... narrative, not a real product'. No real transcript text, account name, product name, or Feishu link may appear in this skill's files."
+}

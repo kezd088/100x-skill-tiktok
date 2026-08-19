@@ -1,0 +1,83 @@
+{
+  "source": {
+    "duration_sec": 24.0,
+    "aspect_ratio": "9:16",
+    "frames_analyzed": 9,
+    "extraction_method": "scene-detect"
+  },
+  "target_model": "veo",
+  "shots": [
+    {
+      "shot_id": 1,
+      "time_bucket": "0.0-6.0",
+      "shot_purpose": "hook",
+      "camera_note": "handheld selfie-height framing, static",
+      "prompt_en": "A woman in her late 20s with straight shoulder-length brown hair sits in a small home office, looking directly into the camera and speaking with an energetic expression, a plain white unbranded supplement bottle visible on the desk beside her, natural window light from the left, handheld phone framing at chest height, no text, no subtitles, no watermarks",
+      "prompt_zh": "一位二十多岁的女性坐在小型家庭办公室里，直视镜头充满活力地说话，桌上放着一瓶无品牌白色保健品瓶，自然窗光从左侧照入，手持手机胸前高度取景。"
+    },
+    {
+      "shot_id": 2,
+      "time_bucket": "6.0-12.0",
+      "shot_purpose": "build",
+      "prompt_en": "The same woman leans slightly closer to the camera, raising both eyebrows as she counts a point on her fingers, the white unbranded supplement bottle still resting on the desk in the background, soft afternoon light, medium close framing, no text, no subtitles, no watermarks",
+      "prompt_zh": "同一位女性微微靠近镜头，扬起眉毛并用手指数着要点，背景桌上仍放着那瓶无品牌白色保健品瓶，午后柔光，中近景取景。"
+    },
+    {
+      "shot_id": 3,
+      "time_bucket": "12.0-18.0",
+      "shot_purpose": "reveal",
+      "camera_note": "macro-style close-up, shallow depth of field",
+      "prompt_en": "Extreme close-up of the plain white unbranded supplement bottle rotating slowly in a hand, matte label with no visible brand marks, soft window light reflecting off the cap, shallow depth of field with a blurred wooden desk surface behind it, no text, no subtitles, no watermarks",
+      "prompt_zh": "无品牌白色保健品瓶的特写镜头，瓶身在手中缓慢转动，哑光标签上没有任何品牌标记，窗光在瓶盖上形成柔和反光，背景木质桌面浅景深虚化。"
+    },
+    {
+      "shot_id": 4,
+      "time_bucket": "18.0-24.0",
+      "shot_purpose": "cta",
+      "prompt_en": "The same woman faces the camera again with a warm confident smile, pointing toward the bottle on the desk and nodding once, bright natural light fills the room, medium shot framing at eye level, no text, no subtitles, no watermarks",
+      "prompt_zh": "同一位女性再次面向镜头，露出温暖自信的笑容，指向桌上的瓶子并点头一次，明亮自然光洒满房间，视线水平的中景取景。"
+    }
+  ],
+  "visual_forms": [
+    {
+      "form_type": "talking_head",
+      "appears_in_shots": [1, 2, 4],
+      "prompt_en": "A woman in her late 20s with straight shoulder-length brown hair sits facing the camera in a small home office, speaking directly to the lens with natural hand gestures, a plain white unbranded supplement bottle visible nearby, soft daylight from a window, medium shot framing, no text, no subtitles, no watermarks",
+      "prompt_zh": "一位二十多岁的女性面对镜头坐在小型家庭办公室里，用自然的手势直接对镜头说话，旁边放着一瓶无品牌白色保健品瓶，柔和的窗光，中景取景。"
+    },
+    {
+      "form_type": "product_closeup",
+      "appears_in_shots": [3],
+      "prompt_en": "Extreme close-up of a plain white unbranded supplement bottle held in a hand or resting on a surface, matte label with no visible brand marks, soft directional light, shallow depth of field, no text, no subtitles, no watermarks",
+      "prompt_zh": "无品牌白色保健品瓶的特写镜头，握在手中或放在台面上，哑光标签没有任何品牌标记，柔和的定向光，浅景深。"
+    }
+  ],
+  "slot_template": {
+    "template_en": "A woman with {HAIRSTYLE} sits in a {SETTING}, speaking directly to the camera with natural hand gestures, a plain white unbranded supplement bottle resting nearby, {LIGHT_SOURCE}, {FRAMING}, no text, no subtitles, no watermarks",
+    "template_zh": "一位{HAIRSTYLE}的女性坐在{SETTING}里，面对镜头自然地做手势说话，旁边放着一瓶无品牌白色保健品瓶，{LIGHT_SOURCE}，{FRAMING}。",
+    "slots": [
+      { "name": "HAIRSTYLE", "observed_value": "straight shoulder-length brown hair", "candidates": ["straight shoulder-length brown hair", "curly chin-length black hair", "wavy long blonde hair"] },
+      { "name": "SETTING", "observed_value": "small home office", "candidates": ["small home office", "cozy living room corner", "bright kitchen nook"] },
+      { "name": "LIGHT_SOURCE", "observed_value": "soft daylight from a window", "candidates": ["soft daylight from a window", "warm lamp light", "overcast natural light"] },
+      { "name": "FRAMING", "observed_value": "medium shot framing", "candidates": ["medium shot framing", "close medium framing", "wide establishing framing"] }
+    ]
+  },
+  "cross_shot_analysis": {
+    "invariants": [
+      { "aspect": "person", "description": "Same woman with the same hair and outfit appears in all talking head shots", "holds_in_shots": [1, 2, 4] },
+      { "aspect": "product", "description": "Same white unbranded supplement bottle with a matte label appears in every shot, either in the background or as the hero subject", "holds_in_shots": [1, 2, 3, 4] },
+      { "aspect": "scene", "description": "Same home office desk setting anchors every shot, from wide talking shots to the close product insert", "holds_in_shots": [1, 2, 3, 4] }
+    ],
+    "varying_axes": [
+      { "axis": "camera", "observed_values": ["medium shot", "extreme close-up"] },
+      { "axis": "composition", "observed_values": ["person-centered framing", "product-centered framing"] },
+      { "axis": "pose", "observed_values": ["seated upright speaking", "leaning forward counting on fingers", "pointing toward the bottle"] }
+    ]
+  },
+  "meta": {
+    "generated_by": "100x-video-reverse",
+    "frames_source": "evals/_fixtures/example-01-supplement-talking-head-en/frames-meta.json",
+    "warnings": [],
+    "note": "合成样例，用于 100x-video-reverse 的 schema/公理校验测试。人物、场景、产品、frames_source 路径均为虚构，不对应任何真实品牌、真实账号或真实视频。target_model=veo，4 镜头覆盖 talking_head + product_closeup 两种画面形态，talking_head 在镜头 1/2/4 非连续复现，用来体现形态轴收敛跨镜头重复画面的作用。"
+  }
+}

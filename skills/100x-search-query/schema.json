@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://100x/schemas/100x-search-query/SearchQueryBundle.json",
+  "title": "SearchQueryBundle",
+  "description": "Output contract for 100x-search-query. Self-contained in this skill (this repo has no shared cross-skill schemas/ yet, so this file is the single source of truth for its own output). One product/persona in -> Pinterest/TikTok/Reddit search-phrase bundle out. NOTE: vanilla JSON Schema draft-07 can enforce per-item shape (bucket size, q ASCII pattern, intent_cn format, stage enum) but CANNOT enforce cross-item aggregates -- axiom 2's per-bucket keyword-density thresholds and axiom 3's 'must cover >=3 of the 5 stages' rule. A document with all 45 items validly stage:'Advocate' passes this schema but violates axiom 3. Those aggregate checks are enforced by the real, runnable script at scripts/validate.js, which loads this file at runtime and reuses its stage enum + intent_cn pattern so the two never drift apart. See axioms.md for the split.",
+  "type": "object",
+  "required": ["product_name", "category", "queries", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "product_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Echo of the input product/persona name. Must not be a real customer/brand identifier when used in this repo's evals/ (synthetic only)."
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Generic taxonomy category (e.g. 保健品/家居/美妆个护/3C/通用), never a customer-specific category dictionary entry."
+    },
+    "source_language_note": {
+      "type": "string",
+      "description": "Optional. Notes the language of the source product copy when it isn't English (e.g. 'source copy: es'). Does not change output language -- see axioms.md #1."
+    },
+    "queries": {
+      "type": "object",
+      "required": ["pinterest", "tiktok", "reddit"],
+      "additionalProperties": false,
+      "properties": {
+        "pinterest": { "$ref": "#/definitions/bucket15" },
+        "tiktok": { "$ref": "#/definitions/bucket15" },
+        "reddit": { "$ref": "#/definitions/bucket15" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["based_on_5a", "generated_by"],
+      "additionalProperties": true,
+      "properties": {
+        "based_on_5a": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dominant 5A stage(s) this run leaned on, e.g. 'Ask+Aware'. Must never be empty."
+        },
+        "generated_by": {
+          "const": "100x-search-query"
+        },
+        "topic_angle": {
+          "type": "string",
+          "enum": ["default", "aesthetic", "pain-driven", "sales-push"]
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Non-fatal flags, e.g. a query that failed an axiom 3x and was kept as best-effort (axioms.md workflow rework rule)."
+        },
+        "persona_informed": {
+          "type": "boolean",
+          "description": "Whether Phase 1 category-C persona/insight input was provided for this run. When true, axiom 5 (scripts/validate.js) requires persona_descriptor_terms to be non-empty and >=6 of the 45 queries to demonstrably reflect it. Omit or set false when no persona/insight input was given -- axiom 5 does not apply then."
+        },
+        "persona_descriptor_terms": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Specific audience/identity descriptor terms drawn from the persona/insight card's identity_label/audience_fit/delivery_style (or equivalent fields), self-reported by whichever agent ran this skill. Used by scripts/validate.js to mechanically check persona-informed query coverage. Required non-empty when persona_informed is true."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "bucket15": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": { "$ref": "#/definitions/query_item" }
+    },
+    "query_item": {
+      "type": "object",
+      "required": ["q", "intent_cn", "stage"],
+      "additionalProperties": false,
+      "properties": {
+        "q": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[\\x00-\\x7F]+$",
+          "description": "Search phrase. ASCII only (axiom 1) -- hashtags and digits allowed, no CJK."
+        },
+        "intent_cn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^(共鸣|决策前|决策|叙事|场景灵感|场景|对比|情绪认同|情绪|方法求解|求助|求推荐|泛用|生活方式|痛点|种草|视觉参考|购买前|购买后|身份认同|陈列|预期管理|风险确认|验证|质疑):[一-龥，、/0-9]+$",
+          "description": "Chinese search-intent annotation, <=20 chars. Axiom 4: must be 'closed-set intent-category label + colon + Chinese-only elaboration' -- pattern enforces this FORMAT by construction, without needing an EN-CN dictionary. Known limitation: this only enforces format, not semantics -- a label-wrapped literal translation (e.g. q:'does this supplement actually work' + intent_cn:'质疑:这个补剂真的有效吗') passes the pattern while still being a word-for-word translation. See axioms.md #4 for the semantic-overlap check and its design rationale."
+        },
+        "stage": {
+          "type": "string",
+          "enum": ["Aware", "Appeal", "Ask", "Act", "Advocate"],
+          "description": "5A stage this query maps to (axiom 3)."
+        }
+      }
+    }
+  }
+}

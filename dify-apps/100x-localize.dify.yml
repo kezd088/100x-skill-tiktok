@@ -1,0 +1,906 @@
+app:
+  name: "100x-localize · 投放语西语本地化"
+  description: "Source ad script (any language) in -> Mexican-Spanish-default localized script out. Actively compresses to avoid literal-translation length inflation (axiom 1), matches the real reference corpus's actual claim intensity by default instead of an unvalidated conservative style guide (axiom 2), enforces universal tu-only person register (axiom 3), and blocks fabricated authority/certification claims absent from the source (axiom 4). Ported from 100x-skill-tiktok/skills/100x-localize v1.3.0."
+  icon: "🌎"
+  icon_type: emoji
+  icon_background: "#FDE7C8"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.2.6@e2665624a156f52160927bceac9e169bd7e5ae6b936ae82575e14c90af390e6e
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.55}
+    nodes:
+      - id: start
+        type: custom
+        data:
+          type: start
+          title: "输入源文案"
+          desc: "Phase 1 class A/B input: source_script is the only hard-required field. target_region/register_profile are free text (not select) on purpose -- schema.json/axioms.md require an out-of-range value to be soft-degraded with a warning, not hard-rejected, so validation happens in normalize_inputs rather than relying on a UI enum."
+          variables:
+            - label: "源文案 source_script (必填 / required)"
+              variable: source_script
+              type: paragraph
+              required: true
+              max_length: 20000
+            - label: "目标地区 target_region (可选，留空默认 mx)"
+              variable: target_region
+              type: text-input
+              required: false
+              max_length: 50
+            - label: "语域档位 register_profile (可选，留空默认 default)"
+              variable: register_profile
+              type: text-input
+              required: false
+              max_length: 50
+        position: {x: 40, y: 300}
+        positionAbsolute: {x: 40, y: 300}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 156
+
+      - id: normalize_inputs
+        type: custom
+        data:
+          type: code
+          title: "归一化 target_region / register_profile"
+          desc: "workflow.md Phase 1 step 3: target_region defaults to mx when missing, degrades to generic-latam with a meta.warnings note when given an unsupported value (axioms.md axiom 3 known-gap). register_profile defaults to 'default' when missing; falling back to 'default' on an unrecognized value is this port's own extrapolation (workflow.md only documents the degrade path for target_region), disclosed in the notes file. Also runs the class-A source_script non-empty check."
+          code_language: python3
+          code: |
+            def main(source_script: str, target_region: str, register_profile: str) -> dict:
+                import json
+
+                warnings = []
+                src = (source_script or '').strip()
+                input_valid = 1
+                input_error = ''
+                if not src:
+                    input_valid = 0
+                    input_error = (
+                        "Class A input missing: source_script is required (at least one paragraph of ad "
+                        "copy text). This skill does not accept video/audio files -- please provide "
+                        "source_script as plain text and retry. "
+                        "(至少需要一段文案文本才能本地化，本 skill 不接视频/音频文件。)"
+                    )
+
+                region_raw = (target_region or '').strip().lower()
+                if not region_raw:
+                    region = 'mx'
+                elif region_raw in ('mx', 'generic-latam'):
+                    region = region_raw
+                else:
+                    region = 'generic-latam'
+                    warnings.append(
+                        "target_region '%s' is outside v1 scope (only mx/generic-latam are supported); "
+                        "degraded to generic-latam -- see axioms.md axiom 3 known-gap note, not silently "
+                        "mislabeled as mx" % target_region
+                    )
+
+                profile_raw = (register_profile or '').strip().lower()
+                if not profile_raw:
+                    profile = 'default'
+                elif profile_raw in ('default', 'compliance-conservative'):
+                    profile = profile_raw
+                else:
+                    profile = 'default'
+                    warnings.append(
+                        "register_profile '%s' is not a recognized value (only default/compliance-conservative "
+                        "are supported); defaulted to 'default' -- this specific fallback is an extrapolation "
+                        "beyond workflow.md, which only documents an explicit degrade path for target_region, "
+                        "not for register_profile" % register_profile
+                    )
+
+                return {
+                    'target_region': region,
+                    'register_profile': profile,
+                    'input_valid': input_valid,
+                    'input_error': input_error,
+                    'input_warnings_json': json.dumps(warnings, ensure_ascii=False),
+                }
+          variables:
+            - value_selector: [start, source_script]
+              variable: source_script
+            - value_selector: [start, target_region]
+              variable: target_region
+            - value_selector: [start, register_profile]
+              variable: register_profile
+          outputs:
+            target_region:
+              type: string
+            register_profile:
+              type: string
+            input_valid:
+              type: number
+            input_error:
+              type: string
+            input_warnings_json:
+              type: string
+        position: {x: 340, y: 300}
+        positionAbsolute: {x: 340, y: 300}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 108
+
+      - id: input_gate
+        type: custom
+        data:
+          type: if-else
+          title: "class A 校验: source_script 是否非空"
+          desc: "Phase 1 class A gate. Empty/whitespace-only source_script routes straight to a dedicated refusal end node instead of spending an LLM call -- mirrors workflow.md's fixed refusal wording, no guessing/no ghost-writing a script for the user."
+          cases:
+            - id: valid
+              case_id: valid
+              logical_operator: and
+              conditions:
+                - id: input-valid-check
+                  variable_selector: [normalize_inputs, input_valid]
+                  comparison_operator: "="
+                  value: "1"
+                  varType: number
+        position: {x: 640, y: 300}
+        positionAbsolute: {x: 640, y: 300}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+
+      - id: end_input_error
+        type: custom
+        data:
+          type: end
+          title: "输出: 拒绝(缺少源文案)"
+          outputs:
+            - variable: result
+              value_selector: [normalize_inputs, input_error]
+              value_type: string
+        position: {x: 940, y: 560}
+        positionAbsolute: {x: 940, y: 560}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+
+      - id: localize_loop
+        type: custom
+        data:
+          type: loop
+          title: "本地化生成 + 四公理校验循环 (最多 3 次尝试)"
+          desc: "Bounded regenerate-on-fail loop, ported from workflow.md Phase 2's self-check-and-fix cycle and axiom 1's explicit '单轮压缩重写上限 2 次' cap (so 1 initial attempt + 2 retries = 3). Breaks early once fully_clean=1 (all four axioms clean). If axioms 2/3/4 are clean but axiom 1 (compression) is still off after 3 attempts, the loop still exits (hard_fail_count=0) and route_result ships the closest version with a warning, matching workflow.md's documented degrade-not-block behavior for compression specifically. If axiom 2/3/4 are still dirty after 3 attempts, route_result hard-rejects -- schema.json has no ship-with-warning escape hatch for those three."
+          loop_count: 5
+          logical_operator: or
+          loop_variables:
+            - id: lv-attempt
+              label: attempt
+              value: "0"
+              value_type: constant
+              var_type: number
+            - id: lv-fully-clean
+              label: fully_clean
+              value: "0"
+              value_type: constant
+              var_type: number
+            - id: lv-hard-fail-count
+              label: hard_fail_count
+              value: "0"
+              value_type: constant
+              var_type: number
+            - id: lv-localized-script
+              label: localized_script
+              value: ""
+              value_type: constant
+              var_type: string
+            - id: lv-compression-ratio
+              label: compression_ratio
+              value: "0"
+              value_type: constant
+              var_type: number
+            - id: lv-warnings-json
+              label: warnings_json
+              value: "[]"
+              value_type: constant
+              var_type: string
+            - id: lv-errors-json
+              label: errors_json
+              value: "[]"
+              value_type: constant
+              var_type: string
+          break_conditions:
+            - id: bc-fully-clean
+              variable_selector: [localize_loop, fully_clean]
+              comparison_operator: "="
+              value: "1"
+              varType: number
+            - id: bc-attempt-cap
+              variable_selector: [localize_loop, attempt]
+              comparison_operator: "≥"
+              value: "3"
+              varType: number
+          start_node_id: localize_loop_start
+          width: 1060
+          height: 300
+        position: {x: 960, y: 160}
+        positionAbsolute: {x: 960, y: 160}
+        sourcePosition: right
+        targetPosition: left
+        width: 1060
+        height: 300
+        zIndex: 1
+
+      - id: localize_loop_start
+        parentId: localize_loop
+        type: custom-loop-start
+        draggable: false
+        selectable: false
+        data:
+          type: loop-start
+          title: ""
+          isInLoop: true
+        position: {x: 40, y: 120}
+        positionAbsolute: {x: 1000, y: 280}
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+
+      - id: generate_llm
+        parentId: localize_loop
+        type: custom
+        data:
+          type: llm
+          title: "生成/重写西语本地化文案"
+          desc: "Phase 2A (register decision) + 2B (natural-language rewrite) + 2C (compression) reasoning. On attempt 0 this is a fresh localization; on retries the prompt feeds back the previous attempt plus the specific validator errors so the model fixes only what failed instead of starting over."
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.5
+          prompt_template:
+            - id: localize-system
+              role: system
+              text: |
+                You are the localization engine for 100x-localize, step 2c of the 100x TikTok ad-creative
+                pipeline. Your ONLY job: take one source ad script (any source language) and produce a
+                Mexican-Spanish-default localized version, following four hard axioms and a natural-delivery
+                style. This is a machine-checked pipeline -- a validator re-checks your output after you
+                respond, so follow every rule precisely rather than approximately.
+
+                OUTPUT FORMAT (strict): reply with ONLY one JSON object, no markdown code fences, no
+                commentary before or after. Exact shape:
+                {"localized_script": "<the Spanish localized script>", "warnings": ["<short string>", ...]}
+                warnings is a plain array of short strings noting any source claim you softened, removed, or
+                compressed away, and why. Use an empty array if there is nothing to flag.
+
+                AXIOM 1 -- COMPRESSION (this skill's most distinctive rule): localized_script's character
+                count must be between 0.5x and 1.10x source_script's character count. Spanish naturally runs
+                about 19% longer than English for the same content, so translating literally WILL blow the
+                ceiling -- you must actively compress, not translate word-for-word. Priority order when
+                cutting: (1) drop a sentence that repeats a claim already made elsewhere more informatively,
+                (2) collapse stacked adjective/adverb phrases into one concrete word, (3) use a short native
+                Spanish idiom instead of a literal rendering of an English wordy construction. NEVER cut the
+                mechanism, the CTA, or a key number just to hit the ratio -- cut decorative repetition first,
+                never facts. Every time you fully drop a sentence's information for length, add one warnings
+                entry describing what you cut and why.
+
+                AXIOM 2 -- REGISTER (behavior depends on REGISTER_PROFILE below):
+                - REGISTER_PROFILE=='default': preserve the source script's original claim intensity and
+                  style. Do not sanitize or soften strong claims -- this skill's real reference corpus is
+                  majority high-intensity ('blackhat') register, and 'default' is calibrated to match that
+                  real distribution, not a conservative style guide.
+                - REGISTER_PROFILE=='compliance-conservative': avoid writing any of these five no-evidence
+                  claim archetypes: (a) permanent-life-change claims ("transforms your life forever"),
+                  (b) instant-total-cure claims ("cures/fixes completely in the blink of an eye, forever"),
+                  (c) unverified mass-adoption claims ("everyone is already using this right now"),
+                  (d) fake regulatory approval ("officially approved by the FDA"), (e) fake academic
+                  authority ("Harvard specialists confirm it"). Instead rewrite the underlying claim using
+                  one of these six real-fact-only templates, filling in ONLY facts actually present in
+                  SOURCE_SCRIPT: everyday scenario, curiosity angle, real reason, shorter path, before/after
+                  contrast, concrete data point. Log in warnings which source claim you softened and what
+                  replaced it.
+
+                AXIOM 3 -- PERSON (universal: applies no matter which REGISTER_PROFILE or TARGET_REGION):
+                use "tu" throughout. NEVER write "usted", "ustedes", "vosotros", or "vosotras" anywhere, in
+                any capitalization. Omit the subject pronoun where natural instead of forcing "tu" into every
+                sentence. Use native Spanish connectors (por eso / pero / asi que / porque / ahora) rather
+                than mirroring the source script's sentence connectors literally.
+
+                AXIOM 4 -- NO FABRICATED AUTHORITY: never introduce an FDA, Harvard, OMS/WHO, or
+                "clinically proven"-style claim unless SOURCE_SCRIPT already contains that same claim (in
+                any spelling or language). Preserve product names, brand names, ingredient names, and model
+                numbers exactly as written in SOURCE_SCRIPT -- do not translate or alter them.
+
+                STYLE: write as if a real person is talking straight to camera. Short sentences, common
+                everyday verbs, one idea per sentence -- never stack two ideas or two subordinate clauses
+                into one sentence. Never use hedging filler ("let me", "perhaps", "maybe", "let's") or
+                AI-customer-service phrasing ("as an AI", "I'd be happy to", "feel free to").
+
+                RETRY HANDLING: PREVIOUS_ATTEMPT and PREVIOUS_ERRORS below may be empty (this is attempt 0,
+                the first try) or populated (a prior attempt was rejected by the validator). If empty, write
+                a fresh localization from scratch. If populated, PREVIOUS_ATTEMPT failed for the reasons in
+                PREVIOUS_ERRORS -- revise it to fix exactly those issues while keeping everything that was
+                already working. Do not regress something that was already correct just to fix something
+                else.
+            - id: localize-user
+              role: user
+              text: |
+                SOURCE_SCRIPT:
+                {{#start.source_script#}}
+
+                TARGET_REGION: {{#normalize_inputs.target_region#}}
+                REGISTER_PROFILE: {{#normalize_inputs.register_profile#}}
+                ATTEMPT_NUMBER: {{#localize_loop.attempt#}} (0 means this is the first attempt)
+
+                PREVIOUS_ATTEMPT (empty if this is attempt 0):
+                {{#localize_loop.localized_script#}}
+
+                PREVIOUS_ERRORS (JSON array, empty if this is attempt 0):
+                {{#localize_loop.errors_json#}}
+
+                Produce the localized_script now. Reply with ONLY the JSON object described in the system
+                instructions.
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          isInLoop: true
+          isInIteration: false
+          loop_id: localize_loop
+        position: {x: 130, y: 60}
+        positionAbsolute: {x: 1090, y: 220}
+        sourcePosition: right
+        targetPosition: left
+        width: 280
+        height: 210
+        zIndex: 1002
+
+      - id: validate_code
+        parentId: localize_loop
+        type: custom
+        data:
+          type: code
+          title: "四公理校验 (压缩比/语域/人称/防臆造权威)"
+          desc: "The real, runnable enforcement, ported from scripts/validate.js's compressionCheck/secondaryPatternCheck/fabricatedAuthorityCheck. Always checks the invisible-char-and-diacritic-normalized text (collapses the original's two-layer ajv-raw-pattern + hand-written-secondary-normalized-pattern structure into one always-normalized check, which is a strict superset of what the original ajv-alone layer would catch -- see notes file). hard_fail_count counts axiom 2/3/4 violations only; axiom 1 (compression) is tracked separately via compression_ratio because workflow.md documents a ship-with-warning fallback for compression specifically, not for the other three."
+          code_language: python3
+          code: |
+            def main(llm_raw_text: str, source_script: str, target_region: str, register_profile: str) -> dict:
+                import json
+                import re
+                import unicodedata
+
+                INVISIBLE_CODEPOINTS = [0x200b, 0x200c, 0x200d, 0xfeff, 0x2060, 0x00ad]
+                INVISIBLE_RE = re.compile('[' + ''.join(chr(c) for c in INVISIBLE_CODEPOINTS) + ']')
+
+                def strip_invisible(text):
+                    return INVISIBLE_RE.sub('', text or '')
+
+                def strip_diacritics(text):
+                    nfd = unicodedata.normalize('NFD', text or '')
+                    return ''.join(ch for ch in nfd if unicodedata.category(ch) != 'Mn')
+
+                def collapse_spaced_acronyms(text):
+                    s = text or ''
+                    s = re.sub(r'\b(?:[A-Z][.\s]+){1,5}[A-Z]\b', lambda m: re.sub(r'[.\s]+', '', m.group(0)), s)
+                    s = re.sub(r'\b(?:[A-Za-z]\.){2,6}', lambda m: m.group(0).replace('.', ''), s)
+                    return s
+
+                # ---- parse the LLM's raw text as JSON (tolerate ```json fences) ----
+                raw = (llm_raw_text or '').strip()
+                if raw.startswith('```'):
+                    raw = re.sub(r'^```[a-zA-Z]*\s*', '', raw)
+                    raw = re.sub(r'```\s*$', '', raw)
+                    raw = raw.strip()
+                json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+                parsed = None
+                parse_error = ''
+                if json_match:
+                    try:
+                        parsed = json.loads(json_match.group(0))
+                    except Exception as exc:
+                        parse_error = str(exc)
+                else:
+                    parse_error = 'no JSON object found in model output'
+
+                errors = []
+                llm_warnings = []
+                localized_script = ''
+                if isinstance(parsed, dict):
+                    localized_script = str(parsed.get('localized_script') or '')
+                    raw_warnings = parsed.get('warnings')
+                    if isinstance(raw_warnings, list):
+                        llm_warnings = [str(item) for item in raw_warnings]
+                if not parsed:
+                    errors.append('[parse] model output was not valid JSON: ' + (parse_error or 'unknown error'))
+
+                hard_fail_count = 0
+
+                if not localized_script.strip():
+                    hard_fail_count += 1
+                    errors.append('[parse] localized_script is empty or missing from model output')
+
+                src = source_script or ''
+                src_len = len(src)
+                out_len = len(localized_script)
+                ratio = (out_len / src_len) if src_len > 0 else 0.0
+                axiom1_ok = 1
+                if localized_script.strip() and src_len > 0:
+                    if ratio > 1.10:
+                        axiom1_ok = 0
+                        errors.append(
+                            '[axiom1] compression ceiling exceeded: ratio=%.3f (source %d chars -> localized '
+                            '%d chars), must be <=1.10 -- rewrite must compress, not literally translate'
+                            % (ratio, src_len, out_len)
+                        )
+                    elif ratio < 0.5:
+                        axiom1_ok = 0
+                        errors.append(
+                            '[axiom1] output too short relative to source: ratio=%.3f (source %d chars -> '
+                            'localized %d chars), must be >=0.5 -- looks like content was gutted, not '
+                            'compressed' % (ratio, src_len, out_len)
+                        )
+
+                if localized_script.strip():
+                    norm3 = strip_diacritics(strip_invisible(localized_script))
+                    if re.search(r'\busted(es)?\b', norm3, re.IGNORECASE) or re.search(
+                        r'\bvosotr[oa]s\b', norm3, re.IGNORECASE
+                    ):
+                        hard_fail_count += 1
+                        errors.append(
+                            '[axiom3] localized_script contains usted/ustedes/vosotros/vosotras (checked '
+                            'after stripping invisible Unicode characters and diacritics) -- must use tu '
+                            'throughout, no exceptions'
+                        )
+
+                if register_profile == 'compliance-conservative' and localized_script.strip():
+                    norm2 = strip_diacritics(strip_invisible(localized_script)).lower()
+                    banned_patterns = [
+                        r'te\s+transforma\s+la\s+vida\s+por\s+completo\s+y\s+para\s+siempre',
+                        r'erradica\s+en\s+un\s+abrir\s+y\s+cerrar\s+de\s+ojos[,\s]+para\s+siempre',
+                        r'suprime\s+en\s+un\s+abrir\s+y\s+cerrar\s+de\s+ojos[,\s]+para\s+siempre',
+                        r'sana\s+en\s+un\s+abrir\s+y\s+cerrar\s+de\s+ojos[,\s]+para\s+siempre',
+                        r'todo\s+el\s+mundo\s+ya\s+lo\s+esta\s+usando\s+ahorita',
+                        r'cuenta\s+con\s+aprobacion\s+oficial\s+de\s+la\s+fda',
+                        r'segun\s+especialistas\s+de\s+harvard\s+lo\s+aseguran',
+                    ]
+                    for pattern in banned_patterns:
+                        if re.search(pattern, norm2):
+                            hard_fail_count += 1
+                            errors.append(
+                                '[axiom2] register_profile=="compliance-conservative" but localized_script '
+                                'matches a banned no-evidence claim archetype (pattern: ' + pattern + ') -- '
+                                'rewrite using one of the six fact-only hook templates instead'
+                            )
+                            break
+
+                if localized_script.strip():
+                    src_norm = strip_diacritics(collapse_spaced_acronyms(strip_invisible(src))).lower()
+                    out_norm = strip_diacritics(collapse_spaced_acronyms(strip_invisible(localized_script))).lower()
+                    authority_tokens = [
+                        ('FDA', ['fda']),
+                        ('Harvard', ['harvard']),
+                        ('OMS/WHO', ['oms', 'who', 'world health organization', 'organizacion mundial de la salud']),
+                        ('clinical-proof wording', [
+                            'clinicamente probado', 'clinically proven', 'estudio clinico',
+                            'clinical trial', 'clinical study',
+                        ]),
+                    ]
+                    for label, variants in authority_tokens:
+                        in_out = any(variant in out_norm for variant in variants)
+                        in_src = any(variant in src_norm for variant in variants)
+                        if in_out and not in_src:
+                            hard_fail_count += 1
+                            errors.append(
+                                '[axiom4] localized_script introduces a "' + label + '"-type authority/'
+                                'certification claim that is not present anywhere in source_script -- looks '
+                                'fabricated during localization'
+                            )
+
+                fully_clean = 1 if (hard_fail_count == 0 and axiom1_ok == 1) else 0
+
+                return {
+                    'localized_script': localized_script,
+                    'compression_ratio': round(ratio, 3),
+                    'hard_fail_count': hard_fail_count,
+                    'fully_clean': fully_clean,
+                    'warnings_json': json.dumps(llm_warnings, ensure_ascii=False),
+                    'errors_json': json.dumps(errors, ensure_ascii=False),
+                }
+          variables:
+            - value_selector: [generate_llm, text]
+              variable: llm_raw_text
+            - value_selector: [start, source_script]
+              variable: source_script
+            - value_selector: [normalize_inputs, target_region]
+              variable: target_region
+            - value_selector: [normalize_inputs, register_profile]
+              variable: register_profile
+          outputs:
+            localized_script:
+              type: string
+            compression_ratio:
+              type: number
+            hard_fail_count:
+              type: number
+            fully_clean:
+              type: number
+            warnings_json:
+              type: string
+            errors_json:
+              type: string
+          isInLoop: true
+          isInIteration: false
+          loop_id: localize_loop
+        position: {x: 460, y: 90}
+        positionAbsolute: {x: 1420, y: 250}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 140
+        zIndex: 1002
+
+      - id: record_attempt
+        parentId: localize_loop
+        type: custom
+        data:
+          type: assigner
+          title: "写回本轮尝试结果到循环变量"
+          version: "2"
+          isInIteration: false
+          isInLoop: true
+          loop_id: localize_loop
+          items:
+            - variable_selector: [localize_loop, attempt]
+              input_type: constant
+              operation: "+="
+              value: 1
+              write_mode: over-write
+            - variable_selector: [localize_loop, fully_clean]
+              input_type: variable
+              operation: over-write
+              value: [validate_code, fully_clean]
+              write_mode: over-write
+            - variable_selector: [localize_loop, hard_fail_count]
+              input_type: variable
+              operation: over-write
+              value: [validate_code, hard_fail_count]
+              write_mode: over-write
+            - variable_selector: [localize_loop, localized_script]
+              input_type: variable
+              operation: over-write
+              value: [validate_code, localized_script]
+              write_mode: over-write
+            - variable_selector: [localize_loop, compression_ratio]
+              input_type: variable
+              operation: over-write
+              value: [validate_code, compression_ratio]
+              write_mode: over-write
+            - variable_selector: [localize_loop, warnings_json]
+              input_type: variable
+              operation: over-write
+              value: [validate_code, warnings_json]
+              write_mode: over-write
+            - variable_selector: [localize_loop, errors_json]
+              input_type: variable
+              operation: over-write
+              value: [validate_code, errors_json]
+              write_mode: over-write
+        position: {x: 790, y: 90}
+        positionAbsolute: {x: 1750, y: 250}
+        sourcePosition: right
+        targetPosition: left
+        width: 220
+        height: 170
+        zIndex: 1002
+
+      - id: route_result
+        type: custom
+        data:
+          type: if-else
+          title: "硬性公理(2/3/4)本轮是否全部通过"
+          desc: "Routes on hard_fail_count only, not on fully_clean -- if axioms 2/3/4 are clean but compression (axiom 1) is still outside [0.5,1.10] after 3 attempts, this still ships (with a warning), matching workflow.md's documented degrade behavior for compression specifically. Only a lingering axiom 2/3/4 violation hard-fails."
+          cases:
+            - id: ship
+              case_id: ship
+              logical_operator: and
+              conditions:
+                - id: hard-fail-zero-check
+                  variable_selector: [localize_loop, hard_fail_count]
+                  comparison_operator: "="
+                  value: "0"
+                  varType: number
+        position: {x: 2100, y: 300}
+        positionAbsolute: {x: 2100, y: 300}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+
+      - id: format_success
+        type: custom
+        data:
+          type: code
+          title: "组装最终产出 (LocalizationBundle)"
+          desc: "Assembles the schema.json-shaped LocalizationBundle (source_script/target_region/register_profile/localized_script/meta). If compression is still off after 3 attempts, appends the same 'kept the closest version, flagged for human review' warning workflow.md specifies for exhausted axiom-1 retries."
+          code_language: python3
+          code: |
+            def main(source_script: str, target_region: str, register_profile: str, localized_script: str,
+                     compression_ratio: float, warnings_json: str, input_warnings_json: str, attempt: float) -> dict:
+                import json
+
+                try:
+                    loop_warnings = json.loads(warnings_json) if warnings_json else []
+                except Exception:
+                    loop_warnings = []
+                try:
+                    input_warnings = json.loads(input_warnings_json) if input_warnings_json else []
+                except Exception:
+                    input_warnings = []
+
+                all_warnings = list(input_warnings) + list(loop_warnings)
+
+                ratio = compression_ratio or 0
+                if ratio > 1.10 or (0 < ratio < 0.5):
+                    all_warnings.append(
+                        'compression ratio still %.3f after %d attempt(s) (must be <=1.10 and >=0.5); kept '
+                        'the closest version and shipped it flagged rather than blocking delivery, per '
+                        'workflow.md Phase 2 failure handling for axiom 1 -- recommend human review'
+                        % (ratio, int(attempt or 0))
+                    )
+
+                bundle = {
+                    'source_script': source_script or '',
+                    'target_region': target_region,
+                    'register_profile': register_profile,
+                    'localized_script': localized_script or '',
+                    'meta': {
+                        'generated_by': '100x-localize',
+                        'compression_ratio': round(ratio, 3),
+                        'warnings': all_warnings,
+                    },
+                }
+                return {'bundle': bundle}
+          variables:
+            - value_selector: [start, source_script]
+              variable: source_script
+            - value_selector: [normalize_inputs, target_region]
+              variable: target_region
+            - value_selector: [normalize_inputs, register_profile]
+              variable: register_profile
+            - value_selector: [localize_loop, localized_script]
+              variable: localized_script
+            - value_selector: [localize_loop, compression_ratio]
+              variable: compression_ratio
+            - value_selector: [localize_loop, warnings_json]
+              variable: warnings_json
+            - value_selector: [normalize_inputs, input_warnings_json]
+              variable: input_warnings_json
+            - value_selector: [localize_loop, attempt]
+              variable: attempt
+          outputs:
+            bundle:
+              type: object
+        position: {x: 2400, y: 140}
+        positionAbsolute: {x: 2400, y: 140}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 100
+
+      - id: format_failure
+        type: custom
+        data:
+          type: code
+          title: "组装拒绝报告 (超出重试上限)"
+          desc: "Surfaces the SPECIFIC still-failing axiom 2/3/4 checks (not a generic message), plus the best-effort attempt for human review. Unlike axiom 1, schema.json has no ship-with-warning escape hatch for usted/vosotros, banned compliance-conservative phrasing, or fabricated authority claims, so this path is a hard rejection."
+          code_language: python3
+          code: |
+            def main(source_script: str, target_region: str, register_profile: str, localized_script: str,
+                     errors_json: str, attempt: float, compression_ratio: float) -> dict:
+                import json
+
+                try:
+                    errors = json.loads(errors_json) if errors_json else []
+                except Exception:
+                    errors = ['[internal] could not parse errors_json from the validation loop: ' + repr(errors_json)]
+
+                failure_report = {
+                    'status': 'rejected',
+                    'reason': (
+                        'Automatic localization could not clear all hard constraints (axiom 2 register / '
+                        'axiom 3 tu-only / axiom 4 no-fabricated-authority) within %d attempt(s). This is a '
+                        'hard gate -- unlike axiom 1 (compression), schema.json has no ship-with-warning '
+                        'fallback for these three.' % int(attempt or 0)
+                    ),
+                    'failing_checks': errors,
+                    'attempts_used': int(attempt or 0),
+                    'best_effort_localized_script': localized_script or '',
+                    'compression_ratio_of_best_effort': round(compression_ratio or 0, 3),
+                    'source_script': source_script or '',
+                    'target_region': target_region,
+                    'register_profile': register_profile,
+                }
+                return {'failure_report': failure_report}
+          variables:
+            - value_selector: [start, source_script]
+              variable: source_script
+            - value_selector: [normalize_inputs, target_region]
+              variable: target_region
+            - value_selector: [normalize_inputs, register_profile]
+              variable: register_profile
+            - value_selector: [localize_loop, localized_script]
+              variable: localized_script
+            - value_selector: [localize_loop, errors_json]
+              variable: errors_json
+            - value_selector: [localize_loop, attempt]
+              variable: attempt
+            - value_selector: [localize_loop, compression_ratio]
+              variable: compression_ratio
+          outputs:
+            failure_report:
+              type: object
+        position: {x: 2400, y: 460}
+        positionAbsolute: {x: 2400, y: 460}
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 100
+
+      - id: end_success
+        type: custom
+        data:
+          type: end
+          title: "输出: 本地化成功"
+          outputs:
+            - variable: result
+              value_selector: [format_success, bundle]
+              value_type: object
+        position: {x: 2740, y: 140}
+        positionAbsolute: {x: 2740, y: 140}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+
+      - id: end_failure
+        type: custom
+        data:
+          type: end
+          title: "输出: 本地化失败 (超出重试上限)"
+          outputs:
+            - variable: result
+              value_selector: [format_failure, failure_report]
+              value_type: object
+        position: {x: 2740, y: 460}
+        positionAbsolute: {x: 2740, y: 460}
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+
+    edges:
+      - id: start-source-normalize_inputs-target
+        source: start
+        sourceHandle: source
+        target: normalize_inputs
+        targetHandle: target
+        type: custom
+        data: {sourceType: start, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: normalize_inputs-source-input_gate-target
+        source: normalize_inputs
+        sourceHandle: source
+        target: input_gate
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false}
+
+      - id: input_gate-false-end_input_error-target
+        source: input_gate
+        sourceHandle: "false"
+        target: end_input_error
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: end, isInIteration: false, isInLoop: false}
+
+      - id: input_gate-valid-localize_loop-target
+        source: input_gate
+        sourceHandle: valid
+        target: localize_loop
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: loop, isInIteration: false, isInLoop: false}
+
+      - id: localize_loop_start-source-generate_llm-target
+        source: localize_loop_start
+        sourceHandle: source
+        target: generate_llm
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: loop-start
+          targetType: llm
+          isInIteration: false
+          isInLoop: true
+          loop_id: localize_loop
+
+      - id: generate_llm-source-validate_code-target
+        source: generate_llm
+        sourceHandle: source
+        target: validate_code
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: llm
+          targetType: code
+          isInIteration: false
+          isInLoop: true
+          loop_id: localize_loop
+
+      - id: validate_code-source-record_attempt-target
+        source: validate_code
+        sourceHandle: source
+        target: record_attempt
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: code
+          targetType: assigner
+          isInIteration: false
+          isInLoop: true
+          loop_id: localize_loop
+
+      - id: localize_loop-source-route_result-target
+        source: localize_loop
+        sourceHandle: source
+        target: route_result
+        targetHandle: target
+        type: custom
+        data: {sourceType: loop, targetType: if-else, isInIteration: false, isInLoop: false}
+
+      - id: route_result-ship-format_success-target
+        source: route_result
+        sourceHandle: ship
+        target: format_success
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: route_result-false-format_failure-target
+        source: route_result
+        sourceHandle: "false"
+        target: format_failure
+        targetHandle: target
+        type: custom
+        data: {sourceType: if-else, targetType: code, isInIteration: false, isInLoop: false}
+
+      - id: format_success-source-end_success-target
+        source: format_success
+        sourceHandle: source
+        target: end_success
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: end, isInIteration: false, isInLoop: false}
+
+      - id: format_failure-source-end_failure-target
+        source: format_failure
+        sourceHandle: source
+        target: end_failure
+        targetHandle: target
+        type: custom
+        data: {sourceType: code, targetType: end, isInIteration: false, isInLoop: false}

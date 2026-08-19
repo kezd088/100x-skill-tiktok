@@ -1,0 +1,9 @@
+{
+  "name": "100x-persona-skill-tooling",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Dev tooling only, for scripts/validate.js to run schema.json (JSON Schema draft-07) through a real validator instead of hand-written field checks. Not published, not a runtime dependency of the skill itself (the skill's actual deliverable is SKILL.md + the four docs + schema.json + evals/, all consumed by an LLM, not by Node).",
+  "devDependencies": {
+    "ajv": "^6.12.6"
+  }
+}

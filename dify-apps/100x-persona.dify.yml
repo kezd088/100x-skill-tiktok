@@ -1,0 +1,1831 @@
+app:
+  name: "100x-persona · 人物×场景生成器"
+  description: "输入 TikTok/UGC 脚本原文，输出谁来讲（人物）+ 在哪讲（独立场景实体）+ 两者如何绑定脚本原句，逐字可回指原文；四条公理（引用完整性/证据子串/场景防泛化/零孤儿）+ v1.2 自我怀疑短语披露缓解，均由 code 节点复核。"
+  icon: "🎭"
+  icon_type: emoji
+  icon_background: "#FDE7D9"
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: "0.7.0"
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/openai:0.2.11@REPLACE_WITH_REAL_HASH_AFTER_IMPORT
+      version: null
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods: [local_file, remote_url]
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: [local_file, remote_url]
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    viewport: { x: 0, y: 0, zoom: 0.12 }
+    nodes:
+      # ---------------------------------------------------------------
+      # 0. START — class A required source_script + class C optional segments_json
+      # ---------------------------------------------------------------
+      - id: start
+        type: custom
+        position: { x: 40, y: 280 }
+        positionAbsolute: { x: 40, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 116
+        data:
+          title: "开始"
+          type: start
+          variables:
+            - label: "脚本原文 source_script（类别A必填，不接视频文件）"
+              variable: source_script
+              type: paragraph
+              required: true
+              max_length: 50000
+            - label: "上游 100x-segment 产出的 segments（类别C可选，缺失静默跳过）"
+              variable: segments_json
+              type: paragraph
+              required: false
+              max_length: 20000
+
+      # ---------------------------------------------------------------
+      # 1. 早期 KB 检索 —— 减少重复发明，为 delivery_style/visual_props 提供先例
+      # ---------------------------------------------------------------
+      - id: kb_retrieve_similar
+        type: custom
+        position: { x: 320, y: 280 }
+        positionAbsolute: { x: 320, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 110
+        data:
+          title: "检索相似历史人物/场景（占位 dataset_id，需人工重连）"
+          type: knowledge-retrieval
+          dataset_ids:
+            - "REPLACE_WITH_DATASET_ID"
+          query_variable_selector: [start, source_script]
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            top_k: 4
+            reranking_enable: false
+            score_threshold_enabled: false
+            score_threshold: 0
+          metadata_filtering_mode: disabled
+          selected: false
+
+      # ---------------------------------------------------------------
+      # 2. Phase 1a — 候选说话人扫描
+      # ---------------------------------------------------------------
+      - id: llm_identify_candidates
+        type: custom
+        position: { x: 600, y: 280 }
+        positionAbsolute: { x: 600, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 110
+        data:
+          title: "Phase1a 候选说话人扫描"
+          type: llm
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.2
+          prompt_template:
+            - id: "a1b2c3d4-0001-4000-9000-000000000001"
+              role: system
+              text: |
+                你是 100x-persona 技能 Phase 1 的候选说话人扫描器（对应 workflow.md Phase 1
+                "接收后立即做" 第1步）。任务：通读用户提供的完整脚本原文，标出脚本里出现的
+                候选"说话人"（谁在用第一人称/口播视角讲话）。
+
+                规则：
+                - 大多数单人口播脚本只有 1 个候选说话人；只有"第三方见证混剪型"这类脚本才会
+                  出现 >=2 个。
+                - 每个候选说话人输出一条简短线索（<=40字，中文或英文均可），描述这个说话人在
+                  原文中的身份/位置线索，方便后续步骤定位到对应的原文句子。例如：
+                  "以'I've been a night-shift ICU nurse for eleven years'开头自述的说话人"
+                  或 "Person B: 提到住小户型公寓的说话人"。
+                - 如果整份脚本完全没有第一人称口播视角（比如纯参数罗列，没有任何"我"/"I"类
+                  自述句），返回空数组 []，不要编造一个不存在的说话人——这是 workflow.md
+                  Phase1 失败处理明确要求的："连一句可用的语气强句都找不到"时不代猜。
+                - 只输出一个 JSON 数组（字符串元素），不要输出 markdown 代码块，不要输出任何
+                  解释文字。
+            - id: "a1b2c3d4-0001-4000-9000-000000000002"
+              role: user
+              text: |
+                脚本原文：
+                {{#start.source_script#}}
+          context:
+            enabled: false
+            variable_selector: []
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+          selected: false
+
+      - id: code_parse_candidates
+        type: custom
+        position: { x: 900, y: 280 }
+        positionAbsolute: { x: 900, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "解析候选说话人 JSON 数组"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+
+            def main(raw_text: str) -> dict:
+                text = (raw_text or '').strip()
+                # 部分模型仍会包一层 markdown 代码块，尽管提示里已要求不要这样做
+                text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+                text = re.sub(r'```\s*$', '', text).strip()
+                candidates = []
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, list):
+                        candidates = [str(item).strip() for item in parsed if str(item).strip()]
+                except Exception:
+                    candidates = []
+                return {"candidates": candidates, "candidate_count": len(candidates)}
+          variables:
+            - variable: raw_text
+              value_selector: [llm_identify_candidates, text]
+          outputs:
+            candidates:
+              type: array[string]
+            candidate_count:
+              type: number
+          selected: false
+
+      - id: if_has_candidates
+        type: custom
+        position: { x: 1180, y: 280 }
+        positionAbsolute: { x: 1180, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+        data:
+          title: "是否存在候选说话人"
+          type: if-else
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: "cond-candidates-0001"
+                  variable_selector: [code_parse_candidates, candidate_count]
+                  comparison_operator: ">"
+                  value: "0"
+                  varType: number
+          selected: false
+
+      - id: tpl_no_persona_signal
+        type: custom
+        position: { x: 1460, y: 560 }
+        positionAbsolute: { x: 1460, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 60
+        data:
+          title: "拼装：无人物信号失败文案"
+          type: template-transform
+          variables: []
+          template: |
+            这份脚本没有第一人称口播视角，不适合做人物设定，需要先补一版有说话人视角的脚本。
+            （workflow.md Phase1 失败处理：通读后连一句可用的语气强句都找不到——不代猜、不代笔改写脚本本身。）
+          selected: false
+
+      - id: end_no_persona_signal
+        type: custom
+        position: { x: 1760, y: 560 }
+        positionAbsolute: { x: 1760, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "结束：无人物信号"
+          type: end
+          outputs:
+            - variable: message
+              value_selector: [tpl_no_persona_signal, output]
+              value_type: string
+
+      # ---------------------------------------------------------------
+      # 3. Phase 1b — 逐候选人反推 Authority/Pain 证据（iteration）
+      # ---------------------------------------------------------------
+      - id: iteration_phase1_personas
+        type: custom
+        position: { x: 1460, y: 180 }
+        positionAbsolute: { x: 1460, y: 180 }
+        sourcePosition: right
+        targetPosition: left
+        width: 460
+        height: 210
+        zIndex: 1
+        data:
+          title: "Phase1b 逐人物反推 Authority/Pain"
+          type: iteration
+          iterator_selector: [code_parse_candidates, candidates]
+          iterator_input_type: array[string]
+          output_selector: [llm_extract_persona, text]
+          output_type: array[string]
+          is_parallel: false
+          parallel_nums: 10
+          error_handle_mode: terminated
+          start_node_id: iteration_phase1_start
+
+      - id: iteration_phase1_start
+        parentId: iteration_phase1_personas
+        type: custom-iteration-start
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 76 }
+        positionAbsolute: { x: 1484, y: 256 }
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+        data:
+          title: ""
+          type: iteration-start
+          isInIteration: true
+
+      - id: llm_extract_persona
+        parentId: iteration_phase1_personas
+        type: custom
+        position: { x: 140, y: 60 }
+        positionAbsolute: { x: 1600, y: 240 }
+        sourcePosition: right
+        targetPosition: left
+        width: 280
+        height: 120
+        zIndex: 1002
+        data:
+          title: "单人物 Authority+Pain 抽取"
+          type: llm
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_phase1_personas
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.2
+          prompt_template:
+            - id: "a1b2c3d4-0002-4000-9000-000000000001"
+              role: system
+              text: |
+                你是 100x-persona 技能 Phase 1 的单人物证据抽取器（workflow.md Phase1 步骤2-5，
+                判据见 axioms.md 公理2）。你正在处理下面这一个候选说话人线索，只产出这一个人物。
+
+                本轮候选说话人线索：{{#iteration_phase1_personas.item#}}
+
+                如果检索到的历史先例 context 中有相似人物，可参考其 delivery_style/
+                relationship_to_camera 的措辞习惯（不是抄用其人物本身），context 为空时忽略：
+                {{#context#}}
+
+                必须按下面规则抽取（原文见用户消息里的完整脚本）：
+
+                1. Authority 信号（对应口播文案蓝图模块2）：扫描这个说话人的自我身份/经历宣称句
+                   （"I've been a ... for N years" / "As a ..." / "I'm a ..." 这类第一人称
+                   身份或经历宣称，资质型或经历型均可——真实 UGC 脚本经常没有正式资质，"产后
+                   亲身经历"这类同理型信任同样合法，见 axioms.md 公理2"关于'权威'不要求正式
+                   资质"）。
+                2. Pain 信号（对应口播文案蓝图模块3）：扫描这个说话人的人群点名句（"If you're
+                   a ..." / "For anyone who ..." / 具体痛点描述句）。
+                3. 【硬性红线】authority_evidence_quote 和 audience_pain_quote 必须是脚本原文
+                   里逐字出现的一段话——大小写不区分子串匹配，但不许改写、不许概括、不许翻译、
+                   不许替换同义词。下游会用 `quote in source_script` 做逐字校验，任何复述都会
+                   FAIL。
+                4. authority_basis / audience_fit 是对上面两条引文的一句话中文总结（总结本身
+                   可以意译，但引文字段不行）。
+                5. delivery_style：一句话概括语气/人称/口语程度。
+                6. relationship_to_camera：只能是这 5 个闭集枚举值之一：direct-to-camera /
+                   confessional / testimonial-witness / voice-over / duo-dialogue。
+                7. appearance_note：可选，一句话着装/视觉描述，不是生成提示词。
+                8. 【降级路径，仅当这个说话人完全没有身份宣称句/人群点名句时启用】改用这个说
+                   话人语气最强的一句话作为替代锚点（仍必须是原文逐字子串，不是留空、不是编
+                   一句原文没有的话），并把 degraded 设为 true，degrade_reason 写清楚原因。
+                9. 【自我怀疑短语自检，v1.2 缓解机制】检查你选的 authority_evidence_quote 是
+                   否命中下面这个闭集短语表（不区分大小写子串匹配）：
+                   英文：if you don't believe me / you don't have to believe me / don't take
+                   my word for it / i'm not sure / i am not sure / i don't know if / maybe
+                   i'm wrong / i could be wrong / who knows / not 100% sure / i doubt
+                   中文：如果你不信我 / 你可以不信 / 不管你信不信 / 信不信由你 / 我不确定 /
+                   我也不知道 / 也许我 / 谁知道呢 / 说实话我也没底
+                   命中则 hedge_self_flagged 设为 true，hedge_note 写清楚命中了哪个短语、为
+                   什么仍选它（如果有更好的候选锚点句，优先换一句，避免命中）。
+
+                严格只输出下面这个 JSON 对象，不要 markdown 代码块，不要解释文字：
+                {
+                  "persona_item": {
+                    "identity_label": "...",
+                    "authority_basis": "...",
+                    "authority_evidence_quote": "...",
+                    "audience_fit": "...",
+                    "audience_pain_quote": "...",
+                    "delivery_style": "...",
+                    "relationship_to_camera": "...",
+                    "appearance_note": "..."
+                  },
+                  "degraded": false,
+                  "degrade_reason": null,
+                  "hedge_self_flagged": false,
+                  "hedge_note": null
+                }
+            - id: "a1b2c3d4-0002-4000-9000-000000000002"
+              role: user
+              text: |
+                完整脚本原文（逐字核对用，所有引文必须能在这段原文里逐字找到）：
+                {{#start.source_script#}}
+          context:
+            enabled: true
+            variable_selector: [kb_retrieve_similar, result]
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+          selected: false
+
+      - id: code_assemble_personas
+        type: custom
+        position: { x: 1980, y: 280 }
+        positionAbsolute: { x: 1980, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "组装 personas map + 生成 PERSONA_ID"
+          type: code
+          code_language: python3
+          code: |
+            import json
+
+
+            def main(items: list) -> dict:
+                personas = {}
+                warnings = []
+                idx = 0
+                for raw in (items or []):
+                    idx += 1
+                    pid = f"PERSONA_{idx}"
+                    try:
+                        parsed = json.loads(raw) if isinstance(raw, str) else (raw or {})
+                    except Exception:
+                        warnings.append(
+                            f"{pid} 解析失败，Phase1 LLM 未返回合法 JSON，已跳过"
+                            f"（原始内容前200字：{str(raw)[:200]}）"
+                        )
+                        continue
+                    item = parsed.get("persona_item") if isinstance(parsed, dict) else None
+                    if not isinstance(item, dict):
+                        warnings.append(f"{pid} 缺少 persona_item 字段，已跳过")
+                        continue
+                    personas[pid] = item
+                    if parsed.get("degraded"):
+                        reason = parsed.get("degrade_reason") or "未说明具体原因"
+                        warnings.append(
+                            f"{pid} 权威/人群证据信号弱，已用替代锚点句，建议人工复核（{reason}）"
+                        )
+                    if parsed.get("hedge_self_flagged"):
+                        note = parsed.get("hedge_note") or "命中闭集自我怀疑短语"
+                        warnings.append(
+                            f"{pid} authority_evidence_quote 含疑似自我怀疑(hedge)表述，"
+                            f"建议人工复核语义方向（{note}）"
+                        )
+                return {"personas": personas, "persona_warnings": warnings}
+          variables:
+            - variable: items
+              value_selector: [iteration_phase1_personas, output]
+          outputs:
+            personas:
+              type: object
+            persona_warnings:
+              type: array[string]
+          selected: false
+
+      # ---------------------------------------------------------------
+      # 4. Phase 2a — 场景线索簇扫描
+      # ---------------------------------------------------------------
+      - id: llm_identify_scene_clusters
+        type: custom
+        position: { x: 2260, y: 280 }
+        positionAbsolute: { x: 2260, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 110
+        data:
+          title: "Phase2a 场景线索簇扫描"
+          type: llm
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.2
+          prompt_template:
+            - id: "a1b2c3d4-0003-4000-9000-000000000001"
+              role: system
+              text: |
+                你是 100x-persona 技能 Phase 2 的场景线索扫描器（workflow.md Phase2"必做动作"
+                第1-2步）。通读脚本，标出脚本里出现的每一个不同的"场景线索簇"：地点词
+                （bathroom / bedroom / break room / gym 等）、动作词暗示的位置（"toss a few
+                in my bag"暗示携带场景、"couch"暗示休息室）、时间/节点词（"before bed" /
+                "right after I get home" / "between shifts"）。
+
+                【关键规则，对应公理1"场景是独立实体"】同一个人物在脚本里出现在2个不同地点，
+                要拆成2个场景线索簇，不能因为是同一个人物就合并成1个——场景是独立实体，不是
+                人物的附属描述。阶梯时间线型脚本（如 Day1 -> Day14）的不同时间阶段，即使地点
+                相近，只要触发时刻不同，也应拆成独立场景线索簇。
+
+                每个场景线索簇输出一条简短线索（<=40字），描述这个场景在原文中的位置/触发词，
+                方便后续步骤定位到对应的原文句子。
+
+                如果脚本是纯棚拍无场景暗示的口播（比如对着白墙念参数，没有任何地点/动作/时间
+                线索），返回空数组 []，不要编造脚本里不存在的场景——这是 workflow.md Phase2
+                失败处理明确要求的。
+
+                只输出一个 JSON 数组（字符串元素），不要输出 markdown 代码块，不要输出任何解
+                释文字。
+            - id: "a1b2c3d4-0003-4000-9000-000000000002"
+              role: user
+              text: |
+                脚本原文：
+                {{#start.source_script#}}
+          context:
+            enabled: false
+            variable_selector: []
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+          selected: false
+
+      - id: code_parse_scene_clusters
+        type: custom
+        position: { x: 2560, y: 280 }
+        positionAbsolute: { x: 2560, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "解析场景线索簇 JSON 数组"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+
+            def main(raw_text: str) -> dict:
+                text = (raw_text or '').strip()
+                text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+                text = re.sub(r'```\s*$', '', text).strip()
+                hints = []
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, list):
+                        hints = [str(item).strip() for item in parsed if str(item).strip()]
+                except Exception:
+                    hints = []
+                return {"scene_hints": hints, "scene_count": len(hints)}
+          variables:
+            - variable: raw_text
+              value_selector: [llm_identify_scene_clusters, text]
+          outputs:
+            scene_hints:
+              type: array[string]
+            scene_count:
+              type: number
+          selected: false
+
+      - id: if_has_scenes
+        type: custom
+        position: { x: 2840, y: 280 }
+        positionAbsolute: { x: 2840, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+        data:
+          title: "是否存在场景线索"
+          type: if-else
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: "cond-scenes-0001"
+                  variable_selector: [code_parse_scene_clusters, scene_count]
+                  comparison_operator: ">"
+                  value: "0"
+                  varType: number
+          selected: false
+
+      - id: tpl_no_scene_signal
+        type: custom
+        position: { x: 3120, y: 560 }
+        positionAbsolute: { x: 3120, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 60
+        data:
+          title: "拼装：无场景信号失败文案"
+          type: template-transform
+          variables: []
+          template: |
+            这份脚本没有可辨识的场景线索，无法独立建场景实体，需要人工补充拍摄场景设定。
+            （workflow.md Phase2 失败处理：不代笔编造脚本里不存在的场景细节。）
+          selected: false
+
+      - id: end_no_scene_signal
+        type: custom
+        position: { x: 3420, y: 560 }
+        positionAbsolute: { x: 3420, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "结束：无场景信号"
+          type: end
+          outputs:
+            - variable: message
+              value_selector: [tpl_no_scene_signal, output]
+              value_type: string
+
+      # ---------------------------------------------------------------
+      # 5. Phase 2b — 逐场景建模（iteration）
+      # ---------------------------------------------------------------
+      - id: iteration_phase2_scenes
+        type: custom
+        position: { x: 3120, y: 180 }
+        positionAbsolute: { x: 3120, y: 180 }
+        sourcePosition: right
+        targetPosition: left
+        width: 460
+        height: 210
+        zIndex: 1
+        data:
+          title: "Phase2b 逐场景独立建模"
+          type: iteration
+          iterator_selector: [code_parse_scene_clusters, scene_hints]
+          iterator_input_type: array[string]
+          output_selector: [llm_extract_scene, text]
+          output_type: array[string]
+          is_parallel: false
+          parallel_nums: 10
+          error_handle_mode: terminated
+          start_node_id: iteration_phase2_start
+
+      - id: iteration_phase2_start
+        parentId: iteration_phase2_scenes
+        type: custom-iteration-start
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 76 }
+        positionAbsolute: { x: 3144, y: 256 }
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+        data:
+          title: ""
+          type: iteration-start
+          isInIteration: true
+
+      - id: llm_extract_scene
+        parentId: iteration_phase2_scenes
+        type: custom
+        position: { x: 140, y: 60 }
+        positionAbsolute: { x: 3260, y: 240 }
+        sourcePosition: right
+        targetPosition: left
+        width: 280
+        height: 120
+        zIndex: 1002
+        data:
+          title: "单场景微观坐标建模"
+          type: llm
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_phase2_scenes
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.25
+          prompt_template:
+            - id: "a1b2c3d4-0004-4000-9000-000000000001"
+              role: system
+              text: |
+                你是 100x-persona 技能 Phase 2 的单场景建模器（workflow.md Phase2"必做动作"
+                第2步，判据见 axioms.md 公理3）。你正在处理下面这一个场景线索簇，只产出这一
+                个场景。
+
+                本轮场景线索：{{#iteration_phase2_scenes.item#}}
+
+                如果检索到的历史先例 context 中有相似场景，可参考其 visual_props 的具体化
+                程度（不是抄用其场景本身），context 为空时忽略：
+                {{#context#}}
+
+                必须产出这些字段：
+                - scene_name：这个场景的简短标签。
+                - trigger_moment：这个场景在人物一天/一生里的什么触发时刻发生（不是"随时"，
+                  要具体到"下班回家换鞋前"这种颗粒度）。
+                - location：物理地点环境。
+                - micro_coordinate：地点内的具体机位/具体动作坐标，必须比 location 更细一级
+                  （例如"衣柜门把手"而不是重复"衣柜"），不能只是把 location 换个说法重复一遍。
+                - visual_props：至少2件画面里会出现的具体物件（通用品类词，不发明具体品牌/
+                  产品名，不写死任何客户品类词典）。
+                - atmosphere：一句话光线/情绪基调。
+
+                【硬性红线，对应公理3闭集泛化词表】trigger_moment / location / micro_coordinate
+                三个字段绝对不能出现下面任何一个词：某处、随便、某个地方、某场景、某个场景、
+                某个地点、某地、某时、待定、TBD、tbd、somewhere、Somewhere、anywhere、
+                Anywhere。命中任一词下游会直接 FAIL。
+
+                严格只输出下面这个 JSON 对象，不要 markdown 代码块，不要解释文字：
+                {
+                  "scene_item": {
+                    "scene_name": "...",
+                    "trigger_moment": "...",
+                    "location": "...",
+                    "micro_coordinate": "...",
+                    "visual_props": ["...", "..."],
+                    "atmosphere": "..."
+                  }
+                }
+            - id: "a1b2c3d4-0004-4000-9000-000000000002"
+              role: user
+              text: |
+                完整脚本原文（定位场景触发点用）：
+                {{#start.source_script#}}
+          context:
+            enabled: true
+            variable_selector: [kb_retrieve_similar, result]
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+          selected: false
+
+      - id: code_assemble_scenes
+        type: custom
+        position: { x: 3640, y: 280 }
+        positionAbsolute: { x: 3640, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "组装 scenes map + 生成 SCENE_ID"
+          type: code
+          code_language: python3
+          code: |
+            import json
+
+
+            def main(items: list) -> dict:
+                scenes = {}
+                warnings = []
+                idx = 0
+                for raw in (items or []):
+                    idx += 1
+                    sid = f"SCENE_{idx}"
+                    try:
+                        parsed = json.loads(raw) if isinstance(raw, str) else (raw or {})
+                    except Exception:
+                        warnings.append(
+                            f"{sid} 解析失败，Phase2 LLM 未返回合法 JSON，已跳过"
+                            f"（原始内容前200字：{str(raw)[:200]}）"
+                        )
+                        continue
+                    item = parsed.get("scene_item") if isinstance(parsed, dict) else None
+                    if not isinstance(item, dict):
+                        warnings.append(f"{sid} 缺少 scene_item 字段，已跳过")
+                        continue
+                    scenes[sid] = item
+                return {"scenes": scenes, "scene_warnings": warnings}
+          variables:
+            - variable: items
+              value_selector: [iteration_phase2_scenes, output]
+          outputs:
+            scenes:
+              type: object
+            scene_warnings:
+              type: array[string]
+          selected: false
+
+      # ---------------------------------------------------------------
+      # 6. Phase 2 pairings — 绑定 persona + scene + 脚本原句
+      # ---------------------------------------------------------------
+      - id: llm_build_pairings
+        type: custom
+        position: { x: 3940, y: 280 }
+        positionAbsolute: { x: 3940, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 110
+        data:
+          title: "组装 pairings：绑定人物+场景+原句"
+          type: llm
+          model:
+            provider: langgenius/openai/openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.3
+          prompt_template:
+            - id: "a1b2c3d4-0005-4000-9000-000000000001"
+              role: system
+              text: |
+                你是 100x-persona 技能 Phase 2 的 pairings 组装器（workflow.md Phase2"必做
+                动作"第3步）。每条 pairing 把「一段脚本原句 script_span_quote」绑定到「一个
+                persona_ref」+「一个 scene_ref」，并写 rationale（为什么这个人物+场景组合
+                适合这段原句，一句话）。
+
+                【硬性规则】
+                1. script_span_quote 必须是脚本原文的逐字子串，不许改写、不许概括——下游会
+                   用 `quote in source_script` 逐字校验。
+                2. persona_ref / scene_ref 只能引用下面提供的 personas / scenes 里真实存在
+                   的 key，不许杜撰不存在的 ID。
+                3. 【对应公理4零孤儿】尽量让每一个 persona 和每一个 scene 都至少被一条
+                   pairing 引用到——已经定义的人物/场景如果一条都没被用到，下游会判定为孤
+                   儿并 FAIL。不要为了凑数量而编造脚本里没有依据的 pairing，也不要遗漏能够
+                   合理配对的组合。
+                4. segment_ref 是可选字段：如果下面提供的 segments_json 非空，为每条 pairing
+                   尝试回填匹配的 segment_ref（引用 segments_json 里对应 segment 的 id）；如
+                   果 segments_json 是空字符串，完全省略 segment_ref 字段，不要杜撰。
+
+                可用的 personas（JSON）：
+                {{#code_assemble_personas.personas#}}
+
+                可用的 scenes（JSON）：
+                {{#code_assemble_scenes.scenes#}}
+
+                上游 100x-segment 产出的 segments（可能为空，为空则忽略 segment_ref）：
+                {{#start.segments_json#}}
+
+                严格只输出一个 JSON 数组，数组每一项形如：
+                {
+                  "pairing_id": "PAIR_...",
+                  "script_span_quote": "...",
+                  "persona_ref": "PERSONA_...",
+                  "scene_ref": "SCENE_...",
+                  "rationale": "..."
+                }
+                不要 markdown 代码块，不要解释文字。
+            - id: "a1b2c3d4-0005-4000-9000-000000000002"
+              role: user
+              text: |
+                完整脚本原文：
+                {{#start.source_script#}}
+          context:
+            enabled: false
+            variable_selector: []
+          memory:
+            query_prompt_template: ""
+            role_prefix:
+              assistant: ""
+              user: ""
+            window:
+              enabled: false
+              size: 50
+          vision:
+            enabled: false
+          selected: false
+
+      - id: code_parse_pairings
+        type: custom
+        position: { x: 4240, y: 280 }
+        positionAbsolute: { x: 4240, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "解析 pairings JSON 数组"
+          type: code
+          code_language: python3
+          code: |
+            import json
+            import re
+
+
+            def main(raw_text: str) -> dict:
+                text = (raw_text or '').strip()
+                text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+                text = re.sub(r'```\s*$', '', text).strip()
+                pairings = []
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, list):
+                        pairings = [p for p in parsed if isinstance(p, dict)]
+                except Exception:
+                    pairings = []
+                return {"pairings": pairings}
+          variables:
+            - variable: raw_text
+              value_selector: [llm_build_pairings, text]
+          outputs:
+            pairings:
+              type: array[object]
+          selected: false
+
+      # ---------------------------------------------------------------
+      # 7. Phase 3 — 组装 PersonaSceneBundle
+      # ---------------------------------------------------------------
+      - id: code_assemble_bundle
+        type: custom
+        position: { x: 4520, y: 280 }
+        positionAbsolute: { x: 4520, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "组装 PersonaSceneBundle"
+          type: code
+          code_language: python3
+          code: |
+            import json
+
+
+            def main(
+                source_script: str,
+                personas: dict,
+                persona_warnings: list,
+                scenes: dict,
+                scene_warnings: list,
+                pairings: list,
+            ) -> dict:
+                warnings = list(persona_warnings or []) + list(scene_warnings or [])
+                bundle = {
+                    "source_script": source_script or "",
+                    "personas": personas or {},
+                    "scenes": scenes or {},
+                    "pairings": pairings or [],
+                    "meta": {
+                        "generated_by": "100x-persona",
+                        "warnings": warnings,
+                    },
+                }
+                bundle_json = json.dumps(bundle, ensure_ascii=False, indent=2)
+                personas_list = [dict(v, persona_id=k) for k, v in (personas or {}).items() if isinstance(v, dict)]
+                scenes_list = [dict(v, scene_id=k) for k, v in (scenes or {}).items() if isinstance(v, dict)]
+                return {
+                    "bundle": bundle,
+                    "bundle_json": bundle_json,
+                    "personas_list": personas_list,
+                    "scenes_list": scenes_list,
+                }
+          variables:
+            - variable: source_script
+              value_selector: [start, source_script]
+            - variable: personas
+              value_selector: [code_assemble_personas, personas]
+            - variable: persona_warnings
+              value_selector: [code_assemble_personas, persona_warnings]
+            - variable: scenes
+              value_selector: [code_assemble_scenes, scenes]
+            - variable: scene_warnings
+              value_selector: [code_assemble_scenes, scene_warnings]
+            - variable: pairings
+              value_selector: [code_parse_pairings, pairings]
+          outputs:
+            bundle:
+              type: object
+            bundle_json:
+              type: string
+            personas_list:
+              type: array[object]
+            scenes_list:
+              type: array[object]
+          selected: false
+
+      # ---------------------------------------------------------------
+      # 8. Phase 3 — 4条公理复核（ajv 的手写 stdlib 近似替代，见 notes.md）
+      # ---------------------------------------------------------------
+      - id: code_validate_bundle
+        type: custom
+        position: { x: 4800, y: 280 }
+        positionAbsolute: { x: 4800, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 260
+        height: 90
+        data:
+          title: "4条公理复核（referential/quote/vague-word/orphan/hedge）"
+          type: code
+          code_language: python3
+          code: |
+            import re
+
+            RELATIONSHIP_ENUM = {
+                "direct-to-camera", "confessional", "testimonial-witness",
+                "voice-over", "duo-dialogue",
+            }
+            REQUIRED_PERSONA_FIELDS = [
+                "identity_label", "authority_basis", "authority_evidence_quote",
+                "audience_fit", "audience_pain_quote", "delivery_style",
+                "relationship_to_camera",
+            ]
+            OPTIONAL_PERSONA_FIELDS = ["appearance_note"]
+            ALLOWED_PERSONA_FIELDS = set(REQUIRED_PERSONA_FIELDS) | set(OPTIONAL_PERSONA_FIELDS)
+            REQUIRED_SCENE_FIELDS = [
+                "scene_name", "trigger_moment", "location", "micro_coordinate",
+                "visual_props", "atmosphere",
+            ]
+            REQUIRED_PAIRING_FIELDS = [
+                "pairing_id", "script_span_quote", "persona_ref", "scene_ref", "rationale",
+            ]
+            OPTIONAL_PAIRING_FIELDS = ["segment_ref"]
+            ALLOWED_PAIRING_FIELDS = set(REQUIRED_PAIRING_FIELDS) | set(OPTIONAL_PAIRING_FIELDS)
+            ALLOWED_TOP_FIELDS = {"source_script", "personas", "scenes", "pairings", "meta"}
+
+            PERSONA_ID_RE = re.compile(r'^PERSONA_[A-Za-z0-9_]+$')
+            SCENE_ID_RE = re.compile(r'^SCENE_[A-Za-z0-9_]+$')
+
+            # 逐字搬自 schema.json 的负向前瞻正则（axioms.md 公理3）。刻意保持大小写敏感——
+            # 源正则里 "TBD" 和 "tbd" 是分开列的两项，没有用不区分大小写标志，这里原样保留
+            # 这个怪癖，不是"顺手改进"。
+            VAGUE_WORDS = [
+                "某处", "随便", "某个地方", "某场景", "某个场景", "某个地点", "某地", "某时",
+                "待定", "TBD", "tbd", "somewhere", "Somewhere", "anywhere", "Anywhere",
+            ]
+
+            # 逐字搬自 scripts/validate.js 的 HEDGE_MARKERS（权威性对冲短语检测）。只扫
+            # authority_evidence_quote，不扫 audience_pain_quote/script_span_quote——那两个
+            # 字段里出现否定词往往是合法内容（如 "I can't sleep"）。
+            HEDGE_MARKERS = [
+                "if you don't believe me", "you don't have to believe me",
+                "don't take my word for it", "i'm not sure", "i am not sure",
+                "i don't know if", "maybe i'm wrong", "i could be wrong", "who knows",
+                "not 100% sure", "i doubt",
+                "如果你不信我", "你可以不信", "不管你信不信", "信不信由你", "我不确定",
+                "我也不知道", "也许我", "谁知道呢", "说实话我也没底",
+            ]
+            DISCLOSURE_RE = re.compile(r'hedge|自我怀疑|信任反转|待核', re.IGNORECASE)
+
+
+            def _err(errors, tag, msg):
+                errors.append(f"[{tag}] {msg}")
+
+
+            def main(bundle: dict) -> dict:
+                errors = []
+                if not isinstance(bundle, dict):
+                    return {"errors": ["[schema-approx] bundle is not a JSON object"]}
+
+                extra_top = [k for k in bundle.keys() if k not in ALLOWED_TOP_FIELDS]
+                if extra_top:
+                    _err(errors, "schema-approx",
+                         f"root has unexpected fields (schema.json additionalProperties:false): {extra_top}")
+                for req in ("source_script", "personas", "scenes", "pairings", "meta"):
+                    if req not in bundle:
+                        _err(errors, "schema-approx", f"root is missing required field '{req}'")
+
+                source_script = bundle.get("source_script")
+                if not isinstance(source_script, str) or not source_script:
+                    _err(errors, "schema-approx", "source_script must be a non-empty string")
+                    source_script = source_script if isinstance(source_script, str) else ""
+
+                personas = bundle.get("personas")
+                if not isinstance(personas, dict) or len(personas) == 0:
+                    _err(errors, "schema-approx", "personas must be a non-empty object (minProperties:1)")
+                    personas = personas if isinstance(personas, dict) else {}
+
+                scenes = bundle.get("scenes")
+                if not isinstance(scenes, dict) or len(scenes) == 0:
+                    _err(errors, "schema-approx", "scenes must be a non-empty object (minProperties:1)")
+                    scenes = scenes if isinstance(scenes, dict) else {}
+
+                pairings = bundle.get("pairings")
+                if not isinstance(pairings, list) or len(pairings) == 0:
+                    _err(errors, "schema-approx", "pairings must be a non-empty array (minItems:1)")
+                    pairings = pairings if isinstance(pairings, list) else []
+
+                meta = bundle.get("meta")
+                if not isinstance(meta, dict):
+                    _err(errors, "schema-approx", "meta must be an object")
+                    meta = {}
+                if meta.get("generated_by") != "100x-persona":
+                    _err(errors, "schema-approx", "meta.generated_by must be the constant '100x-persona'")
+                warnings = meta.get("warnings")
+                if not isinstance(warnings, list) or not all(isinstance(w, str) for w in warnings):
+                    _err(errors, "schema-approx", "meta.warnings must be an array of strings")
+                    warnings = [w for w in (warnings or []) if isinstance(w, str)]
+
+                for pid, item in personas.items():
+                    if not PERSONA_ID_RE.match(pid):
+                        _err(errors, "schema-approx", f"personas key '{pid}' does not match ^PERSONA_[A-Za-z0-9_]+$")
+                    if not isinstance(item, dict):
+                        _err(errors, "schema-approx", f"personas.{pid} must be an object")
+                        continue
+                    extra = [k for k in item.keys() if k not in ALLOWED_PERSONA_FIELDS]
+                    if extra:
+                        _err(errors, "schema-approx",
+                             f"personas.{pid} has unexpected fields (additionalProperties:false): {extra}")
+                    for field in REQUIRED_PERSONA_FIELDS:
+                        value = item.get(field)
+                        if not isinstance(value, str) or not value.strip():
+                            _err(errors, "schema-approx",
+                                 f"personas.{pid}.{field} is missing or not a non-empty string")
+                    rel = item.get("relationship_to_camera")
+                    if rel is not None and rel not in RELATIONSHIP_ENUM:
+                        _err(errors, "schema-approx",
+                             f"personas.{pid}.relationship_to_camera '{rel}' is not one of {sorted(RELATIONSHIP_ENUM)}")
+
+                for sid, item in scenes.items():
+                    if not SCENE_ID_RE.match(sid):
+                        _err(errors, "schema-approx", f"scenes key '{sid}' does not match ^SCENE_[A-Za-z0-9_]+$")
+                    if not isinstance(item, dict):
+                        _err(errors, "schema-approx", f"scenes.{sid} must be an object")
+                        continue
+                    extra = [k for k in item.keys() if k not in REQUIRED_SCENE_FIELDS]
+                    if extra:
+                        _err(errors, "schema-approx",
+                             f"scenes.{sid} has unexpected fields (additionalProperties:false): {extra}")
+                    for field in ("trigger_moment", "location", "micro_coordinate"):
+                        value = item.get(field)
+                        if not isinstance(value, str) or len(value) < 3:
+                            _err(errors, "axiom3", f"scenes.{sid}.{field} missing or shorter than minLength:3")
+                            continue
+                        hit = next((w for w in VAGUE_WORDS if w in value), None)
+                        if hit:
+                            _err(errors, "axiom3",
+                                 f"scenes.{sid}.{field} contains a closed-list vague placeholder word "
+                                 f"'{hit}': \"{value}\"")
+                    props = item.get("visual_props")
+                    if (not isinstance(props, list) or len(props) < 2
+                            or not all(isinstance(p, str) and p.strip() for p in props)):
+                        _err(errors, "axiom3",
+                             f"scenes.{sid}.visual_props must be an array of >=2 non-empty strings (minItems:2)")
+                    atmosphere = item.get("atmosphere")
+                    if not isinstance(atmosphere, str) or not atmosphere.strip():
+                        _err(errors, "schema-approx", f"scenes.{sid}.atmosphere is missing or not a non-empty string")
+                    scene_name = item.get("scene_name")
+                    if not isinstance(scene_name, str) or not scene_name.strip():
+                        _err(errors, "schema-approx", f"scenes.{sid}.scene_name is missing or not a non-empty string")
+
+                for i, item in enumerate(pairings):
+                    loc = f"pairings[{i}]"
+                    if not isinstance(item, dict):
+                        _err(errors, "schema-approx", f"{loc} must be an object")
+                        continue
+                    extra = [k for k in item.keys() if k not in ALLOWED_PAIRING_FIELDS]
+                    if extra:
+                        _err(errors, "schema-approx",
+                             f"{loc} has unexpected fields (additionalProperties:false): {extra}")
+                    for field in REQUIRED_PAIRING_FIELDS:
+                        value = item.get(field)
+                        if not isinstance(value, str) or not value.strip():
+                            _err(errors, "schema-approx", f"{loc}.{field} is missing or not a non-empty string")
+                    pref = item.get("persona_ref")
+                    if isinstance(pref, str) and not PERSONA_ID_RE.match(pref):
+                        _err(errors, "schema-approx", f"{loc}.persona_ref '{pref}' does not match ^PERSONA_[A-Za-z0-9_]+$")
+                    sref = item.get("scene_ref")
+                    if isinstance(sref, str) and not SCENE_ID_RE.match(sref):
+                        _err(errors, "schema-approx", f"{loc}.scene_ref '{sref}' does not match ^SCENE_[A-Za-z0-9_]+$")
+
+                persona_keys = set(personas.keys())
+                scene_keys = set(scenes.keys())
+                for i, item in enumerate(pairings):
+                    if not isinstance(item, dict):
+                        continue
+                    loc = f"pairings[{i}]"
+                    pref = item.get("persona_ref")
+                    if isinstance(pref, str) and pref not in persona_keys:
+                        _err(errors, "axiom1", f'{loc}.persona_ref "{pref}" does not exist as a key in personas')
+                    sref = item.get("scene_ref")
+                    if isinstance(sref, str) and sref not in scene_keys:
+                        _err(errors, "axiom1", f'{loc}.scene_ref "{sref}" does not exist as a key in scenes')
+
+                for pid, item in personas.items():
+                    if not isinstance(item, dict):
+                        continue
+                    aeq = item.get("authority_evidence_quote")
+                    if isinstance(aeq, str) and aeq not in source_script:
+                        _err(errors, "axiom2",
+                             f'personas.{pid}.authority_evidence_quote is not a literal substring of '
+                             f'source_script -> "{aeq}"')
+                    apq = item.get("audience_pain_quote")
+                    if isinstance(apq, str) and apq not in source_script:
+                        _err(errors, "axiom2",
+                             f'personas.{pid}.audience_pain_quote is not a literal substring of '
+                             f'source_script -> "{apq}"')
+                for i, item in enumerate(pairings):
+                    if not isinstance(item, dict):
+                        continue
+                    ssq = item.get("script_span_quote")
+                    if isinstance(ssq, str) and ssq not in source_script:
+                        _err(errors, "axiom2",
+                             f'pairings[{i}].script_span_quote is not a literal substring of '
+                             f'source_script -> "{ssq}"')
+
+                for pid, item in personas.items():
+                    if not isinstance(item, dict):
+                        continue
+                    aeq = item.get("authority_evidence_quote")
+                    if not isinstance(aeq, str):
+                        continue
+                    lowered = aeq.lower()
+                    hit = next((m for m in HEDGE_MARKERS if m.lower() in lowered), None)
+                    if not hit:
+                        continue
+                    disclosed = any(
+                        isinstance(w, str) and pid in w and DISCLOSURE_RE.search(w) for w in warnings
+                    )
+                    if not disclosed:
+                        _err(errors, "axiom2-heuristic",
+                             f'personas.{pid}.authority_evidence_quote contains a closed-list hedge/self-doubt '
+                             f'marker ("{hit}") with no matching meta.warnings disclosure. This heuristic cannot '
+                             f'tell whether a reversal actually happened, only that this closed-list pattern is '
+                             f"present (see axioms.md #2 已知天花板). Fix by re-selecting an anchor quote that "
+                             f"isn't itself a hedge, or adding a meta.warnings entry mentioning '{pid}' and "
+                             f"'hedge'/'自我怀疑' so a human reviews the semantic direction before this ships.")
+
+                used_personas = set()
+                used_scenes = set()
+                for item in pairings:
+                    if not isinstance(item, dict):
+                        continue
+                    if isinstance(item.get("persona_ref"), str):
+                        used_personas.add(item["persona_ref"])
+                    if isinstance(item.get("scene_ref"), str):
+                        used_scenes.add(item["scene_ref"])
+                for pid in personas.keys():
+                    if pid not in used_personas:
+                        _err(errors, "axiom4", f"personas.{pid} is defined but never referenced by any pairing (orphan)")
+                for sid in scenes.keys():
+                    if sid not in used_scenes:
+                        _err(errors, "axiom4", f"scenes.{sid} is defined but never referenced by any pairing (orphan)")
+
+                return {"errors": errors}
+          variables:
+            - variable: bundle
+              value_selector: [code_assemble_bundle, bundle]
+          outputs:
+            errors:
+              type: array[string]
+          selected: false
+
+      - id: if_bundle_valid
+        type: custom
+        position: { x: 5100, y: 280 }
+        positionAbsolute: { x: 5100, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+        data:
+          title: "公理复核是否全部通过"
+          type: if-else
+          cases:
+            - id: "true"
+              case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: "cond-valid-0001"
+                  variable_selector: [code_validate_bundle, errors]
+                  comparison_operator: empty
+                  value: ""
+                  varType: array[string]
+          selected: false
+
+      # ---------------------------------------------------------------
+      # 9a. 失败分支 —— 逐条列出具体失败项，不是泛化"请重新检查"
+      # ---------------------------------------------------------------
+      - id: tpl_render_failure_report
+        type: custom
+        position: { x: 5380, y: 560 }
+        positionAbsolute: { x: 5380, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "拼装：逐条失败项报告"
+          type: template-transform
+          variables:
+            - variable: errors
+              value_selector: [code_validate_bundle, errors]
+            - variable: bundle_json
+              value_selector: [code_assemble_bundle, bundle_json]
+          template: |
+            100x-persona 校验未通过——以下是具体失败项（本仓库房规明确禁止"请重新检查"这类
+            泛化提示，逐条列出哪个 persona/scene/pairing、违反哪条公理）：
+
+            {% for e in errors %}
+            {{ loop.index }}. {{ e }}
+            {% endfor %}
+
+            未通过校验的草稿 JSON（供人工修正参考，不是最终交付物）：
+            {{ bundle_json }}
+          selected: false
+
+      - id: end_validation_failed
+        type: custom
+        position: { x: 5680, y: 560 }
+        positionAbsolute: { x: 5680, y: 560 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 90
+        data:
+          title: "结束：校验未通过"
+          type: end
+          outputs:
+            - variable: validation_report
+              value_selector: [tpl_render_failure_report, output]
+              value_type: string
+
+      # ---------------------------------------------------------------
+      # 9b. 成功分支 —— 写回 KB（每个 persona/scene 独立写一条，供未来脚本检索复用）
+      # ---------------------------------------------------------------
+      - id: iteration_kb_write_personas
+        type: custom
+        position: { x: 5380, y: 180 }
+        positionAbsolute: { x: 5380, y: 180 }
+        sourcePosition: right
+        targetPosition: left
+        width: 460
+        height: 210
+        zIndex: 1
+        data:
+          title: "逐人物写回 KB（占位 dataset_id，需人工重连）"
+          type: iteration
+          iterator_selector: [code_assemble_bundle, personas_list]
+          iterator_input_type: array[object]
+          output_selector: [tpl_persona_doc, output]
+          output_type: array[string]
+          is_parallel: false
+          parallel_nums: 10
+          error_handle_mode: continue-on-error
+          start_node_id: iteration_kb_write_personas_start
+
+      - id: iteration_kb_write_personas_start
+        parentId: iteration_kb_write_personas
+        type: custom-iteration-start
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 76 }
+        positionAbsolute: { x: 5404, y: 256 }
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+        data:
+          title: ""
+          type: iteration-start
+          isInIteration: true
+
+      - id: tpl_persona_doc
+        parentId: iteration_kb_write_personas
+        type: custom
+        position: { x: 120, y: 60 }
+        positionAbsolute: { x: 5500, y: 240 }
+        sourcePosition: right
+        targetPosition: left
+        width: 210
+        height: 64
+        zIndex: 1002
+        data:
+          title: "渲染人物档案文本"
+          type: template-transform
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_personas
+          variables:
+            - variable: p
+              value_selector: [iteration_kb_write_personas, item]
+          template: |
+            [100x-persona 人物档案]
+            persona_id: {{ p.persona_id }}
+            identity_label: {{ p.identity_label }}
+            authority_basis: {{ p.authority_basis }}
+            authority_evidence_quote: "{{ p.authority_evidence_quote }}"
+            audience_fit: {{ p.audience_fit }}
+            audience_pain_quote: "{{ p.audience_pain_quote }}"
+            delivery_style: {{ p.delivery_style }}
+            relationship_to_camera: {{ p.relationship_to_camera }}
+          selected: false
+
+      - id: kb_index_persona
+        parentId: iteration_kb_write_personas
+        type: custom
+        position: { x: 340, y: 60 }
+        positionAbsolute: { x: 5720, y: 240 }
+        sourcePosition: right
+        targetPosition: left
+        width: 210
+        height: 64
+        zIndex: 1002
+        data:
+          title: "写回 KB：人物档案"
+          type: knowledge-index
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_personas
+          dataset_id: "REPLACE_WITH_DATASET_ID"
+          index_chunk_variable_selector: [tpl_persona_doc, output]
+          keyword_number: 10
+          retrieval_model:
+            top_k: 3
+            score_threshold_enabled: false
+            score_threshold: 0.5
+          selected: false
+
+      - id: iteration_kb_write_scenes
+        type: custom
+        position: { x: 5900, y: 180 }
+        positionAbsolute: { x: 5900, y: 180 }
+        sourcePosition: right
+        targetPosition: left
+        width: 460
+        height: 210
+        zIndex: 1
+        data:
+          title: "逐场景写回 KB（占位 dataset_id，需人工重连）"
+          type: iteration
+          iterator_selector: [code_assemble_bundle, scenes_list]
+          iterator_input_type: array[object]
+          output_selector: [tpl_scene_doc, output]
+          output_type: array[string]
+          is_parallel: false
+          parallel_nums: 10
+          error_handle_mode: continue-on-error
+          start_node_id: iteration_kb_write_scenes_start
+
+      - id: iteration_kb_write_scenes_start
+        parentId: iteration_kb_write_scenes
+        type: custom-iteration-start
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 76 }
+        positionAbsolute: { x: 5924, y: 256 }
+        sourcePosition: right
+        targetPosition: left
+        width: 44
+        height: 48
+        zIndex: 1002
+        data:
+          title: ""
+          type: iteration-start
+          isInIteration: true
+
+      - id: tpl_scene_doc
+        parentId: iteration_kb_write_scenes
+        type: custom
+        position: { x: 120, y: 60 }
+        positionAbsolute: { x: 6020, y: 240 }
+        sourcePosition: right
+        targetPosition: left
+        width: 210
+        height: 64
+        zIndex: 1002
+        data:
+          title: "渲染场景档案文本"
+          type: template-transform
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_scenes
+          variables:
+            - variable: s
+              value_selector: [iteration_kb_write_scenes, item]
+          template: |
+            [100x-persona 场景档案]
+            scene_id: {{ s.scene_id }}
+            scene_name: {{ s.scene_name }}
+            trigger_moment: {{ s.trigger_moment }}
+            location: {{ s.location }}
+            micro_coordinate: {{ s.micro_coordinate }}
+            visual_props: {{ s.visual_props | join(', ') }}
+            atmosphere: {{ s.atmosphere }}
+          selected: false
+
+      - id: kb_index_scene
+        parentId: iteration_kb_write_scenes
+        type: custom
+        position: { x: 340, y: 60 }
+        positionAbsolute: { x: 6240, y: 240 }
+        sourcePosition: right
+        targetPosition: left
+        width: 210
+        height: 64
+        zIndex: 1002
+        data:
+          title: "写回 KB：场景档案"
+          type: knowledge-index
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_scenes
+          dataset_id: "REPLACE_WITH_DATASET_ID"
+          index_chunk_variable_selector: [tpl_scene_doc, output]
+          keyword_number: 10
+          retrieval_model:
+            top_k: 3
+            score_threshold_enabled: false
+            score_threshold: 0.5
+          selected: false
+
+      - id: end_success
+        type: custom
+        position: { x: 6420, y: 280 }
+        positionAbsolute: { x: 6420, y: 280 }
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 116
+        data:
+          title: "结束：PersonaSceneBundle 交付"
+          type: end
+          outputs:
+            - variable: persona_scene_bundle
+              value_selector: [code_assemble_bundle, bundle]
+              value_type: object
+            - variable: persona_scene_bundle_json
+              value_selector: [code_assemble_bundle, bundle_json]
+              value_type: string
+
+    edges:
+      - id: start-source-kb_retrieve_similar-target
+        source: start
+        sourceHandle: source
+        target: kb_retrieve_similar
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: start, targetType: knowledge-retrieval, isInIteration: false, isInLoop: false }
+
+      - id: kb_retrieve_similar-source-llm_identify_candidates-target
+        source: kb_retrieve_similar
+        sourceHandle: source
+        target: llm_identify_candidates
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: knowledge-retrieval, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: llm_identify_candidates-source-code_parse_candidates-target
+        source: llm_identify_candidates
+        sourceHandle: source
+        target: code_parse_candidates
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_parse_candidates-source-if_has_candidates-target
+        source: code_parse_candidates
+        sourceHandle: source
+        target: if_has_candidates
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: if_has_candidates-true-iteration_phase1_personas-target
+        source: if_has_candidates
+        sourceHandle: "true"
+        target: iteration_phase1_personas
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: iteration, isInIteration: false, isInLoop: false }
+
+      - id: if_has_candidates-false-tpl_no_persona_signal-target
+        source: if_has_candidates
+        sourceHandle: "false"
+        target: tpl_no_persona_signal
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false }
+
+      - id: tpl_no_persona_signal-source-end_no_persona_signal-target
+        source: tpl_no_persona_signal
+        sourceHandle: source
+        target: end_no_persona_signal
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: iteration_phase1_start-source-llm_extract_persona-target
+        source: iteration_phase1_start
+        sourceHandle: source
+        target: llm_extract_persona
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: iteration-start
+          targetType: llm
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_phase1_personas
+
+      - id: iteration_phase1_personas-source-code_assemble_personas-target
+        source: iteration_phase1_personas
+        sourceHandle: source
+        target: code_assemble_personas
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: iteration, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_assemble_personas-source-llm_identify_scene_clusters-target
+        source: code_assemble_personas
+        sourceHandle: source
+        target: llm_identify_scene_clusters
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: llm_identify_scene_clusters-source-code_parse_scene_clusters-target
+        source: llm_identify_scene_clusters
+        sourceHandle: source
+        target: code_parse_scene_clusters
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_parse_scene_clusters-source-if_has_scenes-target
+        source: code_parse_scene_clusters
+        sourceHandle: source
+        target: if_has_scenes
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: if_has_scenes-true-iteration_phase2_scenes-target
+        source: if_has_scenes
+        sourceHandle: "true"
+        target: iteration_phase2_scenes
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: iteration, isInIteration: false, isInLoop: false }
+
+      - id: if_has_scenes-false-tpl_no_scene_signal-target
+        source: if_has_scenes
+        sourceHandle: "false"
+        target: tpl_no_scene_signal
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false }
+
+      - id: tpl_no_scene_signal-source-end_no_scene_signal-target
+        source: tpl_no_scene_signal
+        sourceHandle: source
+        target: end_no_scene_signal
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: iteration_phase2_start-source-llm_extract_scene-target
+        source: iteration_phase2_start
+        sourceHandle: source
+        target: llm_extract_scene
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: iteration-start
+          targetType: llm
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_phase2_scenes
+
+      - id: iteration_phase2_scenes-source-code_assemble_scenes-target
+        source: iteration_phase2_scenes
+        sourceHandle: source
+        target: code_assemble_scenes
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: iteration, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_assemble_scenes-source-llm_build_pairings-target
+        source: code_assemble_scenes
+        sourceHandle: source
+        target: llm_build_pairings
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: llm, isInIteration: false, isInLoop: false }
+
+      - id: llm_build_pairings-source-code_parse_pairings-target
+        source: llm_build_pairings
+        sourceHandle: source
+        target: code_parse_pairings
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: llm, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_parse_pairings-source-code_assemble_bundle-target
+        source: code_parse_pairings
+        sourceHandle: source
+        target: code_assemble_bundle
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_assemble_bundle-source-code_validate_bundle-target
+        source: code_assemble_bundle
+        sourceHandle: source
+        target: code_validate_bundle
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: code, isInIteration: false, isInLoop: false }
+
+      - id: code_validate_bundle-source-if_bundle_valid-target
+        source: code_validate_bundle
+        sourceHandle: source
+        target: if_bundle_valid
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: code, targetType: if-else, isInIteration: false, isInLoop: false }
+
+      - id: if_bundle_valid-true-iteration_kb_write_personas-target
+        source: if_bundle_valid
+        sourceHandle: "true"
+        target: iteration_kb_write_personas
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: iteration, isInIteration: false, isInLoop: false }
+
+      - id: if_bundle_valid-false-tpl_render_failure_report-target
+        source: if_bundle_valid
+        sourceHandle: "false"
+        target: tpl_render_failure_report
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: if-else, targetType: template-transform, isInIteration: false, isInLoop: false }
+
+      - id: tpl_render_failure_report-source-end_validation_failed-target
+        source: tpl_render_failure_report
+        sourceHandle: source
+        target: end_validation_failed
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: template-transform, targetType: end, isInIteration: false, isInLoop: false }
+
+      - id: iteration_kb_write_personas_start-source-tpl_persona_doc-target
+        source: iteration_kb_write_personas_start
+        sourceHandle: source
+        target: tpl_persona_doc
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: iteration-start
+          targetType: template-transform
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_personas
+
+      - id: tpl_persona_doc-source-kb_index_persona-target
+        source: tpl_persona_doc
+        sourceHandle: source
+        target: kb_index_persona
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: template-transform
+          targetType: knowledge-index
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_personas
+
+      - id: iteration_kb_write_personas-source-iteration_kb_write_scenes-target
+        source: iteration_kb_write_personas
+        sourceHandle: source
+        target: iteration_kb_write_scenes
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: iteration, targetType: iteration, isInIteration: false, isInLoop: false }
+
+      - id: iteration_kb_write_scenes_start-source-tpl_scene_doc-target
+        source: iteration_kb_write_scenes_start
+        sourceHandle: source
+        target: tpl_scene_doc
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: iteration-start
+          targetType: template-transform
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_scenes
+
+      - id: tpl_scene_doc-source-kb_index_scene-target
+        source: tpl_scene_doc
+        sourceHandle: source
+        target: kb_index_scene
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+        data:
+          sourceType: template-transform
+          targetType: knowledge-index
+          isInIteration: true
+          isInLoop: false
+          iteration_id: iteration_kb_write_scenes
+
+      - id: iteration_kb_write_scenes-source-end_success-target
+        source: iteration_kb_write_scenes
+        sourceHandle: source
+        target: end_success
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data: { sourceType: iteration, targetType: end, isInIteration: false, isInLoop: false }

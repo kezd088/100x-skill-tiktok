@@ -1,0 +1,52 @@
+{
+  "source_script": "I've coached postpartum moms back into their bodies for almost fifteen years, and the one thing nobody warns you about is the soft belly pooch that sticks around no matter how many crunches you do. If you're a mom over forty who still looks four months pregnant in every mirror, this is for you. Day one I wrapped this around my waist right after I got out of the shower and just stood in front of the bathroom mirror checking how it sat. By day fourteen I was standing in a dressing room trying on jeans I hadn't fit into since before my second kid, and for the first time in years I didn't have to suck in for the photo.",
+  "personas": {
+    "PERSONA_POSTPARTUM_COACH": {
+      "identity_label": "近十五年产后恢复教练（synthetic example, not a real person）",
+      "authority_basis": "以长期指导产后妈妈的一线教练经验建立专业型信任",
+      "authority_evidence_quote": "I've coached postpartum moms back into their bodies for almost fifteen years",
+      "audience_fit": "四十岁以上、腹部松弛困扰持续未消退的产后妈妈",
+      "audience_pain_quote": "If you're a mom over forty who still looks four months pregnant in every mirror",
+      "delivery_style": "第一人称教练视角，先点出普遍被忽视的痛点再引入个人示范",
+      "relationship_to_camera": "direct-to-camera"
+    }
+  },
+  "scenes": {
+    "SCENE_SHOWER_MIRROR_DAY1": {
+      "scene_name": "沐浴后卫生间镜前检查（第一阶）",
+      "trigger_moment": "洗完澡刚出浴室的第一天",
+      "location": "自家卫生间",
+      "micro_coordinate": "站在浴室穿衣镜前调整腰部缠绕装置",
+      "visual_props": ["浴室穿衣镜", "腰部缠绕装置", "浴巾"],
+      "atmosphere": "刚出浴的清爽居家感，第一阶起点氛围"
+    },
+    "SCENE_DRESSING_ROOM_DAY14": {
+      "scene_name": "两周后试衣间验证（阶梯时间线第二阶）",
+      "trigger_moment": "两周后试穿旧牛仔裤时",
+      "location": "商场试衣间",
+      "micro_coordinate": "站在试衣间穿衣镜前拉上牛仔裤拉链",
+      "visual_props": ["试衣间穿衣镜", "旧牛仔裤", "更衣室挂钩"],
+      "atmosphere": "略带惊喜的验证时刻，对比第一阶的转折感"
+    }
+  },
+  "pairings": [
+    {
+      "pairing_id": "PAIR_DAY1_MIRROR",
+      "script_span_quote": "I wrapped this around my waist right after I got out of the shower and just stood in front of the bathroom mirror checking how it sat",
+      "persona_ref": "PERSONA_POSTPARTUM_COACH",
+      "scene_ref": "SCENE_SHOWER_MIRROR_DAY1",
+      "rationale": "台词描述洗澡后立刻在浴室镜前使用，场景需还原这一私密日常时刻，对应阶梯时间线型的起点阶段"
+    },
+    {
+      "pairing_id": "PAIR_DAY14_DRESSING_ROOM",
+      "script_span_quote": "I was standing in a dressing room trying on jeans I hadn't fit into since before my second kid",
+      "persona_ref": "PERSONA_POSTPARTUM_COACH",
+      "scene_ref": "SCENE_DRESSING_ROOM_DAY14",
+      "rationale": "台词点名两周后试衣间试穿旧牛仔裤的验证时刻，场景对应阶梯时间线型的第二阶段转折"
+    }
+  ],
+  "meta": {
+    "generated_by": "100x-persona",
+    "warnings": []
+  }
+}

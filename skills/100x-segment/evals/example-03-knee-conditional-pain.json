@@ -1,0 +1,68 @@
+{
+  "source_text": "Wait, if your knees crack every time you stand up, this is not normal and you know it. If you are over forty and every stair feels risky and sore, you are exactly who this is for. I have coached over two thousand runners past their forties, and every single one had the same excuse. This blend pairs type two collagen with glucosamine, so your joints get the raw material they are missing. Forget an eight thousand dollar knee surgery — one bottle costs less than your weekly coffee run. If your knees do not feel looser in thirty days, we refund every cent, no forms to fill out. Only forty bottles are left in this batch, and the price doubles the moment they sell out. Tap the link below before your knees make the decision for you.",
+  "language": "en",
+  "archetype": "C",
+  "segments": [
+    {
+      "segment_id": 1,
+      "module": "hook",
+      "raw_text": "Wait, if your knees crack every time you stand up, this is not normal and you know it.",
+      "text_annotated": "Wait, · if your knees crack every time you stand up, · this is not normal and you know it."
+    },
+    {
+      "segment_id": 2,
+      "module": "pain",
+      "raw_text": "If you are over forty and every stair feels risky and sore, you are exactly who this is for.",
+      "text_annotated": "If you are over forty and every stair feels risky and sore, · you are exactly who this is for."
+    },
+    {
+      "segment_id": 3,
+      "module": "authority",
+      "raw_text": "I have coached over two thousand runners past their forties, and every single one had the same excuse.",
+      "text_annotated": "I have coached over two thousand runners past their forties, · and every single one had the same excuse."
+    },
+    {
+      "segment_id": 4,
+      "module": "mechanism",
+      "raw_text": "This blend pairs type two collagen with glucosamine, so your joints get the raw material they are missing.",
+      "text_annotated": "This blend pairs type two collagen with glucosamine, ‖ so your joints get the raw material they are missing."
+    },
+    {
+      "segment_id": 5,
+      "module": "price_anchor",
+      "raw_text": "Forget an eight thousand dollar knee surgery — one bottle costs less than your weekly coffee run.",
+      "text_annotated": "Forget an eight thousand dollar knee surgery — ‖ one bottle costs less than your weekly coffee run."
+    },
+    {
+      "segment_id": 6,
+      "module": "risk_reversal",
+      "raw_text": "If your knees do not feel looser in thirty days, we refund every cent, no forms to fill out.",
+      "text_annotated": "If your knees do not feel looser in thirty days, · we refund every cent, · no forms to fill out."
+    },
+    {
+      "segment_id": 7,
+      "module": "scarcity",
+      "raw_text": "Only forty bottles are left in this batch, and the price doubles the moment they sell out.",
+      "text_annotated": "Only forty bottles are left in this batch, · and the price doubles the moment they sell out."
+    },
+    {
+      "segment_id": 8,
+      "module": "cta",
+      "raw_text": "Tap the link below before your knees make the decision for you.",
+      "text_annotated": "Tap the link below before your knees make the decision for you."
+    }
+  ],
+  "shots": [
+    { "shot_id": 1, "segment_refs": [1], "shot_purpose": "hook" },
+    { "shot_id": 2, "segment_refs": [2], "shot_purpose": "build" },
+    { "shot_id": 3, "segment_refs": [3], "shot_purpose": "social_proof" },
+    { "shot_id": 4, "segment_refs": [4], "shot_purpose": "reveal" },
+    { "shot_id": 5, "segment_refs": [5, 6, 7], "shot_purpose": "cta" },
+    { "shot_id": 6, "segment_refs": [8], "shot_purpose": "cta" }
+  ],
+  "meta": {
+    "generated_by": "100x-segment",
+    "warnings": [],
+    "eval_note": "synthetic example, not a real product or transcript"
+  }
+}
