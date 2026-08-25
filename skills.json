@@ -22,11 +22,11 @@
     {
       "id": "100x-video-reverse",
       "path": "skills/100x-video-reverse",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "step": "0-video-reverse",
       "status": "validated",
       "validation_result": "已通过独立验证",
-      "summary": "输入一条本地参考视频，输出源文件指纹、本地稠密证据、语义镜头时间轴、稳定资产图、音频文字证据、模型提示词包、媒体 provenance 和严格验证报告；只负责反推与交接，不执行生成。",
+      "summary": "输入一条本地参考视频，建立严格证据和机器包，并在当前 Agent 对话中直接展示源视频入口、分镜三帧、资产、提示词、逐段生成方案、成本与耗时；只负责反推与交接，不执行生成。",
       "trigger_examples": [
         "反推这条视频",
         "这个视频怎么复刻",
@@ -39,7 +39,7 @@
       ],
       "validate_cmd": "node skills/100x-video-reverse/scripts/validate.js --selftest",
       "extra_cmd": "python skills/100x-video-reverse/scripts/validate_reverse_package.py --help",
-      "note": "v2.0 破坏性替换并退役旧版双轴提示词契约。依赖 ffmpeg、ffprobe、Python jsonschema；Node/AJV 验证公开 JSON 结构和跨引用，Python 严格验证器负责源哈希、真实媒体和 provenance。"
+      "note": "v2.1 把 Agent 对话内可视化设为默认用户交付，并为新包增加逐段 execution_plan。依赖 ffmpeg、ffprobe、Python jsonschema；Node/AJV 验证 JSON 结构和跨引用，Python 严格验证器负责源哈希、真实媒体和 provenance。"
     },
     {
       "id": "100x-search-query",

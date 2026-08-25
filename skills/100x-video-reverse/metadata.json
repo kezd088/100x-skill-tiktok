@@ -1,35 +1,34 @@
 {
   "id": "100x-video-reverse",
   "name": "100x-video-reverse",
-  "version": "2.0.0",
-  "method_version": "0.1.0",
+  "version": "2.1.0",
   "author": "100x",
   "layer": "L1-source-reversal",
   "step": "0-video-reverse",
   "type": "analytical",
   "status": "validated",
-  "summary": "Local source video in; immutable evidence, semantic shot timeline, stable asset graph, audio/text evidence, generation-ready prompt pack, provenance and strict validation out. Analysis only: no generation, publishing or automatic upload.",
+  "summary": "Local source video in; validated evidence and machine package plus an Agent-native visual review with source video, shot triptychs, assets, prompts, generation plans, cost and timing. Analysis only: no generation, publishing or automatic upload.",
   "supersedes": {
-    "version": "1.0.0",
-    "commit": "572acb755ea6868f9c9971809deafd09e72c8a37",
-    "reason": "The retired implementation validated a bilingual dual-axis prompt format but did not provide the evidence, media provenance, source-hash binding and strict on-disk package validation required by the current golden method."
+    "version": "2.0.0",
+    "commit": "6e1c64a27f868f4b1ff57f27bf60d6f154846f4d",
+    "reason": "Version 2.0 produced a validated machine package but did not require the user-facing Agent-native visual review or a per-segment execution plan."
   },
   "validation": {
     "structural": "schema.json is JSON Schema draft-07 and is compiled by ajv in scripts/validate.js. It validates required fields, types, minimum content and nested package shape.",
-    "cross_item": "scripts/validate.js checks timeline continuity, duration arithmetic, unique and resolvable shot/asset references, segment references, confidence ranges and safe relative media paths. Its --selftest uses synthetic fixtures only.",
+    "cross_item": "scripts/validate.js checks timeline continuity, duration arithmetic, unique and resolvable shot/asset references, segment and execution-plan references, ready-state completeness, confidence ranges and safe relative media paths. Its --selftest uses synthetic fixtures only.",
     "filesystem_and_provenance": "scripts/validate_reverse_package.py performs the full handoff gate against reverse.json, source_manifest.json, materialized files and materialization_manifest.json. It hard-stops when jsonschema is unavailable and does not treat legacy media as valid for a new handoff."
   },
   "input_contract": {
     "required": [
-      "one readable local .mp4, .mov, .webm, .mkv or .m4v file",
-      "a new empty output directory"
+      "one readable local .mp4, .mov, .webm, .mkv or .m4v file"
     ],
     "optional": [
+      "a user-selected output directory; otherwise use the workspace default",
       "explicit authorization for an external multimodal model",
       "a user-selected target generation model for prompt adaptation"
     ]
   },
-  "output_contract": "schema.json plus references/output-contract.md",
+  "output_contract": "schema.json plus references/output-contract.md and references/native-output.md",
   "requires_data": [],
   "requires_data_note": "The public skill contains no customer corpus, account identifier, product name, video frame or private benchmark input. Runtime evidence is created from the user's local video and remains outside this repository.",
   "language_scope": {

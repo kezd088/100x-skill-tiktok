@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
 # 100x-skill-tiktok · 本地安装脚本
 #
-# 把 skills/<name>/ 以软链接方式接入本机 Claude Code / Codex / 通用 agent
-# 的 skill 加载目录，供本地测试用（standalone 方式：/<skill-name> 直接调用）。
+# 把 skills/<name>/ 以软链接方式接入本机 Claude Code / Codex /
+# WorkBuddy(CodeBuddy) / 通用 agent 的 skill 加载目录。
 #
 # 只增不改：目标路径已存在（无论是已有 skill、其他仓库的 junction，还是
 # 之前装过的本仓 skill）一律跳过并提示，绝不覆盖或删除任何已有条目。
-# 这是硬规矩——~/.claude/skills、~/.codex/skills、~/.agents/skills 是运行时
-# 加载路径，可能含大量其他项目的 junction，本脚本不对它们做任何写操作。
+# 这是硬规矩——各运行时加载路径可能含大量其他项目的 junction，本脚本不改动
+# 任何已有条目。
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILLS_DIR="$REPO_ROOT/skills"
+INSTALL_HOME_ROOT="${SKILLS_INSTALL_HOME:-$HOME}"
 
 TARGETS=(
-  "$HOME/.claude/skills"
-  "$HOME/.codex/skills"
-  "$HOME/.agents/skills"
+  "$INSTALL_HOME_ROOT/.claude/skills"
+  "$INSTALL_HOME_ROOT/.codex/skills"
+  "$INSTALL_HOME_ROOT/.agents/skills"
+  "$INSTALL_HOME_ROOT/.codebuddy/skills"
 )
 
 if [[ ! -d "$SKILLS_DIR" ]]; then
@@ -56,4 +58,8 @@ done
 
 echo ""
 echo "完成：新装 $installed 个，跳过 $skipped 个（已存在），失败 $failed 个。"
-echo "测试方式：开一个新的 Claude Code / Codex 会话，直接说 skill 触发词（比如"\""给这条脚本配个人设"\""），或用 /skill-name 调用。"
+echo "测试方式：重启或重载 Agent 的 Skills，然后直接说触发词（比如"\""反推这个视频"\""）。"
+
+if [[ "$failed" -gt 0 ]]; then
+  exit 1
+fi

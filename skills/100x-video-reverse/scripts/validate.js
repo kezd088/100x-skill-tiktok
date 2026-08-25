@@ -167,11 +167,58 @@ function validateBundle(bundle) {
     if (!allAssetIds.has(prompt.asset_id)) errors.push(issue("unknown_asset", `$.prompt_pack.asset_prompts[${index}].asset_id`, `Unknown asset: ${prompt.asset_id}`));
   }
   for (const [index, segment] of ((bundle.prompt_pack && bundle.prompt_pack.segmented_generation_plan) || []).entries()) {
+    const base = `$.prompt_pack.segmented_generation_plan[${index}]`;
     if (!isFiniteNumber(segment.start_time_seconds) || !isFiniteNumber(segment.end_time_seconds) || segment.end_time_seconds <= segment.start_time_seconds) {
-      errors.push(issue("segment_time", `$.prompt_pack.segmented_generation_plan[${index}]`, "Segment end must be greater than start."));
+      errors.push(issue("segment_time", base, "Segment end must be greater than start."));
     }
     for (const ref of segment.shot_ids || []) {
-      if (!shotIds.has(ref)) errors.push(issue("unknown_shot", `$.prompt_pack.segmented_generation_plan[${index}].shot_ids`, `Unknown shot: ${ref}`));
+      if (!shotIds.has(ref)) errors.push(issue("unknown_shot", `${base}.shot_ids`, `Unknown shot: ${ref}`));
+    }
+    const requiresExecutionPlan = typeof bundle.candidate_id === "string"
+      && /(?:^|-)(?:v2\.1|v0\.2)(?:-|$)/.test(bundle.candidate_id);
+    const execution = segment.execution_plan;
+    if (requiresExecutionPlan && (!execution || typeof execution !== "object" || Array.isArray(execution))) {
+      errors.push(issue("missing_execution_plan", `${base}.execution_plan`, "Current packages require a user-visible execution plan."));
+      continue;
+    }
+    if (!execution || typeof execution !== "object" || Array.isArray(execution)) continue;
+
+    const inputReferences = Array.isArray(execution.input_references) ? execution.input_references : [];
+    inputReferences.forEach((reference, referenceIndex) => {
+      const referencePath = `${base}.execution_plan.input_references[${referenceIndex}]`;
+      if (!reference || typeof reference !== "object" || Array.isArray(reference)) {
+        errors.push(issue("invalid_input_reference", referencePath, "Input reference must be an object."));
+        return;
+      }
+      if (typeof reference.asset_id === "string" && !allAssetIds.has(reference.asset_id)) {
+        errors.push(issue("unknown_asset", `${referencePath}.asset_id`, `Unknown asset: ${reference.asset_id}`));
+      }
+      if (typeof reference.shot_id === "string" && !shotIds.has(reference.shot_id)) {
+        errors.push(issue("unknown_shot", `${referencePath}.shot_id`, `Unknown shot: ${reference.shot_id}`));
+      }
+      if (typeof reference.relative_path === "string" && !isSafeRelativePath(reference.relative_path)) {
+        errors.push(issue("unsafe_path", `${referencePath}.relative_path`, "Input media path must be a safe forward-slash relative path."));
+      }
+      if (typeof reference.relative_path !== "string" && typeof reference.asset_id !== "string") {
+        errors.push(issue("unresolved_input_reference", referencePath, "Input reference requires relative_path or asset_id."));
+      }
+    });
+
+    if (execution.status === "ready") {
+      for (const field of ["provider", "model_id", "capability_checked_at_utc"]) {
+        if (typeof execution[field] !== "string" || execution[field].trim().length === 0) {
+          errors.push(issue("incomplete_ready_plan", `${base}.execution_plan.${field}`, `Ready plan requires ${field}.`));
+        }
+      }
+      if (!new Set(["omni", "seedance"]).has(execution.model_adapter)) {
+        errors.push(issue("incomplete_ready_plan", `${base}.execution_plan.model_adapter`, "Ready plan requires a verified model adapter."));
+      }
+      if (execution.generation_method === "undecided") {
+        errors.push(issue("incomplete_ready_plan", `${base}.execution_plan.generation_method`, "Ready plan requires a concrete generation method."));
+      }
+      if (inputReferences.length === 0) {
+        errors.push(issue("incomplete_ready_plan", `${base}.execution_plan.input_references`, "Ready plan requires at least one input reference."));
+      }
     }
   }
 
@@ -188,7 +235,10 @@ function runSelftest() {
     ["unknown asset fails", (() => { const value = clone(valid); value.shots[0].products = ["product_missing"]; return value; })(), false],
     ["path traversal fails", (() => { const value = clone(valid); value.shots[0].frames.start.relative_path = "../escape.jpg"; return value; })(), false],
     ["empty prompt fails", (() => { const value = clone(valid); value.prompt_pack.global_video_prompt = ""; return value; })(), false],
-    ["placeholder fails", (() => { const value = clone(valid); value.prompt_pack.global_video_prompt = "TODO replace this"; return value; })(), false]
+    ["placeholder fails", (() => { const value = clone(valid); value.prompt_pack.global_video_prompt = "TODO replace this"; return value; })(), false],
+    ["missing execution plan fails", (() => { const value = clone(valid); delete value.prompt_pack.segmented_generation_plan[0].execution_plan; return value; })(), false],
+    ["incomplete ready plan fails", (() => { const value = clone(valid); value.prompt_pack.segmented_generation_plan[0].execution_plan.status = "ready"; return value; })(), false],
+    ["unknown execution asset fails", (() => { const value = clone(valid); value.prompt_pack.segmented_generation_plan[0].execution_plan.input_references[3].asset_id = "product_missing"; return value; })(), false]
   ];
   let passed = 0;
   for (const [name, value, shouldPass] of cases) {

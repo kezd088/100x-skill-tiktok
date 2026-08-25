@@ -20,6 +20,8 @@
 8. 每镜头提示词写主体、空间关系、动作顺序、时间节点、运镜、表演、光线、质感、商品位置、音频、字幕、参考资产映射和不变量。
 9. 分段必须沿真实镜头和叙事边界；当前模型时长上限是兼容约束，不是固定切镜规则。
 10. 模型专用版本只能使用已核实的能力。无法确认的输入形式写入 limitations，不要猜接口。
+11. 每个分段填写 execution_plan。若用户已选模型且当前官方能力已核实，status=ready，并填写真实 provider、model_id、omni/seedance adapter、目标时长、生成方式、包内输入素材、selection_basis 和 capability_checked_at_utc。若没有可靠依据，status=needs_model_selection、generation_method=undecided，模型字段为 null；不得把历史金样模型写成当前已选模型。
+12. input_references 优先列出分段首帧、关键高光帧、分段尾帧和实际需要的人物/产品/场景资产。relative_path 必须引用当前包内 frames/ 或 assets/；不要创建不存在的输入文件。
 
-输出前自检：镜头连续覆盖、时长一致、ID 唯一、引用完整、媒体路径相对、must_not_change 非空、limitations 和 uncertainties 真实存在。
+输出前自检：candidate_id 使用 100x-video-reverse-v2.1；镜头连续覆盖、时长一致、ID 唯一、引用完整、媒体路径相对、每段 execution_plan 可如实解释、must_not_change 非空、limitations 和 uncertainties 真实存在。
 ```

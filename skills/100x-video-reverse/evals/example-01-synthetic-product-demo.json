@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "candidate_id": "100x-video-reverse-v0.1",
+  "candidate_id": "100x-video-reverse-v2.1",
   "video_id": "synthetic_product_demo",
   "source_file": "synthetic_product_demo.mp4",
   "video": {
@@ -179,7 +179,43 @@
         "end_state": "Bottle centered and hand out of frame.",
         "continuity_anchors": ["Bottle geometry.", "Gray counter.", "Soft light from frame left."],
         "omni_prompt": "Generate one four-second continuous shot using the referenced bottle, hand and counter.",
-        "seedance_prompt": "Generate one four-second vertical product demo with stable hand and bottle geometry."
+        "seedance_prompt": "Generate one four-second vertical product demo with stable hand and bottle geometry.",
+        "execution_plan": {
+          "status": "needs_model_selection",
+          "target_duration_seconds": 4.0,
+          "provider": null,
+          "model_id": null,
+          "model_adapter": null,
+          "generation_method": "undecided",
+          "input_references": [
+            {
+              "type": "first_frame",
+              "label": "Shot 001 first frame",
+              "relative_path": "frames/shot_001_start.jpg",
+              "shot_id": "shot_001"
+            },
+            {
+              "type": "highlight_frame",
+              "label": "Shot 001 highlight frame",
+              "relative_path": "frames/shot_001_highlight.jpg",
+              "shot_id": "shot_001"
+            },
+            {
+              "type": "end_frame",
+              "label": "Shot 001 end frame",
+              "relative_path": "frames/shot_001_end.jpg",
+              "shot_id": "shot_001"
+            },
+            {
+              "type": "asset",
+              "label": "Product reference",
+              "relative_path": "assets/product_001.jpg",
+              "asset_id": "product_001"
+            }
+          ],
+          "selection_basis": "No current generation model capability has been verified for this synthetic fixture.",
+          "capability_checked_at_utc": null
+        }
       }
     ],
     "stitching_post_notes": ["No stitching is required for this single-shot fixture."],

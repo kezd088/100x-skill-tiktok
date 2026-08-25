@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  面向 TikTok / UGC 内容生产的 Claude Code / Codex agent skill 合集：脚本分段、人物与场景设定、取材关键词、提示词编排，每条判据都能跑脚本验证，不是散文式方法论。
+  面向 TikTok / UGC 内容生产的 Claude Code / Codex / WorkBuddy(CodeBuddy) agent skill 合集：脚本分段、人物与场景设定、取材关键词、提示词编排，每条判据都能跑脚本验证，不是散文式方法论。
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@
 
 | Skill | 做什么 | 触发词示例 | 状态 |
 |---|---|---|---|
-| [`100x-video-reverse`](./skills/100x-video-reverse) | 本地视频 → 只读指纹、双阈值切点提议、稠密帧和音轨 → 语义镜头时间轴、稳定资产图、音频文字证据、模型提示词包和媒体 provenance | 反推这条视频 · 这个视频怎么复刻 · reverse this video | ✅ v2.0 已验证 |
+| [`100x-video-reverse`](./skills/100x-video-reverse) | 本地视频 → 严格证据包 → 对话内直接展示源视频、分镜三帧、人物／产品／场景资产、提示词和逐段生成方案 | 反推这条视频 · 这个视频怎么复刻 · reverse this video | ✅ v2.1 已验证 |
 | [`100x-segment`](./skills/100x-segment) | 口播脚本纯文本（英/西）→ 三层独立叠加切分：段落逻辑（10模块+7原型）+ 镜头目的预判 + 行内气口标记 | "帮我分段" · "这段哪里该喘气" · "segment this script" | ✅ 已验证 |
 | [`100x-localize`](./skills/100x-localize) | 源文案（任意源语言）→ 墨西哥西语默认本地化版本，贴合真实语料强度分布，非逐字翻译 | "本地化成西语" · "翻译成西语文案" · "Mexican Spanish localization" | ✅ 已验证 |
 | [`100x-persona`](./skills/100x-persona) | 脚本文案 → 讲述人物设定 + 独立场景设定，每条可回溯到脚本原文引用 | "给这条脚本配个人设" · "这个场景怎么设定" · "who should deliver this script" | ✅ 已验证 |
@@ -61,24 +61,39 @@
 
 ## 快速开始
 
-### 一键安装（推荐）
+### Codex／Claude Code 一键安装
 
 ```bash
-# 整套：装进本机 Claude Code / Codex / 通用 agent 的 skills 目录
+# 整套
 npx -y skills add kezd088/100x-skill-tiktok -g --all
 
-# 单模块：只装一个 skill（<skill-name> 换成 skills/ 下的目录名，如 100x-segment）
-npx -y skills add kezd088/100x-skill-tiktok --skill <skill-name>
+# 只装视频反推
+npx -y skills add kezd088/100x-skill-tiktok --skill 100x-video-reverse
 ```
 
-### 本地软链（备选）
+### WorkBuddy／CodeBuddy 与本地仓库安装
+
+```powershell
+# Windows；同时注册到 Claude Code、Codex、WorkBuddy(CodeBuddy) 和通用 Agent
+powershell -ExecutionPolicy Bypass -File .\tools\install.ps1 -SkillName 100x-video-reverse
+```
 
 ```bash
-# 本机软链到 ~/.claude/skills、~/.codex/skills、~/.agents/skills，只增不覆盖
+# macOS／Linux／Git Bash
 bash tools/install.sh
 ```
 
-`tools/install.sh` 会把 `skills/<name>/` 软链接进 `~/.claude/skills`、`~/.codex/skills`、`~/.agents/skills` 三处，目标路径已存在会跳过、绝不覆盖。装完开一个新会话，直接说触发词或用 `/skill-name` 调用。
+两个本地安装器都会覆盖四个用户级目录：`~/.claude/skills`、`~/.codex/skills`、`~/.agents/skills`、`~/.codebuddy/skills`。目标路径已存在时跳过，绝不覆盖。安装后重启或重载客户端的 Skills。
+
+### 使用
+
+把视频拖进对话，或给出本地路径，然后只需说：
+
+```text
+反推这个视频
+```
+
+`100x-video-reverse` 会在当前对话中展示源视频入口、每个镜头的首帧／高光帧／尾帧、人物／产品／场景资产与提示词、逐段模型／时长／生成方式／输入素材、限制、成本和耗时。客户端不能内联视频时会提供可点击视频路径，但分镜帧和资产图仍须可视化展示。
 
 ### 验证
 
@@ -93,7 +108,7 @@ done
 
 README 只描述当前已建成、过验证的部分，不把已知局限藏起来：
 
-- `100x-video-reverse` v2.0 依赖 ffmpeg/ffprobe、Python 和 `jsonschema` 建立完整本地证据与严格交接；外部多模态分析不是默认权限。验证器全绿只代表时间轴、引用、路径和 provenance 可交接，不代表最终生成视频达到同等相似度。v2.0 已退役旧版 `visual_forms`／`slot_template` 契约，下游必须按新的 `references/output-contract.md` 适配
+- `100x-video-reverse` v2.1 依赖 ffmpeg/ffprobe、Python 和 `jsonschema` 建立完整本地证据与严格交接；外部多模态分析不是默认权限。验证器全绿只代表时间轴、引用、路径和 provenance 可交接，不代表最终生成视频达到同等相似度。不同客户端的媒体渲染能力不同，因此保证同一内容结构，不承诺完全相同的播放器 UI
 
 - `100x-search-query` 的敏感品类护栏（防止两性健康类文案无提示通过）：品类信号与权威宣称信号共享同一扫描范围（`category`/`product_name` 以及生成的 `queries.*.q`/`intent_cn`），信号词表覆盖常见近义词/委婉说法，但固定关键词表判据不是语义判据，表外的新说法依然能绕过——这条护栏不宣称"已完全解决"
 - `100x-persona` 的证据子串判据防不住"字面是原文子串、但摘录后语义被反转"的滥用（`checkEvidenceQuotes` 只做逐字包含检查），另有一层闭集自我怀疑短语强制披露作为缓解（`checkAuthorityHedgeRisk`），但反讽/引用-驳斥框架类反转依然检测不到，这是 JSON Schema 和字符串匹配两层机制共同的天花板

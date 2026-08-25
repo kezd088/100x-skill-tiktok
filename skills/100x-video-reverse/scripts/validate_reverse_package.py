@@ -503,8 +503,10 @@ def validate_materialization_provenance(
 
 def validate_prompt_pack(
     data: dict[str, Any],
+    root: Path,
     shot_ids: set[str],
     asset_ids: set[str],
+    require_media: bool,
     max_segment_seconds: float,
     errors: list[dict[str, str]],
     warnings: list[dict[str, str]],
@@ -530,6 +532,10 @@ def validate_prompt_pack(
             add(errors, "unknown_prompt_asset", f"$.prompt_pack.asset_prompts[{index}].asset_id", f"Prompt references unknown asset: {item.get('asset_id')}")
 
     segments = prompt_pack.get("segmented_generation_plan") if isinstance(prompt_pack.get("segmented_generation_plan"), list) else []
+    candidate_id = data.get("candidate_id")
+    requires_execution_plan = isinstance(candidate_id, str) and re.search(
+        r"(?:^|-)(?:v2\.1|v0\.2)(?:-|$)", candidate_id
+    ) is not None
     segment_ranges: list[tuple[float, float, int]] = []
     seen_segment_ids: set[str] = set()
     covered_shots: set[str] = set()
@@ -553,6 +559,53 @@ def validate_prompt_pack(
                 add(errors, "unknown_segment_shot", f"{location}.shot_ids", f"Segment references unknown shot: {shot_id}")
             else:
                 covered_shots.add(shot_id)
+        execution = segment.get("execution_plan")
+        if requires_execution_plan and not isinstance(execution, dict):
+            add(errors, "missing_execution_plan", f"{location}.execution_plan", "Current packages require a user-visible execution plan.")
+            continue
+        if not isinstance(execution, dict):
+            continue
+        status = execution.get("status")
+        if status not in {"ready", "needs_model_selection", "blocked"}:
+            add(errors, "invalid_execution_status", f"{location}.execution_plan.status", "Execution status is invalid.")
+        target_duration = as_number(execution.get("target_duration_seconds"))
+        if target_duration is None or target_duration <= 0:
+            add(errors, "invalid_target_duration", f"{location}.execution_plan.target_duration_seconds", "Target duration must be positive.")
+        method = execution.get("generation_method")
+        allowed_methods = {
+            "text_to_video", "first_frame_to_video", "first_last_frame_to_video",
+            "reference_images_to_video", "video_to_video", "undecided",
+        }
+        if method not in allowed_methods:
+            add(errors, "invalid_generation_method", f"{location}.execution_plan.generation_method", "Generation method is invalid.")
+        references = execution.get("input_references") if isinstance(execution.get("input_references"), list) else []
+        for reference_index, reference in enumerate(references):
+            reference_location = f"{location}.execution_plan.input_references[{reference_index}]"
+            if not isinstance(reference, dict):
+                add(errors, "invalid_input_reference", reference_location, "Input reference must be an object.")
+                continue
+            asset_id = reference.get("asset_id")
+            shot_id = reference.get("shot_id")
+            relative_path = reference.get("relative_path")
+            if isinstance(asset_id, str) and asset_id not in asset_ids:
+                add(errors, "unknown_execution_asset", f"{reference_location}.asset_id", f"Execution plan references unknown asset: {asset_id}")
+            if isinstance(shot_id, str) and shot_id not in shot_ids:
+                add(errors, "unknown_execution_shot", f"{reference_location}.shot_id", f"Execution plan references unknown shot: {shot_id}")
+            if isinstance(relative_path, str):
+                validate_media_reference(root, relative_path, f"{reference_location}.relative_path", require_media, errors, warnings)
+            elif not isinstance(asset_id, str):
+                add(errors, "unresolved_input_reference", reference_location, "Input reference requires relative_path or asset_id.")
+        if status == "ready":
+            for field in ("provider", "model_id", "selection_basis", "capability_checked_at_utc"):
+                require_nonempty_string(execution.get(field), f"{location}.execution_plan.{field}", errors)
+            if execution.get("model_adapter") not in {"omni", "seedance"}:
+                add(errors, "invalid_ready_adapter", f"{location}.execution_plan.model_adapter", "A ready plan must select the omni or seedance prompt adapter.")
+            if method == "undecided":
+                add(errors, "undecided_ready_method", f"{location}.execution_plan.generation_method", "A ready plan must select a generation method.")
+            if not references:
+                add(errors, "missing_ready_inputs", f"{location}.execution_plan.input_references", "A ready plan must identify its input media.")
+        elif status in {"needs_model_selection", "blocked"}:
+            add(warnings, "generation_plan_not_ready", f"{location}.execution_plan", f"Generation plan status is {status}; the Agent response must show this limitation.")
     if segments and shot_ids - covered_shots:
         add(errors, "uncovered_segment_shots", "$.prompt_pack.segmented_generation_plan", f"Shots absent from every segment: {', '.join(sorted(shot_ids - covered_shots))}")
     segment_ranges.sort(key=lambda item: item[0])
@@ -608,7 +661,7 @@ def main() -> None:
         shot_ids = validate_timeline(data, errors, warnings)
         validate_semantic_content(data, errors)
         asset_ids = validate_refs_and_media(data, root, shot_ids, args.require_media, errors, warnings)
-        validate_prompt_pack(data, shot_ids, asset_ids, args.max_segment_seconds, errors, warnings)
+        validate_prompt_pack(data, root, shot_ids, asset_ids, args.require_media, args.max_segment_seconds, errors, warnings)
         evidence = data.get("evidence") if isinstance(data.get("evidence"), dict) else {}
         limitations = evidence.get("limitations") if isinstance(evidence.get("limitations"), list) else []
         uncertainties = evidence.get("uncertainties") if isinstance(evidence.get("uncertainties"), list) else []
