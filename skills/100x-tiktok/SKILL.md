@@ -26,7 +26,7 @@ TikTok/UGC 广告创意生产流水线的总路由。不代替任何 skill 的�
 
 | Skill | 步骤 | 一句话说明 | 典型触发场景 |
 |---|---|---|---|
-| `100x-video-reverse` | 0 视频反推 | 视频→（ffmpeg 抽帧）→复刻提示词（分镜时间轴+画面形态轴双轴）+变量化模板，中英双语 | "反推这条视频""这个视频怎么复刻""reverse this video" |
+| `100x-video-reverse` | 0 视频反推 | 本地视频→只读证据→语义镜头时间轴+稳定资产图+音频文字证据+提示词包+provenance | "反推这条视频""这个视频怎么复刻""reverse this video" |
 | `100x-segment` | 1 分段 | 口播脚本切三段：段落逻辑+镜头目的+气口标记 | "帮我分段""这段哪里该喘气""拆一下这条口播文案" |
 | `100x-localize` | 2c 投放语本地化 | 源文案→墨西哥西语本地化，主动压缩防直译膨胀 | "本地化成西语""翻译成西语文案""localize this ad copy" |
 | `100x-persona` | 3.1 人物×场景 | 脚本→"谁来讲"+"在哪拍"，逐字回指原文 | "给这条脚本配个人设""这条广告适合什么场景拍""who should deliver this script" |
@@ -42,7 +42,7 @@ TikTok/UGC 广告创意生产流水线的总路由。不代替任何 skill 的�
 
 | 刚做完 | 典型下一步 | 说明 |
 |---|---|---|
-| `100x-video-reverse` | → `100x-visual-fission` 或 `100x-prompt-compose` | 反推出复刻提示词和变量化模板了，要么做视觉裂变出多版，要么直接组装提示词喂模型 |
+| `100x-video-reverse` | → 生成适配／`100x-visual-fission`／`100x-prompt-compose` | 先复核反推包；后两个 Skill 可消费其中的参考资产或提示词，但不承诺直接兼容完整 `reverse.json` |
 | `100x-segment` | → `100x-persona` 或 `100x-localize` | 分好段了，要么配人物场景，要么直接本地化 |
 | `100x-localize` | → `100x-exaggerate` | 西语文案有了，加夸张和反差让它不"平" |
 | `100x-persona` | → `100x-search-query` 或 `100x-exaggerate` | 人设场景定了，可以搜视觉参考或设计夸张点 |
@@ -52,9 +52,9 @@ TikTok/UGC 广告创意生产流水线的总路由。不代替任何 skill 的�
 | `100x-prompt-compose` | （终点） | 提示词已组装好，可以直接喂 Veo/Seedance/即创 |
 
 ## 独立调用保证
-以上 8 个 skill **每个都完全独立可调用**，不要求先跑别的。唯一例外是 `100x-video-reverse`
-需要先跑本 skill 自己的 `scripts/extract-frames.mjs`（依赖 ffmpeg/ffprobe 把视频抽成帧图，
-因为 agent 读不了 mp4）——这是它内部的两步流水线，不是要求先跑另一个 skill。路由只是帮你
+以上 8 个 skill **每个都完全独立可调用**，不要求先跑别的。`100x-video-reverse`
+会在内部运行 `scripts/prepare_evidence.py`（依赖 ffmpeg/ffprobe）建立源指纹、稠密帧和音轨，
+再物化并严格验证交付媒体——这是它自己的工作流，不是要求先跑另一个 skill。路由只是帮你
 选入口和指方向，不是前置条件。"先跑路由"不是必选项——你直接叫任何一个 skill 的名字或说
 触发词，它都会被自动激活。
 

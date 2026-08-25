@@ -1,42 +1,41 @@
 {
   "id": "100x-video-reverse",
   "name": "100x-video-reverse",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "method_version": "0.1.0",
   "author": "100x",
   "layer": "L1-source-reversal",
   "step": "0-video-reverse",
-  "type": "generative",
-  "status": "v1.0",
-  "summary": "Source video (or its pre-extracted frames) in -> two sections out: (1) replication prompts on two orthogonal axes -- shots[] (per-cut timeline axis) and visual_forms[] (per-visual-form axis, linked back to shots[] via appears_in_shots); (2) variabilization -- slot_template ({VAR} placeholders + candidate values) and cross_shot_analysis (invariants vs. varying axes across cuts within this one video). Every prompt ships bilingual: prompt_en (for Veo/Seedance) + prompt_zh (for the ops team to read and edit).",
+  "type": "analytical",
+  "status": "validated",
+  "summary": "Local source video in; immutable evidence, semantic shot timeline, stable asset graph, audio/text evidence, generation-ready prompt pack, provenance and strict validation out. Analysis only: no generation, publishing or automatic upload.",
+  "supersedes": {
+    "version": "1.0.0",
+    "commit": "572acb755ea6868f9c9971809deafd09e72c8a37",
+    "reason": "The retired implementation validated a bilingual dual-axis prompt format but did not provide the evidence, media provenance, source-hash binding and strict on-disk package validation required by the current golden method."
+  },
   "validation": {
-    "structural_and_per_item": "schema.json (JSON Schema draft-07) -- enforces required/additionalProperties/enum/pattern/minLength/maxLength/minItems/uniqueItems, executed by ajv (devDependency declared in package.json, run 'npm install' first) inside scripts/validate.js. This covers: source.duration_sec's exclusiveMinimum:0 + maximum:180 (axiom 1's structural half -- rejects a hand-fabricated bundle claiming to reverse a >180s video even if it never went through extract-frames.mjs); time_bucket's SHAPE pattern (one-decimal 'start-end' string, axiom 2's shape half only, not the arithmetic); prompt_en/template_en's printable-ASCII lockdown + mandatory ', no text, no subtitles, no watermarks' suffix pattern (axiom 3's two of three rules); visual_form_item.appears_in_shots' uniqueItems (axiom 4's within-array half only); slot_item.name's ALL-CAPS pattern, slot_item.candidates' minItems:2, and template_en's at-least-one-{SLOT}-token lookahead (axiom 5's naming/existence half). This is everything vanilla JSON Schema CAN express -- per-field shape and single-object constraints, not cross-item or cross-field arithmetic/string-parsing.",
-    "cross_item_aggregate": "scripts/validate.js's hand-written layer -- the real, runnable enforcement of everything schema.json's own description fields flag as out of ajv's reach: axiom 1's meta.frames_source non-empty + source.frames_analyzed>=1 cross-object consistency (schema.json's required covers presence, not 'do these two fields agree with each other', and cannot detect a fabricated frames_source path); axiom 2's C1-C5 timeline continuity (first shot start==0.0, last shot end within +/-0.2 of source.duration_sec, adjacent shots touch with zero gap/overlap, end>start, shot_id ascending from 1 -- all require parsing the two numbers out of each time_bucket string and comparing across sibling array items and a top-level field, which no JSON Schema keyword can do) plus the per-model duration-cap comparison ((end-start) against target_model's ceiling, reusing MODEL_DURATION_CAP byte-for-byte from this repo's own 100x-prompt-compose/scripts/validate.js:90 ({veo:8.0, seedance:10.0, '即创':null}), with '即创' (null cap) and 'generic' (no key at all) both falling back to the strictest 8.0s tier per axioms.md axiom 2's original decision); axiom 3's case-insensitive, word-boundary-matched 21-word banned-list scan on prompt_en, run only AFTER stripping the mandatory ', no text, no subtitles, no watermarks' suffix (axioms.md's explicit warning: scanning before stripping fails every legal prompt, since 'text'/'subtitle'/'watermark' are themselves 3 of the 21 banned words) -- bare substring (.includes()) matching is explicitly forbidden here to prevent false-positive matches on words like 'secure'/'manicure' (containing 'cure') or 'unpolished' (containing 'polished'); axiom 4's bidirectional shots[]<->visual_forms[] integrity (every visual_forms[].appears_in_shots value must be a real shots[].shot_id; every shots[].shot_id must be covered by at least one visual_forms[] entry -- zero orphans in both directions) plus visual_forms[].form_type uniqueness across the array, plus cross_shot_analysis.invariants[].holds_in_shots referential integrity; axiom 5's {VAR}-token tokenization and bidirectional closure between template_en's placeholders and slots[].name (every token used must be declared AND every declared slot must be used), plus the template_en<->template_zh slot-set equality check. Run 'node scripts/validate.js --selftest' for the built-in regression suite (54 checks, every axiom covered by at least one passing and one failing case) -- see axioms.md's per-axiom '反例' sections for the exact counterexamples each check must catch.",
-    "note": "Same schema/script split discipline as every other skill in this repo (ajv 8.x wiring, structural checks executed by ajv against schema.json, cross-item/cross-field checks hand-written in scripts/validate.js). The shipped functions map one-to-one onto the axioms -- axiom1Check, axiom2TimelineCheck, axiom3BannedWordScan (with stripMandatorySuffix enforcing strip-before-scan, wordMatch enforcing word-boundary + optional-plural matching, and the dual-variant pair collapsedVariant/spacedExemptVariant feeding it), axiom4CrossAxisIntegrityCheck, axiom5SlotClosureCheck (with extractSlotTokens, setsEqual and checkBraceWellFormedness), and bilingualStructuralAlignmentCheck. The dual-variant design is load-bearing and must not be collapsed back into a single normalization: deleting hyphens catches split-word attacks (beauti-ful) but destroys the word boundary that already protected against compound-word attacks (professional-grade), while replacing hyphens with spaces does the exact reverse -- both variants are scanned and a hit in either one fails the bundle. The spaced variant additionally exempts <text-layer-word>(s)?-free/-less compounds, built ONLY from TEXT_LAYER_WORDS and never from the AI-beautification list, so that legitimate phrasings like logo-free / watermark-free pass while deliberately disguised ones like professional-free / studio-less are still caught. An exemption branch for <text-layer-word>-to-<word> is not permitted: its trailing [a-z]+ accepts any word, so text-to-professional / logo-to-glamour / font-to-watermark would erase the banned word on the far side of the hyphen along with the trigger. 'node scripts/validate.js --selftest' reports 54/54 and exits 0; 'node scripts/validate.js evals/*.json' passes every synthetic example. axiom1Check's assertions are backed by ajv (frames_analyzed's minimum:1 and frames_source's minLength:1) with the hand-written check serving as defensive backstop."
+    "structural": "schema.json is JSON Schema draft-07 and is compiled by ajv in scripts/validate.js. It validates required fields, types, minimum content and nested package shape.",
+    "cross_item": "scripts/validate.js checks timeline continuity, duration arithmetic, unique and resolvable shot/asset references, segment references, confidence ranges and safe relative media paths. Its --selftest uses synthetic fixtures only.",
+    "filesystem_and_provenance": "scripts/validate_reverse_package.py performs the full handoff gate against reverse.json, source_manifest.json, materialized files and materialization_manifest.json. It hard-stops when jsonschema is unavailable and does not treat legacy media as valid for a new handoff."
   },
   "input_contract": {
-    "class_a_required": ["a source video file path, OR pre-extracted frames plus the meta.json produced by scripts/extract-frames.mjs"],
-    "class_b_optional_soft_degrade": ["target_model (veo/seedance/即创/generic; when unspecified, FILL THE FIELD WITH 'generic' -- not 'veo' -- and apply the strictest 8.0s per-segment ceiling per axioms.md axiom 2. The two share the same numeric cap but differ in meaning: 'generic' records that no engine was specified, whereas writing 'veo' would make the bundle claim it was prepared for Veo when the user never said so)"],
-    "class_c_upstream_optional_silent_skip": [],
-    "note": "This repo does not yet have a shared cross-skill input schema (schemas/ is empty). Unlike every downstream skill in this repo's pipeline, this skill has NO class-C upstream input at all: it is the earliest source-reversal step in the video-first path (video -> 100x-video-reverse -> 100x-visual-fission -> 100x-prompt-compose), not a consumer of any other skill's output. A video that fails to open, has no readable duration, or exceeds 180s is rejected outright by scripts/extract-frames.mjs's exit code (axiom 1) before this skill's generative step ever runs -- this is a class-A hard gate enforced upstream of the schema, not a soft degrade."
+    "required": [
+      "one readable local .mp4, .mov, .webm, .mkv or .m4v file",
+      "a new empty output directory"
+    ],
+    "optional": [
+      "explicit authorization for an external multimodal model",
+      "a user-selected target generation model for prompt adaptation"
+    ]
   },
-  "output_contract": "schema.json (VideoReverseBundle, self-contained in this skill)",
-  "requires_data": [
-    "taxonomy.video_reverse_generation_axioms",
-    "methodology.video_reverse_selfcheck_insights",
-    "taxonomy.video_reverse_segment_duration_caps",
-    "taxonomy.storyboard_time_bucket_and_camera_fields",
-    "taxonomy.visual_form_vocabulary"
-  ],
-  "requires_data_note": "Not runtime dependencies -- this skill is purely generative and does not query a corpus or taxonomy file at inference time. 'taxonomy.video_reverse_generation_axioms' records the 180s refusal threshold, the 21-word banned list (11 AI-beautification + 10 text-layer), and the mandatory ', no text, no subtitles, no watermarks' suffix (axioms 1 and 3). 'methodology.video_reverse_selfcheck_insights' records the word-boundary matching requirement to prevent false positives like 'unpolished'. 'taxonomy.video_reverse_segment_duration_caps' records the veo/seedance per-model segment duration tiers and C1-C5 timeline continuity assertions (axiom 2), using the MODEL_DURATION_CAP constant. 'taxonomy.storyboard_time_bucket_and_camera_fields' records storyboard time_bucket format and single-line camera_note. 'taxonomy.visual_form_vocabulary' records the 9-value form_type_enum visual form taxonomy. No corpus/table content is stored in this repo.",
-  "ported_from": {
-    "private_source_skill": null,
-    "private_source_paths": [],
-    "adaptation_summary": "Video reversal generation framework featuring: (1) dual-axis structure combining shots[] (timeline cuts) and visual_forms[] (visual forms), cross-linked via appears_in_shots and enforced by axiom 4; (2) bilingual output pairing prompt_en (ASCII + banned words scan + mandatory suffix) with prompt_zh; (3) variabilization section with slot_template and cross_shot_analysis (invariants and varying axes). shot_purpose 7-value enum is reused from 100x-segment. Full details in axioms.md and sources.md."
-  },
+  "output_contract": "schema.json plus references/output-contract.md",
+  "requires_data": [],
+  "requires_data_note": "The public skill contains no customer corpus, account identifier, product name, video frame or private benchmark input. Runtime evidence is created from the user's local video and remains outside this repository.",
   "language_scope": {
-    "output_language": "prompt_en/template_en are pattern-locked to printable ASCII plus the mandatory ', no text, no subtitles, no watermarks' suffix (axiom 3) -- these feed Veo/Seedance directly. prompt_zh/template_zh are Chinese reading copy for the ops team, checked only for STRUCTURAL alignment with their English counterpart (both present, matching {VAR} slot counts), never for translation fidelity (known limitation, see SKILL.md). slot_item.name is an ALL-CAPS English token (e.g. 'ETHNICITY'); slot_item.observed_value and every entry of slot_item.candidates are ALSO pattern-locked to printable ASCII, ensuring values substituted into template_en remain compliant ASCII prompts.",
-    "input_language": "The source video's spoken audio or on-screen text language is irrelevant to this skill's input contract -- it consumes visual frames, not audio transcripts or captions, and always produces prompts in the two fixed languages described above regardless of what language, if any, is spoken or shown in the source video."
+    "instructions": "Chinese",
+    "observed_audio_and_text": "Preserve the source language exactly when legible or audible; otherwise record uncertainty instead of inventing content.",
+    "generation_prompts": "Model-neutral common prompt plus currently verified model adapters."
   },
-  "banned_terms_ref": "SKILL.md#禁用词",
-  "eval_policy": "evals/ contains synthetic/fictional videos and frame descriptions only -- no real transcript text, account name, product name, or Feishu link may appear in this skill's files. Because this skill's input is VIDEO FRAMES rather than text, evals/ entries must additionally avoid describing any real, identifiable video's actual visual content; only synthetic structural/methodological patterns are used, never verbatim scene descriptions."
+  "eval_policy": "evals/ contains only synthetic reverse.json structures. Real videos, frames, transcripts, customer names, account names, product names and credentials are prohibited."
 }

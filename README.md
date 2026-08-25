@@ -49,7 +49,7 @@
 
 | Skill | 做什么 | 触发词示例 | 状态 |
 |---|---|---|---|
-| [`100x-video-reverse`](./skills/100x-video-reverse) | 视频 →（ffmpeg 抽帧）→ 两段产出：复刻提示词（分镜时间轴 + 画面形态轴双轴）+ 变量化（{VAR} 插槽模板 + 跨镜头不变量与变化轴），中英双语 | 反推这条视频 · 这个视频怎么复刻 · reverse this video | ✅ 已验证 |
+| [`100x-video-reverse`](./skills/100x-video-reverse) | 本地视频 → 只读指纹、双阈值切点提议、稠密帧和音轨 → 语义镜头时间轴、稳定资产图、音频文字证据、模型提示词包和媒体 provenance | 反推这条视频 · 这个视频怎么复刻 · reverse this video | ✅ v2.0 已验证 |
 | [`100x-segment`](./skills/100x-segment) | 口播脚本纯文本（英/西）→ 三层独立叠加切分：段落逻辑（10模块+7原型）+ 镜头目的预判 + 行内气口标记 | "帮我分段" · "这段哪里该喘气" · "segment this script" | ✅ 已验证 |
 | [`100x-localize`](./skills/100x-localize) | 源文案（任意源语言）→ 墨西哥西语默认本地化版本，贴合真实语料强度分布，非逐字翻译 | "本地化成西语" · "翻译成西语文案" · "Mexican Spanish localization" | ✅ 已验证 |
 | [`100x-persona`](./skills/100x-persona) | 脚本文案 → 讲述人物设定 + 独立场景设定，每条可回溯到脚本原文引用 | "给这条脚本配个人设" · "这个场景怎么设定" · "who should deliver this script" | ✅ 已验证 |
@@ -93,7 +93,7 @@ done
 
 README 只描述当前已建成、过验证的部分，不把已知局限藏起来：
 
-- `100x-video-reverse` 依赖外部二进制 ffmpeg/ffprobe 抽帧（agent 读不了 mp4，必须先跑 `scripts/extract-frames.mjs`）；`prompt_en` 的 21 词禁词扫描经多轮加固，但仍有三处如实披露的天花板：无分隔符融合词（`homestudio` 焊死 `studio`）绕过词边界、`text-to-speech`/`speech-to-text` 这类技术术语被误判为文字层禁词、`phrase`/`lettering` 等同义表达绕开名词词表——这三处是刻意不修或修了代价更大的已知局限，不宣称已完全解决
+- `100x-video-reverse` v2.0 依赖 ffmpeg/ffprobe、Python 和 `jsonschema` 建立完整本地证据与严格交接；外部多模态分析不是默认权限。验证器全绿只代表时间轴、引用、路径和 provenance 可交接，不代表最终生成视频达到同等相似度。v2.0 已退役旧版 `visual_forms`／`slot_template` 契约，下游必须按新的 `references/output-contract.md` 适配
 
 - `100x-search-query` 的敏感品类护栏（防止两性健康类文案无提示通过）：品类信号与权威宣称信号共享同一扫描范围（`category`/`product_name` 以及生成的 `queries.*.q`/`intent_cn`），信号词表覆盖常见近义词/委婉说法，但固定关键词表判据不是语义判据，表外的新说法依然能绕过——这条护栏不宣称"已完全解决"
 - `100x-persona` 的证据子串判据防不住"字面是原文子串、但摘录后语义被反转"的滥用（`checkEvidenceQuotes` 只做逐字包含检查），另有一层闭集自我怀疑短语强制披露作为缓解（`checkAuthorityHedgeRisk`），但反讽/引用-驳斥框架类反转依然检测不到，这是 JSON Schema 和字符串匹配两层机制共同的天花板

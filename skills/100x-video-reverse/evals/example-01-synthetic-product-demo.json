@@ -1,0 +1,196 @@
+{
+  "schema_version": "1.0",
+  "candidate_id": "100x-video-reverse-v0.1",
+  "video_id": "synthetic_product_demo",
+  "source_file": "synthetic_product_demo.mp4",
+  "video": {
+    "filename": "synthetic_product_demo.mp4",
+    "duration_seconds": 4.0,
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "fps": 30,
+    "audio_track": "No audible speech; one soft placement sound.",
+    "language": "none",
+    "subtitle_type": "none",
+    "overall_style": "Synthetic handheld product demonstration in a neutral kitchen.",
+    "narrative_structure": "A hand places a plain blue bottle on a counter and rotates it toward camera.",
+    "hook": "The bottle enters the empty frame immediately.",
+    "product_bridge": "The hand centers and rotates the bottle.",
+    "proof_process": "The front, side and cap remain visible during the rotation.",
+    "cta": "No CTA is observed in this synthetic fixture."
+  },
+  "shots": [
+    {
+      "shot_id": "shot_001",
+      "start_time_seconds": 0.0,
+      "end_time_seconds": 4.0,
+      "duration_seconds": 4.0,
+      "transition": "Single continuous shot.",
+      "frames": {
+        "start": {
+          "timestamp_seconds": 0.0,
+          "reason": "Empty counter before the product enters.",
+          "relative_path": "frames/shot_001_start.jpg"
+        },
+        "representative": {
+          "timestamp_seconds": 1.5,
+          "reason": "Hand and bottle are both clearly visible.",
+          "relative_path": "frames/shot_001_representative.jpg"
+        },
+        "highlight": {
+          "timestamp_seconds": 2.5,
+          "reason": "Bottle front reaches the camera-facing position.",
+          "relative_path": "frames/shot_001_highlight.jpg"
+        },
+        "end": {
+          "timestamp_seconds": 3.9,
+          "reason": "Hand exits while the bottle remains centered.",
+          "relative_path": "frames/shot_001_end.jpg"
+        }
+      },
+      "people": ["person_001"],
+      "products": ["product_001"],
+      "scenes": ["scene_001"],
+      "props": [],
+      "wardrobe": [],
+      "expressions": ["Face not visible."],
+      "actions": ["A right hand places and rotates the bottle, then exits frame."],
+      "product_interactions": ["The fingers grip the bottle at its middle without covering the cap."],
+      "shot_size": "Close product shot.",
+      "camera_position": "Eye-level camera facing the counter.",
+      "camera_motion": "Minor handheld drift; no deliberate move.",
+      "lighting": "Soft window light from frame left.",
+      "color": "Neutral gray counter with a blue product accent.",
+      "dialogue": [],
+      "sound_effects": ["Soft bottle placement sound at approximately 1.0 seconds."],
+      "music": "No music is observed.",
+      "subtitles": [],
+      "screen_text": [],
+      "narrative_function": "Introduce and reveal the product shape.",
+      "conversion_function": "Show the object clearly without making a commercial claim.",
+      "evidence_timestamps": [0.0, 1.5, 2.5, 3.9],
+      "confidence": 0.98
+    }
+  ],
+  "assets": {
+    "people": [
+      {
+        "asset_id": "person_001",
+        "asset_type": "person",
+        "name": "Anonymous hand",
+        "first_appearance_seconds": 0.6,
+        "shot_ids": ["shot_001"],
+        "observable_facts": ["Only a right hand and wrist are visible."],
+        "consistency_anchors": ["Short unpainted nails.", "No visible jewelry."],
+        "screenshot_timestamp_seconds": 1.5,
+        "screenshot_relative_path": "assets/person_001.jpg",
+        "crop_instruction": "Crop the hand and wrist without including the bottle.",
+        "generic_prompt": "A natural right hand with short unpainted nails entering from frame right.",
+        "omni_prompt": "Preserve the same right hand, nail length and entry direction.",
+        "seedance_prompt": "Keep the hand anatomy natural and the grip stable around the bottle.",
+        "invariants": ["Right hand.", "Short unpainted nails.", "No jewelry."],
+        "confidence": 0.95
+      }
+    ],
+    "products": [
+      {
+        "asset_id": "product_001",
+        "asset_type": "product",
+        "name": "Plain blue bottle",
+        "first_appearance_seconds": 0.6,
+        "shot_ids": ["shot_001"],
+        "observable_facts": ["Matte blue cylindrical bottle with a matching round cap and no visible label."],
+        "consistency_anchors": ["Matte blue body.", "Round matching cap.", "No visible printed label."],
+        "screenshot_timestamp_seconds": 2.5,
+        "screenshot_relative_path": "assets/product_001.jpg",
+        "crop_instruction": "Crop the full bottle with a small margin and exclude the hand.",
+        "generic_prompt": "A matte blue cylindrical bottle with a matching round cap and no printed label.",
+        "omni_prompt": "Preserve the blue bottle proportions, cap shape and label-free surface.",
+        "seedance_prompt": "Keep the bottle rigid and unchanged while it rotates toward camera.",
+        "invariants": ["Blue cylindrical body.", "Matching round cap.", "No label."],
+        "confidence": 0.99
+      }
+    ],
+    "scenes": [
+      {
+        "asset_id": "scene_001",
+        "asset_type": "scene",
+        "name": "Neutral kitchen counter",
+        "first_appearance_seconds": 0.0,
+        "shot_ids": ["shot_001"],
+        "observable_facts": ["Light gray counter and an out-of-focus pale wall."],
+        "consistency_anchors": ["Light gray counter.", "Pale background.", "Window light from left."],
+        "screenshot_timestamp_seconds": 0.0,
+        "screenshot_relative_path": "assets/scene_001.jpg",
+        "crop_instruction": "Use the full frame before the hand enters.",
+        "generic_prompt": "A light gray kitchen counter against a pale softly blurred wall.",
+        "omni_prompt": "Preserve the empty counter, pale wall and left-side soft light.",
+        "seedance_prompt": "Keep the neutral kitchen background fixed throughout the shot.",
+        "invariants": ["Gray counter.", "Pale wall.", "Soft left light."],
+        "confidence": 0.98
+      }
+    ],
+    "props": [],
+    "wardrobe": [],
+    "audio": [],
+    "text": []
+  },
+  "prompt_pack": {
+    "global_video_prompt": "A four-second vertical handheld product demonstration on a neutral kitchen counter. A right hand enters from frame right, places a matte blue cylindrical bottle, rotates its front toward camera, and exits while the bottle remains centered. Preserve the bottle proportions, cap, neutral background and soft left-side window light.",
+    "shot_prompts": [
+      {
+        "shot_id": "shot_001",
+        "common": "Start on an empty gray counter. A right hand enters from frame right with a matte blue bottle, places it at center, rotates it toward camera, releases it and exits by four seconds.",
+        "omni": "Use the supplied hand, bottle and counter references; maintain the exact bottle proportions and grip sequence.",
+        "seedance": "One continuous close product shot with stable hand anatomy, a rigid bottle and slight natural handheld drift."
+      }
+    ],
+    "asset_prompts": [
+      {
+        "asset_id": "person_001",
+        "common": "Natural right hand with short unpainted nails and no jewelry.",
+        "omni": "Match the right hand reference and entry direction.",
+        "seedance": "Preserve finger count, grip and wrist angle."
+      },
+      {
+        "asset_id": "product_001",
+        "common": "Matte blue cylindrical bottle with a matching round cap and no label.",
+        "omni": "Match the bottle reference exactly.",
+        "seedance": "Keep bottle geometry rigid during rotation."
+      },
+      {
+        "asset_id": "scene_001",
+        "common": "Neutral gray kitchen counter and softly blurred pale wall.",
+        "omni": "Match the counter and left-side light reference.",
+        "seedance": "Keep background and lighting unchanged."
+      }
+    ],
+    "omni_version": "Model identifier must be verified at runtime; use common prompts if unavailable.",
+    "seedance_version": "Model identifier must be verified at runtime; use common prompts if unavailable.",
+    "negative_constraints": ["Do not add labels, text, jewelry, extra hands, camera cuts or background objects."],
+    "segmented_generation_plan": [
+      {
+        "segment_id": "segment_001",
+        "start_time_seconds": 0.0,
+        "end_time_seconds": 4.0,
+        "shot_ids": ["shot_001"],
+        "start_state": "Empty gray counter.",
+        "key_action": "Hand places and rotates the blue bottle.",
+        "end_state": "Bottle centered and hand out of frame.",
+        "continuity_anchors": ["Bottle geometry.", "Gray counter.", "Soft light from frame left."],
+        "omni_prompt": "Generate one four-second continuous shot using the referenced bottle, hand and counter.",
+        "seedance_prompt": "Generate one four-second vertical product demo with stable hand and bottle geometry."
+      }
+    ],
+    "stitching_post_notes": ["No stitching is required for this single-shot fixture."],
+    "reference_asset_map": ["person_001 -> assets/person_001.jpg", "product_001 -> assets/product_001.jpg", "scene_001 -> assets/scene_001.jpg"],
+    "must_not_change": ["Bottle color and proportions.", "Cap shape.", "Counter color.", "Hand entry direction."]
+  },
+  "evidence": {
+    "input_mode": "Synthetic fixture; no real video is included in the repository.",
+    "sampling_density": "Four declared evidence moments across one four-second shot.",
+    "transcript_source": "No speech is present.",
+    "limitations": ["This fixture validates structure and references, not visual-analysis accuracy."],
+    "uncertainties": []
+  }
+}

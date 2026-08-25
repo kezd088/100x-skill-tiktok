@@ -31,9 +31,10 @@ for skill_path in "$SKILLS_DIR"/*/; do
     continue
   fi
 
-  # node_modules（devDependency，比如 ajv）不进分发包——安装方自己 npm install
+  # 本地依赖和解释器缓存不进分发包——安装方自行安装依赖，缓存由运行环境重建
   cp -R "$skill_path" "$DIST_DIR/$name"
-  rm -rf "$DIST_DIR/$name/node_modules"
+  find "$DIST_DIR/$name" -type d \( -name node_modules -o -name __pycache__ \) -prune -exec rm -rf {} +
+  find "$DIST_DIR/$name" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
   echo "已打包: $name"
   built=$((built + 1))
 done

@@ -22,11 +22,11 @@
     {
       "id": "100x-video-reverse",
       "path": "skills/100x-video-reverse",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "step": "0-video-reverse",
       "status": "validated",
       "validation_result": "已通过独立验证",
-      "summary": "输入一条视频（先经 ffmpeg 抽帧，agent 读帧图）→ 输出两段：复刻提示词（shots[] 分镜时间轴 + visual_forms[] 画面形态轴，双轴正交挂钩）+ 变量化（{VAR} 插槽模板 + 同视频内跨镜头不变量与变化轴），每条提示词 prompt_en 喂模型、prompt_zh 给运营读改。",
+      "summary": "输入一条本地参考视频，输出源文件指纹、本地稠密证据、语义镜头时间轴、稳定资产图、音频文字证据、模型提示词包、媒体 provenance 和严格验证报告；只负责反推与交接，不执行生成。",
       "trigger_examples": [
         "反推这条视频",
         "这个视频怎么复刻",
@@ -38,8 +38,8 @@
         "extract prompts from this video"
       ],
       "validate_cmd": "node skills/100x-video-reverse/scripts/validate.js --selftest",
-      "extra_cmd": "node skills/100x-video-reverse/scripts/extract-frames.mjs --selftest",
-      "note": "本仓唯一需要外部二进制依赖的 skill：agent 读不了 mp4，必须先跑 scripts/extract-frames.mjs（依赖 ffmpeg 与 ffprobe）把视频抽成帧图。也是原 7 个规划名额之外新增的第 8 个功能 skill。"
+      "extra_cmd": "python skills/100x-video-reverse/scripts/validate_reverse_package.py --help",
+      "note": "v2.0 破坏性替换并退役旧版双轴提示词契约。依赖 ffmpeg、ffprobe、Python jsonschema；Node/AJV 验证公开 JSON 结构和跨引用，Python 严格验证器负责源哈希、真实媒体和 provenance。"
     },
     {
       "id": "100x-search-query",

@@ -1,0 +1,6 @@
+interface:
+  display_name: "100X Video Reverse v2.0"
+  short_description: "把参考视频反推为可验证、可生成、可交接的镜头与资产包"
+  default_prompt: "使用 $100x-video-reverse 把这条参考视频反推成可验证的复刻包，只做分析，不执行付费生成。"
+policy:
+  allow_implicit_invocation: true
