@@ -80,16 +80,27 @@ def main() -> None:
         )
         if fragment.returncode != 0:
             raise AssertionError(fragment.stderr or fragment.stdout)
-        files = list(fragment_dir.glob("*-v094.html"))
+        files = list(fragment_dir.glob("*-v095.html"))
         if len(files) != 1:
-            raise AssertionError(f"Expected one v094 fragment, got {len(files)}")
+            raise AssertionError(f"Expected one v095 fragment, got {len(files)}")
         html = files[0].read_text(encoding="utf-8")
         for expected in (
             "rv-workbench", "data-prompt-inspector", "shotToSegment",
-            "segment_001", "needs_model_selection",
+            "segment_001", "needs_model_selection", "原片与三帧素材",
+            "复制原帧路径", "DownloadURL", "new File",
         ):
             if expected not in html:
                 raise AssertionError(f"Fragment lost expected content: {expected}")
+        segment_frames = re.findall(r'<button[^>]+data-segment-frame[^>]*>', html)
+        draggable_frames = re.findall(r'<img[^>]+data-drag-frame[^>]*>', html)
+        if len(segment_frames) != 3 or len(draggable_frames) != 3:
+            raise AssertionError(
+                f"Expected one fixed three-frame segment group, got "
+                f"{len(segment_frames)} controls and {len(draggable_frames)} draggable images"
+            )
+        for forbidden in ("FRAME INDEX", "SEGMENT PROMPT", "CONVERSION FLOW"):
+            if forbidden in html:
+                raise AssertionError(f"Fragment still exposes decorative English label: {forbidden}")
         embedded = re.search(r'<script type="application/json" data-shot-prompts>(.*?)</script>', html)
         if not embedded:
             raise AssertionError("Fragment lost the shot-to-segment prompt map")
@@ -99,6 +110,8 @@ def main() -> None:
         expected_prompt = fixture["prompt_pack"]["segmented_generation_plan"][0]["omni_prompt"]
         if prompt_map["segments"]["segment_001"]["prompt"] != expected_prompt:
             raise AssertionError("Shot interaction no longer exposes the owning segment prompt verbatim")
+        if prompt_map["segments"]["segment_001"]["keyAction"] != fixture["prompt_pack"]["segmented_generation_plan"][0]["key_action"]:
+            raise AssertionError("Prompt inspector lost the Chinese operator context fields")
         if files[0].stat().st_size >= 1_000_000:
             raise AssertionError("Synthetic fragment exceeded the 1 MB contract")
         if sha256(reverse_path) != before:
@@ -108,6 +121,8 @@ def main() -> None:
             "digest_selftest_passed": True,
             "fragment": files[0].name,
             "fragment_bytes": files[0].stat().st_size,
+            "segment_triptych_slots": len(segment_frames),
+            "draggable_files_contract": True,
             "machine_package_unchanged": True,
         }, ensure_ascii=False))
 

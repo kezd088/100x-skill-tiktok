@@ -1,23 +1,23 @@
 {
   "id": "100x-video-reverse",
   "name": "100x-video-reverse",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "author": "100x",
   "layer": "L1-source-reversal",
   "step": "0-video-reverse",
   "type": "analytical",
   "status": "validated",
-  "summary": "Local source video in; validated evidence and machine package plus an Agent-native review with a narrow portrait player, multi-column shot board, click-through owning-segment prompts, assets and generation plans. Analysis only: no generation, publishing or automatic upload.",
+  "summary": "Local source video in; validated evidence and machine package plus a Chinese operator review with a narrow portrait player, fixed first/highlight/end segment triptychs, draggable JPEG previews, original-frame path fallback and owning-segment prompts. Analysis only: no generation, publishing or automatic upload.",
   "supersedes": {
-    "version": "2.1.0",
-    "commit": "707665921dd630f9913f0886a898f5488a5e1a28",
-    "reason": "Version 2.1 defined the Agent-native review contract but left layout and interaction to the Agent; v2.2 adds a deterministic digest projection without changing the v2.1 machine Schema."
+    "version": "2.2.0",
+    "commit": "a0b16ea78c5b7ae0670a58c6d6131bb8b3fa7c76",
+    "reason": "Version 2.3 keeps the v2.1 machine Schema and v2.2 digest compatibility while improving the deterministic Chinese operator projection, segment triptychs and image drag handoff."
   },
   "validation": {
     "structural": "schema.json is JSON Schema draft-07 and is compiled by ajv in scripts/validate.js. It validates required fields, types, minimum content and nested package shape.",
     "cross_item": "scripts/validate.js checks timeline continuity, duration arithmetic, unique and resolvable shot/asset references, segment and execution-plan references, ready-state completeness, confidence ranges and safe relative media paths. Its --selftest uses synthetic fixtures only.",
     "filesystem_and_provenance": "scripts/validate_reverse_package.py performs the full handoff gate against reverse.json, source_manifest.json, materialized files and materialization_manifest.json. It hard-stops when jsonschema is unavailable and does not treat legacy media as valid for a new handoff.",
-    "presentation": "scripts/digest.py deterministically projects validated packages to Markdown or self-contained Codex fragments. Its UI does not modify reverse.json, validation.json or materialized media."
+    "presentation": "scripts/digest.py deterministically projects validated packages to Markdown or self-contained Codex fragments. The fragment fixes three first/highlight/end slots per segment, localizes operator labels, exposes English prompts on demand and supplies draggable JPEG previews plus original-frame paths. Its UI does not modify reverse.json, validation.json or materialized media."
   },
   "input_contract": {
     "required": [

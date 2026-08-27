@@ -33,10 +33,31 @@ from pathlib import Path
 from typing import Any
 
 ASSET_CATEGORIES = ("people", "products", "scenes", "props", "wardrobe", "audio", "text")
+ASSET_CATEGORY_LABELS = {
+    "people": "人物", "products": "产品", "scenes": "场景", "props": "道具",
+    "wardrobe": "服装", "audio": "音频", "text": "文字",
+}
 # native-output.md 3: these three get image + prompt + invariants, the rest get one line.
 PRIMARY_ASSET_CATEGORIES = ("people", "products", "scenes")
 # Enough to show a segment without opening the package; more would just bloat the reply.
 FRAMES_PER_SEGMENT = 3
+SEGMENT_FRAME_ROLES = (
+    ("first_frame", "start", "首帧"),
+    ("highlight_frame", "highlight", "高光帧"),
+    ("end_frame", "end", "尾帧"),
+)
+GENERATION_METHOD_LABELS = {
+    "text_to_video": "文生视频",
+    "first_frame_to_video": "首帧生视频",
+    "first_last_frame_to_video": "首尾帧生视频",
+    "reference_images_to_video": "参考图生视频",
+    "video_to_video": "视频转视频",
+    "undecided": "未决定",
+}
+INPUT_MODE_LABELS = {
+    "frames_only": "帧回退（音频未分析）",
+    "api": "API 分析",
+}
 # selection_basis already opens with this; a second label around it doubles the prefix.
 ADVICE_PREFIXES = ("建议：", "建议:")
 # Word-level kinetic captions sampled at a few fps look like a caption track but are not one.
@@ -51,7 +72,7 @@ STORYBOARD_WIDTH = 160
 # Bump when the inline presentation changes. Codex can keep an already rendered
 # fragment by filename, so a visual redesign must produce a fresh filename even
 # when reverse.json and the package path are unchanged.
-FRAGMENT_PRESENTATION_VERSION = "v094"
+FRAGMENT_PRESENTATION_VERSION = "v095"
 # The source file stays the truth. A full-duration, low-bitrate derivative is
 # embedded only so the inline sandbox can play it without file:// access.
 PREVIEW_MAX_WIDTH = 240
@@ -139,6 +160,43 @@ def strip_advice_prefix(text: Any) -> str:
         if stripped.startswith(prefix):
             return stripped[len(prefix):].lstrip()
     return stripped
+
+
+def localized_generation_method(value: Any) -> str:
+    """Localize a closed machine enum without rewriting the source package."""
+    raw = "" if value is None else str(value)
+    return GENERATION_METHOD_LABELS.get(raw, raw or "未记录")
+
+
+def localized_input_mode(value: Any) -> str:
+    raw = "" if value is None else str(value)
+    return INPUT_MODE_LABELS.get(raw, raw or "未记录")
+
+
+def localized_asset_category(value: Any) -> str:
+    raw = "" if value is None else str(value)
+    return ASSET_CATEGORY_LABELS.get(raw, raw or "未分类")
+
+
+def segment_number(value: Any) -> str:
+    match = re.search(r"(\d+)$", "" if value is None else str(value))
+    return match.group(1).zfill(2) if match else str(value or "--")
+
+
+def shot_number(value: Any) -> str:
+    match = re.search(r"(\d+)$", "" if value is None else str(value))
+    return match.group(1).zfill(2) if match else str(value or "--")
+
+
+def looks_like_legacy_english(value: Any) -> bool:
+    """Flag older human-facing prose that violates the current Chinese operator contract.
+
+    This is deliberately detection-only. A deterministic presentation projection must
+    not invent a translation and silently turn it into package truth.
+    """
+    if not isinstance(value, str) or re.search(r"[\u3400-\u9fff]", value):
+        return False
+    return len(re.findall(r"[A-Za-z]", value)) >= 12
 
 
 def source_video(package: Path) -> dict[str, Any]:
@@ -250,24 +308,49 @@ def audio_lines(audio: dict[str, Any], input_mode: Any) -> list[str]:
     return lines
 
 
-def pick_segment_frames(package: Path, segment: dict[str, Any], shots: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    """First, peak and last of the segment - the minimum that shows what happens in it."""
+def pick_segment_frames(
+    package: Path,
+    segment: dict[str, Any],
+    shots: dict[str, dict[str, Any]],
+    recommendation: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Return a fixed first/highlight/end triptych for every generation segment.
+
+    input_references is the generation contract and therefore wins. The former
+    shot-count shortcut omitted the highlight for two-shot segments and omitted
+    both highlight and end for one-shot segments even though all three references
+    already existed. Missing media stays visible as an explicit slot.
+    """
     ids = [value for value in segment.get("shot_ids", []) if value in shots]
-    if not ids:
-        return []
-    picks: list[tuple[str, str, str]] = [(ids[0], "start", "首帧")]
-    if len(ids) > 2:
-        picks.append((ids[len(ids) // 2], "highlight", "高光帧"))
-    if len(ids) > 1:
-        picks.append((ids[-1], "end", "尾帧"))
+    references = [item for item in (recommendation.get("input_references") or []) if isinstance(item, dict)]
+    by_type = {str(item.get("type")): item for item in references if item.get("type")}
+    fallbacks = {
+        "first_frame": (ids[0], "start") if ids else (None, "start"),
+        "highlight_frame": (ids[len(ids) // 2], "highlight") if ids else (None, "highlight"),
+        "end_frame": (ids[-1], "end") if ids else (None, "end"),
+    }
     frames: list[dict[str, Any]] = []
-    for shot_id, role, label in picks[:FRAMES_PER_SEGMENT]:
-        frame = (shots[shot_id].get("frames") or {}).get(role) or {}
-        path = absolute(package, frame.get("relative_path"))
-        if path:
-            frames.append({"label": label, "shot_id": shot_id,
-                           "at_seconds": frame.get("timestamp_seconds"), "path": path})
-    return frames
+    for reference_type, role, label in SEGMENT_FRAME_ROLES:
+        reference = by_type.get(reference_type) or {}
+        fallback_shot_id, _ = fallbacks[reference_type]
+        shot_id = reference.get("shot_id") or fallback_shot_id
+        shot_frame = ((shots.get(str(shot_id)) or {}).get("frames") or {}).get(role) or {}
+        relative = reference.get("relative_path") or shot_frame.get("relative_path")
+        path = absolute(package, relative)
+        at_seconds = shot_frame.get("timestamp_seconds")
+        frames.append({
+            "type": reference_type,
+            "role": role,
+            "label": label,
+            "source_label": reference.get("label"),
+            "shot_id": shot_id,
+            "at_seconds": at_seconds,
+            "relative_path": relative,
+            "path": path,
+            "filename": Path(path).name if path else Path(str(relative)).name if relative else None,
+            "missing_reason": None if path else "包内缺少%s素材" % label,
+        })
+    return frames[:FRAMES_PER_SEGMENT]
 
 
 def pick_storyboard_frames(package: Path, shots: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -361,6 +444,7 @@ def digest_package(package: Path) -> dict[str, Any]:
             model = "%s / %s" % (recommendation["provider"], recommendation["model_id"])
         if status:
             model = "%s · %s" % (model, status)
+        method = recommendation.get("generation_method") or "未决定"
         segments.append({
             "segment_id": segment.get("segment_id"),
             "window": [segment.get("start_time_seconds"), segment.get("end_time_seconds")],
@@ -376,15 +460,28 @@ def digest_package(package: Path) -> dict[str, Any]:
             "seedance_prompt": segment.get("seedance_prompt") if segment.get("seedance_prompt") != segment.get("omni_prompt") else None,
             "recommendation": {
                 "model": model,
-                "method": recommendation.get("generation_method") or "未决定",
+                "method": method,
+                "method_label": localized_generation_method(method),
                 "adapter": recommendation.get("model_adapter"),
                 "target_duration_seconds": recommendation.get("target_duration_seconds"),
                 "basis": recommendation.get("selection_basis"),
                 "inputs": [item.get("label") for item in (recommendation.get("input_references") or []) if isinstance(item, dict)],
+                "input_references": [item for item in (recommendation.get("input_references") or []) if isinstance(item, dict)],
                 "status": status,
             },
-            "frames": pick_segment_frames(package, segment, shots),
+            "frames": pick_segment_frames(package, segment, shots, recommendation),
         })
+
+    human_texts = [
+        headline.get("overall_style"), headline.get("narrative_structure"), headline.get("hook"),
+        headline.get("product_bridge"), headline.get("proof_process"), headline.get("cta"),
+    ]
+    for segment in segments:
+        human_texts.extend((
+            segment.get("start_state"), segment.get("key_action"), segment.get("end_state"),
+            (segment.get("recommendation") or {}).get("basis"),
+        ))
+    headline["legacy_english_operator_text"] = any(looks_like_legacy_english(value) for value in human_texts)
 
     # The machine contract generates by segment, not by individual shot. Link
     # each storyboard beat to its owning segment so the review surface can show
@@ -597,7 +694,9 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
                      % (trim_number(head["duration_seconds"]), head["aspect_ratio"], head["resolution"],
                         counts["beats"], counts["segments"], counts["assets"]))
         lines.append("- 语言 %s · 音轨 %s · 分析模式 %s"
-                     % (head["language"], digest["audio"]["audio_track"], head["input_mode"]))
+                     % (head["language"], digest["audio"]["audio_track"], localized_input_mode(head["input_mode"])))
+        if head.get("legacy_english_operator_text"):
+            lines.append("- 历史包提示：部分运营说明仍是英文；本投影保留原文，没有伪造翻译。")
         lines.append("- 字幕/屏幕文字：%s" % (head["subtitle_type"] or "未观察到"))
         lines.append("- 验证：valid=%s · 硬错误 %s · 警告 %s"
                      % (validation["valid"], validation["hard_errors"], validation["warnings"]))
@@ -609,7 +708,7 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
         lines.append("- CTA：%s" % (head["cta"] or "未观察到"))
         lines.append("")
         if head["global_prompt"]:
-            lines.append("整片提示词（逐字）：")
+            lines.append("英文整片生成提示词（逐字）：")
             lines.append("")
             lines.extend(md_code(head["global_prompt"]))
 
@@ -623,7 +722,7 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
             lines.append("| %s | %s | %ss | %s | %s | %s | %ss |"
                          % (md_cell(segment["segment_id"]), md_cell(md_window(segment["window"])),
                             md_cell(trim_number(segment["duration_seconds"])), md_cell(segment["narrative_role"]),
-                            md_cell(recommendation["model"]), md_cell(recommendation["method"]),
+                            md_cell(recommendation["model"]), md_cell(recommendation["method_label"]),
                             md_cell(trim_number(recommendation["target_duration_seconds"]))))
         lines.append("")
         lines.append("模型、状态与生成方式来自当前包内计划；未选定或阻塞状态不得视为可执行。")
@@ -635,7 +734,10 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
                             trim_number(segment["duration_seconds"])))
             lines.append("")
             for frame in segment["frames"]:
-                lines.append(md_media(frame["label"], frame["path"], host))
+                if frame.get("path"):
+                    lines.append(md_media(frame["label"], frame["path"], host))
+                else:
+                    lines.append("> %s：%s" % (frame["label"], frame.get("missing_reason") or "素材缺失"))
             if segment["frames"]:
                 lines.append("")
             lines.append("- 镜头：%s" % " ".join(segment["shot_ids"] or []))
@@ -653,7 +755,7 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
                 parts.append("资产 %s" % "、".join(assets_in))
             lines.append("- 输入：%s" % (" ｜ ".join(parts) or "未指定"))
             lines.append("")
-            lines.append("生成提示词（逐字，%s 版 · %d 字符）："
+            lines.append("英文生成提示词（逐字，%s 版 · %d 字符）："
                          % (recommendation["adapter"] or "omni", len(str(segment["prompt"]))))
             lines.append("")
             lines.extend(md_code(segment["prompt"]))
@@ -668,7 +770,7 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
         lines.append("## 3 · 资产（%d 项）" % len(digest["assets"]))
         lines.append("")
         for asset in primary:
-            lines.append("### %s · %s（%s）" % (asset["asset_id"], asset["name"] or "", asset["category"]))
+            lines.append("### %s · %s（%s）" % (asset["asset_id"], asset["name"] or "", localized_asset_category(asset["category"])))
             lines.append("")
             if asset["path"]:
                 lines.append(md_media(asset["asset_id"], asset["path"], host))
@@ -677,7 +779,7 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
                 lines.append("（无截图）")
                 lines.append("")
             if asset["prompt"]:
-                lines.append("一致性提示词（逐字 · %d 字符）：" % len(str(asset["prompt"])))
+                lines.append("英文一致性提示词（逐字 · %d 字符）：" % len(str(asset["prompt"])))
                 lines.append("")
                 lines.extend(md_code(asset["prompt"]))
             if asset["anchors"]:
@@ -689,7 +791,7 @@ def markdown(digests: list[dict[str, Any]], host: str = "codex") -> str:
             lines.append("")
             for asset in secondary:
                 lines.append("- `%s`（%s）%s —— %s"
-                             % (asset["asset_id"], asset["category"], asset["name"] or "",
+                             % (asset["asset_id"], localized_asset_category(asset["category"]), asset["name"] or "",
                                 asset_one_liner(asset)))
             lines.append("")
 
@@ -792,7 +894,7 @@ def outline(digests: list[dict[str, Any]]) -> str:
                                                        head["aspect_ratio"], head["resolution"]))
         lines.append("节拍 %s · 分段 %s · 资产 %s · 验证 valid=%s 硬错误 %s 警告 %s · 分析模式 %s"
                      % (counts["beats"], counts["segments"], counts["assets"],
-                        validation["valid"], validation["hard_errors"], validation["warnings"], head["input_mode"]))
+                        validation["valid"], validation["hard_errors"], validation["warnings"], localized_input_mode(head["input_mode"])))
         lines.append("骨架：%s" % (head["narrative_structure"] or "未观察到"))
         lines.append("Hook：%s" % (head["hook"] or "未观察到"))
         lines.append("产品桥接：%s" % (head["product_bridge"] or "未观察到"))
@@ -816,21 +918,21 @@ def outline(digests: list[dict[str, Any]]) -> str:
             lines.append("    止：%s" % segment["end_state"])
             for frame in segment["frames"]:
                 lines.append("    %s %s" % (frame["label"], frame["path"]))
-            lines.append("    提示词：%s" % segment["prompt"])
+            lines.append("    英文生成提示词：%s" % segment["prompt"])
             if segment["seedance_prompt"]:
                 lines.append("    Seedance 版：%s" % segment["seedance_prompt"])
             recommendation = segment["recommendation"]
             lines.append("    建议：%s ｜ %s ｜ 目标 %ss ｜ 输入 %s"
-                         % (recommendation["model"], recommendation["method"],
+                         % (recommendation["model"], recommendation["method_label"],
                             recommendation["target_duration_seconds"], ", ".join(recommendation["inputs"] or [])))
             lines.append("    依据：%s" % strip_advice_prefix(recommendation["basis"]))
 
         lines.append("")
         lines.append("【3 资产】%d 项" % len(digest["assets"]))
         for asset in digest["assets"]:
-            lines.append("  %s（%s）%s" % (asset["asset_id"], asset["category"], asset["name"] or ""))
+            lines.append("  %s（%s）%s" % (asset["asset_id"], localized_asset_category(asset["category"]), asset["name"] or ""))
             lines.append("    图：%s" % (asset["path"] or "（无截图）"))
-            lines.append("    提示词：%s" % (asset["prompt"] or ""))
+            lines.append("    英文资产提示词：%s" % (asset["prompt"] or ""))
             if asset["anchors"]:
                 lines.append("    一致性锚点：%s" % "；".join(asset["anchors"]))
             lines.append("    禁变：%s" % "；".join(asset["invariants"] or []))
@@ -1017,7 +1119,7 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add = lines.append
     shots = 0
 
-    tabs = (("m", "原片与帧图"), ("c", "结论"), ("s", "分段 %d" % len(digest["segments"])),
+    tabs = (("m", "原片与三帧素材"), ("c", "结论"), ("s", "分段 %d" % len(digest["segments"])),
             ("a", "资产 %d" % len(digest["assets"])),
             ("t", "文字层 %d" % len(digest["text_layer"])), ("x", "音频与约束"))
     add('<div id="%s">' % root_id)
@@ -1026,7 +1128,7 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     validation_label = "验证通过" if validation["valid"] is True else "未验证" if validation["valid"] is None else "验证未通过"
     validation_state = "ok" if validation["valid"] is True else "warn"
     add('<header class="rv-header">')
-    add('<div class="rv-kicker"><span>100X · VIDEO REVERSE</span><span>%s</span></div>' % h(batch_label))
+    add('<div class="rv-kicker"><span>100X 视频反推</span><span>%s</span></div>' % h(batch_label))
     add('<div class="rv-title-row"><div><h1>%s</h1><p>%s</p></div>'
         '<span class="rv-status" data-state="%s">%s</span></div>'
         % (h(head.get("file") or Path(digest["package"]).name),
@@ -1036,6 +1138,8 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
         '<span><b>%s</b> 节拍</span><span><b>%s</b> 分段</span><span><b>%s</b> 资产</span></div>'
         % (h(trim_number(head.get("duration_seconds")) + "s"), h(head.get("aspect_ratio") or "未知"),
            h(counts["beats"]), h(counts["segments"]), h(counts["assets"])))
+    if head.get("legacy_english_operator_text"):
+        add('<p class="rv-language-note">历史包提示：部分运营说明仍是英文。界面保留原文，没有伪造翻译；重新分析后会按中文运营契约输出。</p>')
     add('</header>')
     add('<div class="viz-controls" role="tablist" aria-label="反推交付分块">')
     for index, (key, label) in enumerate(tabs):
@@ -1048,19 +1152,29 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     # Media home: source preview + one already-verified frame per beat.
     source = head.get("source_video") or {}
     storyboard = [item for item in digest.get("storyboard") or [] if item.get("_thumb")]
-    # Normalize shot-to-segment links so a segment prompt is embedded only once even
-    # when several storyboard shots belong to the same generation segment.
+    # Store each segment prompt once. Both the compact triptych and the optional
+    # shot locator point to this map, so repeated image controls do not duplicate
+    # the long English prompt in the fragment body.
     prompt_segments = {}
+    for segment in digest.get("segments") or []:
+        recommendation = segment.get("recommendation") or {}
+        adapter = recommendation.get("adapter") or "omni"
+        prompt = (segment.get("seedance_prompt") if adapter == "seedance" else None) or segment.get("prompt")
+        prompt_segments[segment.get("segment_id")] = {
+            "adapter": adapter,
+            "prompt": prompt,
+            "startState": segment.get("start_state"),
+            "keyAction": segment.get("key_action"),
+            "endState": segment.get("end_state"),
+            "basis": strip_advice_prefix(recommendation.get("basis")),
+            "model": recommendation.get("model"),
+            "method": recommendation.get("method_label") or localized_generation_method(recommendation.get("method")),
+        }
     shot_to_segment = {}
     for frame in storyboard:
         segment_id = frame.get("segment_id")
-        if not segment_id or not frame.get("segment_prompt"):
-            continue
-        shot_to_segment[frame["label"]] = segment_id
-        prompt_segments.setdefault(segment_id, {
-            "adapter": frame.get("segment_prompt_adapter"),
-            "prompt": frame.get("segment_prompt"),
-        })
+        if segment_id:
+            shot_to_segment[frame["label"]] = segment_id
     shot_prompts = {"shotToSegment": shot_to_segment, "segments": prompt_segments}
     shot_prompts_json = (json.dumps(shot_prompts, ensure_ascii=False)
                          .replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e"))
@@ -1086,9 +1200,52 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     else:
         add('<div class="rv-stage-foot"><span>原片未嵌入，帧图仍可审阅</span><strong>--:--</strong></div>')
     add('</div>')
-    add('<aside class="rv-beats" aria-label="按节拍定位的帧图">')
-    add('<div class="rv-beats-head"><div><span>FRAME INDEX</span><strong>节拍定位</strong></div>'
-        '<span data-current-beat>%s</span></div>' % (h(storyboard[0]["label"]) if storyboard else "无帧图"))
+    add('<aside class="rv-review-board" aria-label="分段素材与镜头定位">')
+    add('<div class="rv-board-head"><div><strong>分段素材</strong><span data-current-beat>%s</span></div>'
+        '<div class="rv-view-switch" role="group" aria-label="素材视图">'
+        '<button type="button" data-review-switch="segments" aria-pressed="true">分段素材</button>'
+        '<button type="button" data-review-switch="beats" aria-pressed="false">镜头定位</button>'
+        '</div></div>' % ("每段固定首帧、高光帧、尾帧" if digest.get("segments") else "无分段"))
+    add('<div class="rv-review-view rv-segment-view" data-review-view="segments">')
+    if digest.get("segments"):
+        add('<p class="rv-drag-help">拖动图片可导出轻量预览图；需要包内原图时，点“复制原帧路径”。</p>')
+        add('<div class="rv-segment-list">')
+        for segment in digest["segments"]:
+            segment_id = segment.get("segment_id")
+            add('<section class="rv-segment-group" data-segment-group="%s">'
+                '<header><div><strong>分段 %s</strong><time>%s–%ss</time></div><p>%s</p></header>'
+                % (h(segment_id), h(segment_number(segment_id)), trim_number(segment["window"][0]),
+                   trim_number(segment["window"][1]), h(segment.get("narrative_role") or "未记录叙事作用")))
+            add('<div class="rv-triptych" aria-label="分段 %s 的首帧、高光帧和尾帧">' % h(segment_number(segment_id)))
+            for frame in segment.get("frames") or []:
+                thumb = frame.get("_thumb")
+                if thumb:
+                    shots += 1
+                    add('<figure class="rv-frame-slot"><button type="button" class="rv-segment-frame" '
+                        'data-segment-frame data-segment="%s" data-shot="%s" data-at="%s" '
+                        'aria-label="分段 %s %s，定位到 %s 并查看英文生成提示词">'
+                        '<img src="%s" alt="分段 %s %s" loading="lazy" draggable="true" data-drag-frame '
+                        'data-download-name="%s" data-frame-path="%s">'
+                        '<span><b>%s</b><time>%s</time></span></button>'
+                        '<button type="button" class="rv-path-copy" data-copy-path="%s" aria-label="复制%s原帧路径">复制原帧路径</button>'
+                        '</figure>'
+                        % (h(segment_id), h(frame.get("shot_id")), h(trim_number(frame.get("at_seconds"))),
+                           h(segment_number(segment_id)), h(frame.get("label")), h(clock_time(frame.get("at_seconds"))),
+                           thumb, h(segment_number(segment_id)), h(frame.get("label")),
+                           h(frame.get("filename") or (str(segment_id) + "-" + str(frame.get("role")) + ".jpg")),
+                           h(frame.get("path")), h(frame.get("label")), h(clock_time(frame.get("at_seconds"))),
+                           h(frame.get("path")), h(frame.get("label"))))
+                else:
+                    add('<div class="rv-frame-slot rv-frame-missing" role="status"><strong>%s</strong><span>%s</span></div>'
+                        % (h(frame.get("label")), h(frame.get("missing_reason") or "素材缺失")))
+            add('</div>')
+            add('<p class="rv-segment-action"><span>动作</span>%s</p>' % h(segment.get("key_action") or "未记录"))
+            add('</section>')
+        add('</div>')
+    else:
+        add('<p class="text-warning">包内没有可展示的分段素材。</p>')
+    add('</div>')
+    add('<div class="rv-review-view rv-beat-view" data-review-view="beats" hidden>')
     if storyboard:
         add('<div class="rv-beat-list">')
         for index, frame in enumerate(storyboard, start=1):
@@ -1108,14 +1265,21 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
         add('</div>')
     else:
         add('<p class="text-warning">包内没有可嵌入的节拍帧图。</p>')
+    add('</div>')
     add('<script type="application/json" data-shot-prompts>%s</script>' % shot_prompts_json)
     add('<section class="rv-prompt-inspector" data-prompt-inspector data-copy-scope role="region" '
         'aria-label="镜头对应的分段提示词" hidden>')
-    add('<div class="rv-inspector-head"><div><span>SEGMENT PROMPT</span><h3 data-inspector-title>镜头提示词</h3></div>'
-        '<button type="button" class="btn" data-prompt-close>返回帧板</button></div>')
-    add('<p class="rv-inspector-note">生成单位是分段；这里显示该镜头所属分段的完整提示词，不另造镜头级提示词。</p>')
+    add('<div class="rv-inspector-head"><div><span>分段生成输入</span><h3 data-inspector-title>分段提示词</h3></div>'
+        '<button type="button" class="btn" data-prompt-close>返回素材板</button></div>')
+    add('<p class="rv-inspector-note">生成单位是分段。点击任一三帧素材或镜头后，这里显示所属分段的中文操作说明与英文生成提示词。</p>')
     add('<p class="rv-inspector-meta" data-inspector-meta></p>')
-    add('<div class="viz-row"><button type="button" class="btn btn-primary" data-copy>复制提示词</button>'
+    add('<dl class="rv-inspector-context">'
+        '<div><dt>起始状态</dt><dd data-context="startState"></dd></div>'
+        '<div><dt>关键动作</dt><dd data-context="keyAction"></dd></div>'
+        '<div><dt>结束状态</dt><dd data-context="endState"></dd></div>'
+        '<div><dt>选型依据</dt><dd data-context="basis"></dd></div></dl>')
+    add('<div class="rv-prompt-label"><strong>英文生成提示词</strong><span>仅在需要复制到生成模型时使用</span></div>')
+    add('<div class="viz-row"><button type="button" class="btn btn-primary" data-copy>复制英文生成提示词</button>'
         '<span class="text-muted text-small" data-copy-note>或直接拖选下方文本</span></div>')
     add('<pre data-prompt><code data-inspector-prompt></code></pre>')
     add('</section>')
@@ -1138,27 +1302,27 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     # 1 结论
     add('<section id="%s-panel-c" role="tabpanel" aria-labelledby="%s-tab-c" data-panel="c" hidden>'
         % (root_id, root_id))
-    add('<div class="rv-section-intro"><div><span>CONVERSION FLOW</span><h2>一屏看懂这条视频怎么推进</h2></div>'
+    add('<div class="rv-section-intro"><div><span>叙事推进</span><h2>一屏看懂这条视频怎么推进</h2></div>'
         '<p>%s</p></div>' % h(head.get("narrative_structure") or "未记录完整叙事骨架"))
     add('<ol class="rv-story-flow">')
-    flow = (("01", "HOOK", "钩子", head.get("hook")),
-            ("02", "BRIDGE", "产品桥接", head.get("product_bridge")),
-            ("03", "PROOF", "证明过程", head.get("proof_process")),
-            ("04", "CTA", "行动引导", head.get("cta")))
-    for number, english, label, value in flow:
-        add('<li><span class="rv-step-number">%s</span><div><span class="rv-step-label">%s · %s</span>'
-            '<p>%s</p></div></li>' % (number, english, h(label), h(value or "未观察到")))
+    flow = (("01", "钩子", head.get("hook")),
+            ("02", "产品桥接", head.get("product_bridge")),
+            ("03", "证明过程", head.get("proof_process")),
+            ("04", "行动引导", head.get("cta")))
+    for number, label, value in flow:
+        add('<li><span class="rv-step-number">%s</span><div><span class="rv-step-label">%s</span>'
+            '<p>%s</p></div></li>' % (number, h(label), h(value or "未观察到")))
     add('</ol>')
     add('<div class="rv-fact-band">')
     for label, value in (("整体风格", head.get("overall_style") or "未观察到"),
                          ("字幕", head.get("subtitle_type") or "未观察到"),
                          ("语言", head.get("language") or "未识别"),
-                         ("分析模式", head.get("input_mode") or "未记录")):
+                         ("分析模式", localized_input_mode(head.get("input_mode")))):
         add('<div><span>%s</span><strong>%s</strong></div>' % (h(label), h(value)))
     add('</div>')
     if head.get("global_prompt"):
-        add('<details><summary>整片提示词（逐字）</summary>'
-            '<div class="viz-row"><button type="button" class="btn" data-copy>复制</button>'
+        add('<details><summary>英文整片生成提示词（按需展开）</summary>'
+            '<div class="viz-row"><button type="button" class="btn" data-copy>复制英文生成提示词</button>'
             '<span class="text-muted text-small" data-copy-note>或拖选下方文本</span></div>'
             '<pre data-prompt><code>%s</code></pre></details>' % h(head["global_prompt"]))
     add('</section>')
@@ -1175,33 +1339,26 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
             '<td>%s</td><td>%s</td><td>%s</td><td class="text-end tabular-nums">%ss</td></tr>'
             % (h(str(segment["segment_id"]).replace("segment_", "")),
                trim_number(segment["window"][0]), trim_number(segment["window"][1]),
-               h(segment.get("narrative_role") or ""), h(rec["model"]), h(rec["method"]),
+               h(segment.get("narrative_role") or ""), h(rec["model"]), h(rec.get("method_label") or localized_generation_method(rec.get("method"))),
                trim_number(rec["target_duration_seconds"])))
     add('</tbody></table></div>')
     for segment in digest["segments"]:
         rec = segment["recommendation"]
-        add('<details><summary>%s · %s–%ss · %s</summary>'
-            % (h(segment["segment_id"]), trim_number(segment["window"][0]),
+        add('<details><summary>分段 %s · %s–%ss · %s</summary>'
+            % (h(segment_number(segment["segment_id"])), trim_number(segment["window"][0]),
                trim_number(segment["window"][1]), h(segment.get("narrative_role") or "")))
-        strip = [frame for frame in segment["frames"] if frame.get("_thumb")]
-        if strip:
-            add('<div class="viz-row">')
-            for frame in strip:
-                shots += 1
-                add('<figure><img src="%s" alt="%s %s" loading="lazy">'
-                    '<figcaption class="text-muted text-small">%s %ss</figcaption></figure>'
-                    % (frame["_thumb"], h(segment["segment_id"]), h(frame["label"]),
-                       h(frame["label"]), trim_number(frame["at_seconds"])))
-            add('</div>')
+        add('<div class="viz-row"><button type="button" class="btn" data-open-segment="%s">在首页查看首／高光／尾三帧</button></div>'
+            % h(segment["segment_id"]))
         add('<table class="table table-sm"><tbody>')
-        for label, value in (("起", segment["start_state"]), ("动作", segment["key_action"]),
-                             ("止", segment["end_state"]), ("依据", rec["basis"])):
+        for label, value in (("起始状态", segment["start_state"]), ("关键动作", segment["key_action"]),
+                             ("结束状态", segment["end_state"]), ("选型依据", strip_advice_prefix(rec["basis"]))):
             if value:
                 add('<tr><th scope="row" class="text-nowrap">%s</th><td>%s</td></tr>' % (h(label), h(value)))
         add('</tbody></table>')
-        add('<div class="viz-row"><button type="button" class="btn btn-primary" data-copy>复制提示词</button>'
-            '<span class="text-muted text-small" data-copy-note>或直接拖选下方文本</span></div>')
-        add('<pre data-prompt><code>%s</code></pre>' % h(segment["prompt"]))
+        add('<details class="rv-prompt-details" data-copy-scope><summary>英文生成提示词（按需展开）</summary>'
+            '<div class="viz-row"><button type="button" class="btn btn-primary" data-copy>复制英文生成提示词</button>'
+            '<span class="text-muted text-small" data-copy-note>或直接拖选下方文本</span></div>'
+            '<pre data-prompt><code>%s</code></pre></details>' % h(segment["prompt"]))
         add('</details>')
     add('</section>')
 
@@ -1212,7 +1369,7 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     secondary = [item for item in digest["assets"] if item["category"] not in PRIMARY_ASSET_CATEGORIES]
     for item in primary:
         add('<details><summary>%s · %s（%s）</summary>'
-            % (h(item["asset_id"]), h(item["name"] or ""), h(item["category"])))
+            % (h(item["asset_id"]), h(item["name"] or ""), h(localized_asset_category(item["category"]))))
         if item.get("_thumb"):
             shots += 1
             add('<img src="%s" alt="%s" loading="lazy">' % (item["_thumb"], h(item["asset_id"])))
@@ -1224,16 +1381,17 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
             add('<tr><th scope="row" class="text-nowrap">禁变</th><td>%s</td></tr>'
                 % h("；".join(item["invariants"])))
         add('</tbody></table>')
-        add('<div class="viz-row"><button type="button" class="btn" data-copy>复制提示词</button>'
-            '<span class="text-muted text-small" data-copy-note>或拖选下方文本</span></div>')
-        add('<pre data-prompt><code>%s</code></pre>' % h(item["prompt"] or ""))
+        add('<details class="rv-prompt-details" data-copy-scope><summary>英文资产提示词（按需展开）</summary>'
+            '<div class="viz-row"><button type="button" class="btn" data-copy>复制英文资产提示词</button>'
+            '<span class="text-muted text-small" data-copy-note>或拖选下方文本</span></div>'
+            '<pre data-prompt><code>%s</code></pre></details>' % h(item["prompt"] or ""))
         add('</details>')
     if secondary:
         add('<table class="table table-sm"><thead><tr><th>ID</th><th>类目</th><th>名称</th>'
             '</tr></thead><tbody>')
         for item in secondary:
             add('<tr><td>%s</td><td>%s</td><td>%s</td></tr>'
-                % (h(item["asset_id"]), h(item["category"]), h(item["name"] or "")))
+                % (h(item["asset_id"]), h(localized_asset_category(item["category"])), h(item["name"] or "")))
         add('</tbody></table>')
     add('</section>')
 
@@ -1263,7 +1421,7 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
         add('<p class="text-muted">%s</p>' % h(line))
     constraints = digest["constraints"]
     for label, items in (("必须保持", constraints.get("must_not_change") or []),
-                         ("负向约束", constraints.get("negative_constraints") or []),
+                         ("英文负向约束（模型输入）", constraints.get("negative_constraints") or []),
                          ("拼接", constraints.get("stitching_post_notes") or []),
                          ("限制", digest.get("limitations") or []),
                          ("不确定", digest.get("uncertainties") or [])):
@@ -1288,9 +1446,9 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add(scope + ' [hidden]{display:none!important}' + scope + ' h1,' + scope + ' h2,' + scope + ' p{margin-top:0}')
     add(scope + ' .rv-header{padding:4px 0 18px;border-bottom:1px solid var(--rv-border)}')
     add(scope + ' .rv-kicker{display:flex;justify-content:space-between;gap:16px;margin-bottom:12px;color:var(--rv-faint);'
-        'font:600 11px/1.2 ui-monospace,"SFMono-Regular",Consolas,monospace;letter-spacing:.08em;text-transform:uppercase}')
+        'font:600 11px/1.2 ui-monospace,"SFMono-Regular",Consolas,monospace}')
     add(scope + ' .rv-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}')
-    add(scope + ' .rv-title-row h1{margin:0 0 4px;font-size:clamp(20px,2.2vw,28px);line-height:1.2;letter-spacing:-.025em;overflow-wrap:anywhere}')
+    add(scope + ' .rv-title-row h1{margin:0 0 4px;font-size:24px;line-height:1.2;overflow-wrap:anywhere;text-wrap:balance}')
     add(scope + ' .rv-title-row p{max-width:760px;margin:0;color:var(--rv-sub);font-size:13px}')
     add(scope + ' .rv-status{flex:0 0 auto;display:inline-flex;align-items:center;min-height:30px;padding:4px 10px;border:1px solid var(--rv-border-strong);'
         'border-radius:999px;background:var(--rv-surface);font-size:12px;font-weight:700}')
@@ -1298,6 +1456,7 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add(scope + ' .rv-status[data-state="ok"]::before{background:var(--rv-ok)}')
     add(scope + ' .rv-meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:16px;color:var(--rv-sub);font-size:12px}')
     add(scope + ' .rv-meta span{display:flex;gap:6px;align-items:baseline}' + scope + ' .rv-meta b{color:var(--rv-ink);font:700 13px/1.2 ui-monospace,Consolas,monospace}')
+    add(scope + ' .rv-language-note{max-width:75ch;margin:12px 0 0;padding:9px 11px;border:1px solid #d8b36a;border-radius:8px;background:#fff8e8;color:#65430b;font-size:12px;text-wrap:pretty}')
     add(scope + ' .viz-controls{display:flex;gap:20px;overflow-x:auto;border-bottom:1px solid var(--rv-border);scrollbar-width:thin}')
     add(scope + ' .rv-tab{appearance:none;flex:0 0 auto;min-height:48px;padding:0 1px;border:0;border-bottom:2px solid transparent;background:transparent;'
         'color:var(--rv-sub);cursor:pointer;font-size:13px;font-weight:650;white-space:nowrap}')
@@ -1315,10 +1474,27 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
         'color:#aaa9a3;font:500 11px/1.3 ui-monospace,Consolas,monospace}')
     add(scope + ' .rv-stage-foot span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}')
     add(scope + ' .rv-stage-foot strong{color:#fff;font-size:12px;font-variant-numeric:tabular-nums}')
-    add(scope + ' .rv-beats{min-width:0;max-height:calc(var(--rv-review-h) + 49px);display:grid;grid-template-rows:auto minmax(0,1fr);background:var(--rv-surface)}')
-    add(scope + ' .rv-beats-head{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--rv-border)}')
-    add(scope + ' .rv-beats-head div{display:grid;gap:2px}' + scope + ' .rv-beats-head div>span{color:var(--rv-faint);font:600 10px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.08em}')
-    add(scope + ' .rv-beats-head strong{font-size:15px}' + scope + ' .rv-beats-head>span{max-width:120px;color:var(--rv-sub);font:600 11px/1.3 ui-monospace,Consolas,monospace;overflow-wrap:anywhere}')
+    add(scope + ' .rv-review-board{min-width:0;max-height:calc(var(--rv-review-h) + 49px);display:grid;grid-template-rows:auto minmax(0,1fr);background:var(--rv-surface)}')
+    add(scope + ' .rv-board-head{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--rv-border)}')
+    add(scope + ' .rv-board-head>div:first-child{display:grid;gap:3px}' + scope + ' .rv-board-head strong{font-size:15px}' + scope + ' .rv-board-head [data-current-beat]{color:var(--rv-faint);font-size:11px}')
+    add(scope + ' .rv-view-switch{display:flex;gap:2px;padding:2px;border:1px solid var(--rv-border);border-radius:7px;background:var(--rv-muted)}')
+    add(scope + ' .rv-view-switch button{appearance:none;min-height:34px;padding:5px 9px;border:0;border-radius:5px;background:transparent;color:var(--rv-sub);cursor:pointer;font-size:11px;font-weight:650}')
+    add(scope + ' .rv-view-switch button[aria-pressed="true"]{background:var(--rv-surface);color:var(--rv-ink)}')
+    add(scope + ' .rv-review-view{min-height:0;overflow:auto;scrollbar-width:thin}')
+    add(scope + ' .rv-drag-help{margin:0;padding:8px 12px;border-bottom:1px solid var(--rv-border);background:#f7f7f4;color:var(--rv-sub);font-size:10px;text-wrap:pretty}')
+    add(scope + ' .rv-segment-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1px;align-content:start;background:var(--rv-border)}')
+    add(scope + ' .rv-segment-group{min-width:0;padding:12px;background:var(--rv-surface)}')
+    add(scope + ' .rv-segment-group>header{display:grid;gap:3px;margin-bottom:9px}' + scope + ' .rv-segment-group>header>div{display:flex;align-items:baseline;justify-content:space-between;gap:10px}')
+    add(scope + ' .rv-segment-group>header strong{font-size:13px}' + scope + ' .rv-segment-group>header time{color:var(--rv-faint);font:600 10px/1 ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}')
+    add(scope + ' .rv-segment-group>header p{display:-webkit-box;margin:0;overflow:hidden;color:var(--rv-sub);font-size:11px;line-height:1.4;-webkit-line-clamp:1;-webkit-box-orient:vertical}')
+    add(scope + ' .rv-triptych{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}')
+    add(scope + ' .rv-frame-slot{min-width:0;margin:0}' + scope + ' .rv-segment-frame{appearance:none;width:100%;display:block;padding:0;border:1px solid var(--rv-border);border-radius:7px;background:var(--rv-surface);overflow:hidden;cursor:pointer;text-align:left}')
+    add(scope + ' .rv-segment-frame:hover{border-color:var(--rv-border-strong);background:#f6f6f3}' + scope + ' .rv-segment-frame[aria-current="true"]{border-color:var(--rv-accent);box-shadow:inset 0 0 0 1px var(--rv-accent)}')
+    add(scope + ' .rv-segment-frame img{display:block;width:100%;aspect-ratio:9/13;background:#d9d9d5;object-fit:contain;cursor:grab}' + scope + ' .rv-segment-frame img:active{cursor:grabbing}')
+    add(scope + ' .rv-segment-frame>span{display:flex;align-items:baseline;justify-content:space-between;gap:4px;padding:6px}' + scope + ' .rv-segment-frame b{font-size:10px}' + scope + ' .rv-segment-frame time{color:var(--rv-faint);font:600 9px/1 ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}')
+    add(scope + ' .rv-path-copy{appearance:none;width:100%;min-height:34px;margin-top:3px;padding:4px;border:0;background:transparent;color:var(--rv-sub);cursor:pointer;font-size:9px;text-decoration:underline;text-underline-offset:2px}')
+    add(scope + ' .rv-frame-missing{min-height:158px;display:grid;place-content:center;gap:4px;padding:8px;border:1px dashed #b36b61;border-radius:7px;background:#fff4f1;color:#75362e;text-align:center}' + scope + ' .rv-frame-missing strong{font-size:11px}' + scope + ' .rv-frame-missing span{font-size:9px}')
+    add(scope + ' .rv-segment-action{display:-webkit-box;margin:8px 0 0;overflow:hidden;color:var(--rv-sub);font-size:11px;line-height:1.45;-webkit-line-clamp:2;-webkit-box-orient:vertical}' + scope + ' .rv-segment-action span{margin-right:6px;color:var(--rv-faint);font-size:10px}')
     add(scope + ' .rv-beat-list{min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1px;align-content:start;overflow-y:auto;background:var(--rv-border);scrollbar-width:thin}')
     add(scope + ' .rv-beat{appearance:none;width:100%;min-height:110px;display:grid;grid-template-columns:76px minmax(0,1fr);gap:11px;align-items:center;padding:9px 10px;'
         'border:0;background:var(--rv-surface);text-align:left;cursor:pointer}')
@@ -1328,12 +1504,15 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add(scope + ' .rv-beat-line strong{font-size:12px}' + scope + ' .rv-beat-line time{color:var(--rv-faint);font:600 11px/1 ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}')
     add(scope + ' .rv-beat-role,' + scope + ' .rv-beat-action{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical}')
     add(scope + ' .rv-beat-role{-webkit-line-clamp:2;font-size:12px;line-height:1.45}' + scope + ' .rv-beat-action{-webkit-line-clamp:1;color:var(--rv-faint);font-size:11px}')
-    add(scope + ' .rv-prompt-inspector{grid-row:2;min-height:0;overflow:auto;padding:18px;background:var(--rv-surface)}')
+    add(scope + ' .rv-prompt-inspector{grid-row:2;min-height:0;overflow:auto;padding:16px;background:var(--rv-surface)}')
     add(scope + ' .rv-inspector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:14px;border-bottom:1px solid var(--rv-border)}')
     add(scope + ' .rv-inspector-head>div{min-width:0}' + scope + ' .rv-inspector-head span{color:var(--rv-faint);font:600 10px/1.1 ui-monospace,Consolas,monospace}')
-    add(scope + ' .rv-inspector-head h3{margin:5px 0 0;font-size:19px;line-height:1.25;letter-spacing:-.02em}')
+    add(scope + ' .rv-inspector-head h3{margin:5px 0 0;font-size:19px;line-height:1.25;text-wrap:balance}')
     add(scope + ' .rv-inspector-note{max-width:760px;margin:14px 0 6px;color:var(--rv-sub);font-size:12px}')
     add(scope + ' .rv-inspector-meta{margin:0;color:var(--rv-faint);font:600 11px/1.4 ui-monospace,Consolas,monospace}')
+    add(scope + ' .rv-inspector-context{display:grid;grid-template-columns:1fr 1fr;margin:12px 0 0;border-top:1px solid var(--rv-border);border-left:1px solid var(--rv-border)}')
+    add(scope + ' .rv-inspector-context>div{min-width:0;padding:9px 10px;border-right:1px solid var(--rv-border);border-bottom:1px solid var(--rv-border)}' + scope + ' .rv-inspector-context dt{margin-bottom:3px;color:var(--rv-faint);font-size:10px}' + scope + ' .rv-inspector-context dd{margin:0;font-size:12px;line-height:1.5;text-wrap:pretty}')
+    add(scope + ' .rv-prompt-label{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:14px}' + scope + ' .rv-prompt-label strong{font-size:13px}' + scope + ' .rv-prompt-label span{color:var(--rv-faint);font-size:10px}')
     add(scope + ' .rv-prompt-inspector pre{max-height:360px;margin:10px 0 0}')
     add(scope + ' .rv-source-evidence{margin-top:10px;border:1px solid var(--rv-border);border-radius:8px;background:var(--rv-surface)}')
     add(scope + ' .rv-source-evidence>summary{min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 12px;cursor:pointer;list-style-position:inside}')
@@ -1342,12 +1521,12 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add(scope + ' .rv-source-grid>div{min-width:0}' + scope + ' .rv-source-grid dt{margin-bottom:4px;color:var(--rv-faint);font-size:11px}')
     add(scope + ' .rv-source-grid dd{margin:0;overflow-wrap:anywhere}' + scope + ' .rv-source-path code{font:11px/1.5 ui-monospace,Consolas,monospace;white-space:normal}')
     add(scope + ' .rv-section-intro{display:grid;grid-template-columns:minmax(0,.8fr) minmax(280px,1.2fr);gap:32px;align-items:end;padding:8px 0 18px}')
-    add(scope + ' .rv-section-intro span{color:var(--rv-faint);font:600 10px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.08em}')
-    add(scope + ' .rv-section-intro h2{margin:5px 0 0;font-size:22px;line-height:1.25;letter-spacing:-.02em}' + scope + ' .rv-section-intro p{margin:0;color:var(--rv-sub)}')
+    add(scope + ' .rv-section-intro span{color:var(--rv-faint);font:600 10px/1.1 ui-monospace,Consolas,monospace}')
+    add(scope + ' .rv-section-intro h2{margin:5px 0 0;font-size:22px;line-height:1.25;text-wrap:balance}' + scope + ' .rv-section-intro p{margin:0;color:var(--rv-sub);text-wrap:pretty}')
     add(scope + ' .rv-story-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;padding:0;border:1px solid var(--rv-border-strong);border-radius:10px;background:var(--rv-surface);list-style:none;overflow:hidden}')
     add(scope + ' .rv-story-flow li{min-height:180px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:28px;border-left:1px solid var(--rv-border)}')
     add(scope + ' .rv-story-flow li:first-child{border-left:0}' + scope + ' .rv-step-number{color:var(--rv-accent);font:700 12px/1 ui-monospace,Consolas,monospace}')
-    add(scope + ' .rv-step-label{display:block;margin-bottom:7px;color:var(--rv-faint);font:600 10px/1.1 ui-monospace,Consolas,monospace;letter-spacing:.04em}')
+    add(scope + ' .rv-step-label{display:block;margin-bottom:7px;color:var(--rv-faint);font:600 10px/1.1 ui-monospace,Consolas,monospace}')
     add(scope + ' .rv-story-flow p{margin:0;font-size:13px;line-height:1.58}')
     add(scope + ' .rv-fact-band{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px;border-top:1px solid var(--rv-border);border-bottom:1px solid var(--rv-border)}')
     add(scope + ' .rv-fact-band>div{padding:12px 14px;border-left:1px solid var(--rv-border)}' + scope + ' .rv-fact-band>div:first-child{border-left:0}')
@@ -1361,6 +1540,7 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add(scope + ' .viz-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;margin:10px 0}')
     add(scope + ' figure{margin:0}' + scope + ' .viz-row figure{flex:0 1 160px}' + scope + ' figure img,' + scope + ' details>img{display:block;width:100%;max-width:180px;height:auto;border-radius:4px}')
     add(scope + ' details:not(.rv-source-evidence){border-bottom:1px solid var(--rv-border);padding:8px 0}' + scope + ' details:not(.rv-source-evidence)>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:650}')
+    add(scope + ' .rv-prompt-details{margin-top:8px;padding:4px 0!important;border-top:1px solid var(--rv-border)!important;border-bottom:0!important}' + scope + ' .rv-prompt-details>summary{font-size:12px!important;font-weight:600!important}')
     add(scope + ' pre{max-height:520px;overflow:auto;white-space:pre-wrap;word-break:break-word;padding:14px;border:1px solid var(--rv-border);border-radius:6px;background:#e9e9e6;color:var(--rv-ink);font:12px/1.65 ui-monospace,Consolas,monospace}')
     add(scope + ' .btn{appearance:none;min-height:44px;padding:7px 12px;border:1px solid var(--rv-border-strong);border-radius:5px;background:var(--rv-surface);cursor:pointer;font-size:12px;font-weight:650}')
     add(scope + ' .btn:hover{background:#f5f5f2}' + scope + ' .btn-primary{border-color:var(--rv-ink);background:var(--rv-ink);color:#fff}' + scope + ' .btn-primary:hover{background:#31312f}')
@@ -1368,7 +1548,8 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add(scope + ' ul{padding-left:22px}')
     add('@media (max-width:820px){' + scope + '{padding:14px}' + scope + ' .rv-workbench{grid-template-columns:1fr}'
         + scope + ' .rv-player-shell{height:min(68vh,600px);min-height:420px;padding:10px}'
-        + scope + ' .rv-beats{max-height:none;grid-template-rows:auto auto}' + scope + ' .rv-beat-list{display:flex;overflow-x:auto;overflow-y:hidden;background:transparent;scroll-snap-type:x proximity}'
+        + scope + ' .rv-review-board{max-height:none;grid-template-rows:auto auto}' + scope + ' .rv-review-view{max-height:620px}'
+        + scope + ' .rv-beat-list{display:flex;overflow-x:auto;overflow-y:hidden;background:transparent;scroll-snap-type:x proximity}'
         + scope + ' .rv-beat{flex:0 0 270px;scroll-snap-align:start;border-right:1px solid var(--rv-border);border-bottom:0}'
         + scope + ' .rv-beat[aria-current="true"]{box-shadow:inset 0 3px var(--rv-accent)}'
         + scope + ' .rv-source-grid{grid-template-columns:1fr 1fr}' + scope + ' .rv-source-path{grid-column:1/-1}'
@@ -1377,7 +1558,10 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
         + scope + ' .rv-fact-band{grid-template-columns:1fr 1fr}' + scope + ' .rv-fact-band>div:nth-child(3){border-left:0;border-top:1px solid var(--rv-border)}'
         + scope + ' .rv-fact-band>div:nth-child(4){border-top:1px solid var(--rv-border)}}')
     add('@media (max-width:520px){' + scope + '{padding:10px}' + scope + ' .rv-title-row{display:block}' + scope + ' .rv-status{margin-top:12px}'
-        + scope + ' .rv-meta{gap:8px 14px}' + scope + ' .viz-controls{gap:18px}' + scope + ' .rv-source-evidence>summary{align-items:flex-start;flex-direction:column;gap:2px}'
+        + scope + ' .rv-title-row h1{font-size:21px}' + scope + ' .rv-meta{gap:8px 14px}' + scope + ' .viz-controls{gap:18px}'
+        + scope + ' .rv-board-head{align-items:flex-start;flex-direction:column}' + scope + ' .rv-view-switch{width:100%}' + scope + ' .rv-view-switch button{flex:1;min-height:44px}'
+        + scope + ' .rv-segment-list{grid-template-columns:1fr}' + scope + ' .rv-path-copy{min-height:44px}' + scope + ' .rv-inspector-context{grid-template-columns:1fr}'
+        + scope + ' .rv-prompt-label{align-items:flex-start;flex-direction:column;gap:2px}' + scope + ' .rv-source-evidence>summary{align-items:flex-start;flex-direction:column;gap:2px}'
         + scope + ' .rv-source-evidence>summary span:last-child{text-align:left}' + scope + ' .rv-source-grid{grid-template-columns:1fr}' + scope + ' .rv-source-path{grid-column:auto}'
         + scope + ' .rv-story-flow{grid-template-columns:1fr}' + scope + ' .rv-story-flow li{min-height:0;border-left:0;border-top:1px solid var(--rv-border);gap:16px}'
         + scope + ' .rv-story-flow li:first-child{border-top:0}' + scope + ' .rv-fact-band{grid-template-columns:1fr}' + scope + ' .rv-fact-band>div{border-left:0;border-top:1px solid var(--rv-border)}'
@@ -1420,14 +1604,18 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add('  });')
     add('  var reviewVideo = root.querySelector("[data-review-video]");')
     add('  var beats = Array.prototype.slice.call(root.querySelectorAll("[data-beat]"));')
+    add('  var segmentFrames = Array.prototype.slice.call(root.querySelectorAll("[data-segment-frame]"));')
     add('  var playhead = root.querySelector("[data-playhead]");')
     add('  var currentBeat = root.querySelector("[data-current-beat]");')
-    add('  var beatList = root.querySelector(".rv-beat-list");')
+    add('  var reviewSwitches = Array.prototype.slice.call(root.querySelectorAll("[data-review-switch]"));')
+    add('  var reviewViews = Array.prototype.slice.call(root.querySelectorAll("[data-review-view]"));')
+    add('  var activeReviewView = "segments";')
     add('  var inspector = root.querySelector("[data-prompt-inspector]");')
     add('  var inspectorTitle = root.querySelector("[data-inspector-title]");')
     add('  var inspectorMeta = root.querySelector("[data-inspector-meta]");')
     add('  var inspectorPrompt = root.querySelector("[data-inspector-prompt]");')
     add('  var inspectorClose = root.querySelector("[data-prompt-close]");')
+    add('  var lastPromptTrigger = null;')
     add('  var shotPrompts = {};')
     add('  try {')
     add('    var promptData = root.querySelector("[data-shot-prompts]");')
@@ -1439,28 +1627,46 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add('    var seconds = Math.max(0, value) - minutes * 60;')
     add('    return String(minutes).padStart(2, "0") + ":" + seconds.toFixed(1).padStart(4, "0");')
     add('  };')
-    add('  var showPrompt = function (beat, moveFocus) {')
-    add('    if (!beat || !inspector || !beatList) return;')
-    add('    var shot = beat.getAttribute("data-shot");')
-    add('    var segmentId = (shotPrompts.shotToSegment || {})[shot];')
+    add('  var setReviewView = function (key, moveFocus) {')
+    add('    activeReviewView = key;')
+    add('    if (inspector) inspector.hidden = true;')
+    add('    reviewViews.forEach(function (view) { view.hidden = view.getAttribute("data-review-view") !== key; });')
+    add('    reviewSwitches.forEach(function (button) {')
+    add('      var on = button.getAttribute("data-review-switch") === key;')
+    add('      button.setAttribute("aria-pressed", on ? "true" : "false");')
+    add('      if (on && moveFocus) button.focus();')
+    add('    });')
+    add('    if (currentBeat) currentBeat.textContent = key === "segments" ? "每段固定首帧、高光帧、尾帧" : "按镜头定位原片";')
+    add('  };')
+    add('  reviewSwitches.forEach(function (button) {')
+    add('    button.addEventListener("click", function () { setReviewView(button.getAttribute("data-review-switch"), false); });')
+    add('  });')
+    add('  var showPrompt = function (trigger, moveFocus) {')
+    add('    if (!trigger || !inspector) return;')
+    add('    var shot = trigger.getAttribute("data-shot");')
+    add('    var segmentId = trigger.getAttribute("data-segment") || (shotPrompts.shotToSegment || {})[shot];')
     add('    var data = (shotPrompts.segments || {})[segmentId] || {};')
-    add('    var title = beat.querySelector(".rv-beat-line strong");')
-    add('    inspectorTitle.textContent = (title ? title.textContent : shot || "当前镜头") + " · 对应提示词";')
-    add('    inspectorMeta.textContent = segmentId ? segmentId + " · " + String(data.adapter || "omni").toUpperCase() : "未映射到生成分段";')
-    add('    inspectorPrompt.textContent = data.prompt || "该镜头没有可用的分段提示词。";')
+    add('    var isSegmentFrame = trigger.hasAttribute("data-segment-frame");')
+    add('    var title = trigger.querySelector(".rv-beat-line strong");')
+    add('    inspectorTitle.textContent = isSegmentFrame ? "分段 " + String(segmentId || "--").replace(/^segment_/, "") + " · 生成提示词" : (title ? title.textContent : "镜头 " + String(shot || "--").replace(/^shot_/, "")) + " · 所属分段提示词";')
+    add('    var adapterLabel = String(data.adapter || "omni").toLowerCase() === "seedance" ? "Seedance 版" : "Omni 版";')
+    add('    inspectorMeta.textContent = segmentId ? "分段 " + String(segmentId).replace(/^segment_/, "") + " · " + String(data.model || "模型未记录") + " · " + String(data.method || "方式未记录") + " · " + adapterLabel : "未映射到生成分段";')
+    add('    inspectorPrompt.textContent = data.prompt || "该素材没有可用的分段提示词。";')
+    add('    root.querySelectorAll("[data-context]").forEach(function (node) { node.textContent = data[node.getAttribute("data-context")] || "未记录"; });')
     add('    var copyButton = inspector.querySelector("[data-copy]");')
     add('    if (copyButton) copyButton.disabled = !data.prompt;')
-    add('    beatList.hidden = true;')
+    add('    reviewViews.forEach(function (view) { view.hidden = true; });')
     add('    inspector.hidden = false;')
     add('    inspector.scrollTop = 0;')
+    add('    lastPromptTrigger = trigger;')
     add('    if (moveFocus && inspectorClose) inspectorClose.focus();')
     add('  };')
     add('  var closePrompt = function () {')
-    add('    if (!inspector || !beatList) return;')
+    add('    if (!inspector) return;')
     add('    inspector.hidden = true;')
-    add('    beatList.hidden = false;')
-    add('    var selected = root.querySelector("[data-beat][aria-current=true]");')
-    add('    if (selected) selected.focus();')
+    add('    reviewViews.forEach(function (view) { view.hidden = view.getAttribute("data-review-view") !== activeReviewView; });')
+    add('    if (currentBeat) currentBeat.textContent = activeReviewView === "segments" ? "每段固定首帧、高光帧、尾帧" : "按镜头定位原片";')
+    add('    if (lastPromptTrigger && lastPromptTrigger.focus) lastPromptTrigger.focus();')
     add('  };')
     add('  if (inspectorClose) inspectorClose.addEventListener("click", closePrompt);')
     add('  root.addEventListener("keydown", function (event) {')
@@ -1475,7 +1681,7 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add('      currentBeat.textContent = title ? title.textContent : "当前节拍";')
     add('    }')
     add('    if (inspector && !inspector.hidden) showPrompt(selected, false);')
-    add('    if (previous !== selected && (!inspector || inspector.hidden) && selected.scrollIntoView) selected.scrollIntoView({block:"nearest", inline:"nearest"});')
+    add('    if (previous !== selected && activeReviewView === "beats" && (!inspector || inspector.hidden) && selected.scrollIntoView) selected.scrollIntoView({block:"nearest", inline:"nearest"});')
     add('  };')
     add('  beats.forEach(function (beat) {')
     add('    beat.addEventListener("click", function () {')
@@ -1487,8 +1693,32 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add('      if (isFinite(at)) reviewVideo.currentTime = Math.max(0, at);')
     add('    });')
     add('  });')
+    add('  segmentFrames.forEach(function (frame) {')
+    add('    frame.addEventListener("click", function () {')
+    add('      if (frame.getAttribute("data-was-dragged") === "true") return;')
+    add('      segmentFrames.forEach(function (other) { other.setAttribute("aria-current", other === frame ? "true" : "false"); });')
+    add('      if (currentBeat) currentBeat.textContent = "分段 " + String(frame.getAttribute("data-segment") || "--").replace(/^segment_/, "") + " · " + (frame.querySelector("b") ? frame.querySelector("b").textContent : "素材");')
+    add('      showPrompt(frame, true);')
+    add('      if (!reviewVideo) return;')
+    add('      reviewVideo.pause();')
+    add('      var at = Number(frame.getAttribute("data-at"));')
+    add('      if (isFinite(at)) reviewVideo.currentTime = Math.max(0, at);')
+    add('    });')
+    add('  });')
+    add('  root.querySelectorAll("[data-open-segment]").forEach(function (button) {')
+    add('    button.addEventListener("click", function () {')
+    add('      var mediaTab = root.querySelector("[data-tab=m]");')
+    add('      if (mediaTab) activate(mediaTab, false);')
+    add('      setReviewView("segments", false);')
+    add('      var wanted = button.getAttribute("data-open-segment");')
+    add('      var group = Array.prototype.find.call(root.querySelectorAll("[data-segment-group]"), function (item) { return item.getAttribute("data-segment-group") === wanted; });')
+    add('      if (group && group.scrollIntoView) group.scrollIntoView({block:"nearest"});')
+    add('      var first = group ? group.querySelector("[data-segment-frame]") : null;')
+    add('      if (first) first.focus();')
+    add('    });')
+    add('  });')
     add('  if (reviewVideo) {')
-    add('    var firstFrame = root.querySelector("[data-beat] img");')
+    add('    var firstFrame = root.querySelector("[data-segment-frame] img") || root.querySelector("[data-beat] img");')
     add('    if (firstFrame && !reviewVideo.poster) reviewVideo.poster = firstFrame.src;')
     add('    var syncBeat = function () {')
     add('      var now = reviewVideo.currentTime || 0;')
@@ -1504,6 +1734,35 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add('    reviewVideo.addEventListener("timeupdate", syncBeat);')
     add('    reviewVideo.addEventListener("seeked", syncBeat);')
     add('  }')
+    # Chromium's DownloadURL payload turns the embedded JPEG preview into a real
+    # file when dragged out of the sandbox. The absolute package path is also
+    # supplied as text for tools that prefer the original frame. The UI states
+    # clearly that the dragged file is a preview derivative, not the source frame.
+    add('  root.querySelectorAll("[data-drag-frame]").forEach(function (image) {')
+    add('    image.addEventListener("dragstart", function (event) {')
+    add('      var transfer = event.dataTransfer;')
+    add('      if (!transfer) return;')
+    add('      var name = image.getAttribute("data-download-name") || "100x-frame.jpg";')
+    add('      var uri = image.currentSrc || image.src;')
+    add('      var path = image.getAttribute("data-frame-path") || name;')
+    add('      transfer.effectAllowed = "copy";')
+    add('      try { transfer.setData("DownloadURL", "image/jpeg:" + name + ":" + uri); } catch (err) {}')
+    add('      try { transfer.setData("text/uri-list", uri); } catch (err) {}')
+    add('      try { transfer.setData("text/plain", path); } catch (err) {}')
+    add('      try {')
+    add('        var binary = atob(uri.split(",")[1] || "");')
+    add('        var bytes = new Uint8Array(binary.length);')
+    add('        for (var index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);')
+    add('        if (transfer.items && transfer.items.add) transfer.items.add(new File([bytes], name, {type:"image/jpeg"}));')
+    add('      } catch (err) {}')
+    add('      var button = image.closest("[data-segment-frame]");')
+    add('      if (button) button.setAttribute("data-was-dragged", "true");')
+    add('    });')
+    add('    image.addEventListener("dragend", function () {')
+    add('      var button = image.closest("[data-segment-frame]");')
+    add('      if (button) setTimeout(function () { button.removeAttribute("data-was-dragged"); }, 0);')
+    add('    });')
+    add('  });')
     # The surface runs this in sandbox="allow-scripts" with no allow-same-origin, so the
     # origin is opaque and navigator.clipboard.writeText rejects with NotAllowedError.
     # Measured: the legacy execCommand path still works there, so it is the real mechanism.
@@ -1523,6 +1782,15 @@ def fragment(digest: dict[str, Any], root_id: str, width: int) -> tuple[str, int
     add('      return ok;')
     add('    } catch (err) { return false; }')
     add('  };')
+    add('  root.querySelectorAll("[data-copy-path]").forEach(function (button) {')
+    add('    var label = button.textContent;')
+    add('    button.addEventListener("click", function (event) {')
+    add('      event.stopPropagation();')
+    add('      var ok = legacyCopy(button.getAttribute("data-copy-path") || "");')
+    add('      button.textContent = ok ? "原帧路径已复制 ✓" : "复制失败";')
+    add('      setTimeout(function () { button.textContent = label; }, 2000);')
+    add('    });')
+    add('  });')
     add('  root.querySelectorAll("[data-copy]").forEach(function (btn) {')
     add('    var label = btn.textContent;')
     add('    btn.addEventListener("click", function () {')
@@ -1559,7 +1827,7 @@ def batch_fragment(digests: list[dict[str, Any]], root_id: str) -> str:
     total_duration = sum(float(digest["headline"].get("duration_seconds") or 0) for digest in digests)
     lines = ['<meta charset="utf-8">', '<link rel="icon" href="data:,">', '<div id="%s">' % root_id]
     add = lines.append
-    add('<header class="rv-batch-head"><div class="rv-batch-kicker">100X · REVERSE BATCH</div>'
+    add('<header class="rv-batch-head"><div class="rv-batch-kicker">100X 视频反推 · 批次总览</div>'
         '<div class="rv-batch-title"><div><h1>%d 条参考视频</h1>'
         '<p>这是批次导航。下方将按 01 → %02d 依次展开，每条视频保留独立的原片、帧图、分段和提示词。</p></div>'
         '<dl><div><dt>总时长</dt><dd>%s</dd></div><div><dt>验证通过</dt><dd>%d/%d</dd></div></dl></div></header>'
@@ -1600,16 +1868,16 @@ def batch_fragment(digests: list[dict[str, Any]], root_id: str) -> str:
         '--accent:#2b7fff;box-sizing:border-box;padding:22px;background:var(--canvas);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei UI",system-ui,sans-serif;font-size:14px;line-height:1.5}')
     add(scope + ' *,' + scope + ' *::before,' + scope + ' *::after{box-sizing:border-box}')
     add(scope + ' .rv-batch-head{padding:4px 0 22px;border-bottom:1px solid var(--border)}')
-    add(scope + ' .rv-batch-kicker{margin-bottom:12px;color:var(--faint);font:600 11px/1.2 ui-monospace,Consolas,monospace;letter-spacing:.08em}')
+    add(scope + ' .rv-batch-kicker{margin-bottom:12px;color:var(--faint);font:600 11px/1.2 ui-monospace,Consolas,monospace}')
     add(scope + ' .rv-batch-title{display:flex;justify-content:space-between;align-items:flex-end;gap:32px}'
-        + scope + ' h1{margin:0 0 7px;font-size:28px;line-height:1.15;letter-spacing:-.03em}' + scope + ' p{margin:0;color:var(--sub)}')
+        + scope + ' h1{margin:0 0 7px;font-size:28px;line-height:1.15;text-wrap:balance}' + scope + ' p{margin:0;color:var(--sub);text-wrap:pretty}')
     add(scope + ' .rv-batch-title>div{max-width:740px}' + scope + ' dl{display:flex;gap:26px;margin:0;flex:0 0 auto}')
     add(scope + ' dl div{display:grid;gap:3px}' + scope + ' dt{color:var(--faint);font-size:10px}' + scope + ' dd{margin:0;font:700 18px/1.1 ui-monospace,Consolas,monospace}')
     add(scope + ' .rv-batch-list{display:grid;gap:0;margin-top:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden}')
     add(scope + ' .rv-batch-item{min-width:0;display:grid;grid-template-columns:54px 86px minmax(0,1fr);gap:14px;align-items:center;padding:12px 16px;border-top:1px solid var(--border)}')
     add(scope + ' .rv-batch-item:first-child{border-top:0}' + scope + ' .rv-batch-number{color:var(--accent);font:700 13px/1 ui-monospace,Consolas,monospace}')
     add(scope + ' .rv-batch-item>img,' + scope + ' .rv-batch-placeholder{width:86px;height:100px;display:grid;place-items:center;border-radius:4px;background:#e4e4e0;object-fit:cover}')
-    add(scope + ' .rv-batch-placeholder{color:var(--faint);font:600 9px/1 ui-monospace,Consolas,monospace;letter-spacing:.06em}')
+    add(scope + ' .rv-batch-placeholder{color:var(--faint);font:600 9px/1 ui-monospace,Consolas,monospace}')
     add(scope + ' .rv-batch-copy{min-width:0}' + scope + ' .rv-batch-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}')
     add(scope + ' h2{margin:0 0 8px;font-size:16px;line-height:1.35;overflow-wrap:anywhere}' + scope + ' .rv-batch-copy>p{font-size:12px}')
     add(scope + ' .rv-package-name{display:block;margin:-4px 0 8px;color:var(--faint);font:500 10px/1.3 ui-monospace,Consolas,monospace;overflow-wrap:anywhere}')

@@ -1,4 +1,4 @@
-# 输出契约 v2.2（机器 Schema 兼容 v2.1）
+# 输出契约 v2.3（机器 Schema 兼容 v2.1）
 
 ## 目录
 
@@ -72,7 +72,7 @@
 
 ## Agent 原生用户视图
 
-默认由 `scripts/digest.py` 按 [native-output.md](native-output.md) 从已验证的 `reverse.json`、`validation.json` 和包内媒体确定性投影。Codex 首 tab 展示完整时长压缩预览和可点击镜头帧板；点击镜头显示其所属分段的现有提示词，不能据此声称机器包存在独立逐镜头生成提示词。其余 tab 展示结论、分段计划、资产、文字层、音频与约束。回复不是新的文件或业务真源；不能只交付 JSON 路径。
+默认由 `scripts/digest.py` 按 [native-output.md](native-output.md) 从已验证的 `reverse.json`、`validation.json` 和包内媒体确定性投影。Codex 首 tab 展示完整时长压缩预览和分段三帧素材板：优先从 `execution_plan.input_references`（兼容新版 `recommendation.input_references`）固定投影首帧／高光帧／尾帧三个槽位，缺失槽位显式报错。三帧拖拽输出预算内 JPEG 预览，同时提供包内原帧绝对路径。点击三帧或次级镜头定位视图会显示所属分段的中文操作说明和现有英文提示词，不能据此声称机器包存在独立逐镜头生成提示词。默认可见标签和闭集枚举映射为中文，英文模型提示词按需展开；其余 tab 展示结论、分段计划、资产、文字层、音频与约束。回复不是新的文件或业务真源；不能只交付 JSON 路径。
 
 ## 下游兼容边界
 

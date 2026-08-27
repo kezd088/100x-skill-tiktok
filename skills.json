@@ -22,11 +22,11 @@
     {
       "id": "100x-video-reverse",
       "path": "skills/100x-video-reverse",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "step": "0-video-reverse",
       "status": "validated",
       "validation_result": "已通过独立验证",
-      "summary": "输入本地参考视频，建立严格证据和机器包，并在当前 Agent 对话中用窄幅竖屏播放器、多列镜头帧板和镜头所属分段提示词联动审阅；多包使用轻量总览加独立详情。只负责反推与交接，不执行生成。",
+      "summary": "输入本地参考视频，建立严格证据和机器包，并在当前 Agent 对话中用窄幅竖屏播放器、每段首／高光／尾三帧组和所属分段提示词联动审阅；图片可拖出 JPEG 预览并可复制原帧路径，多包使用轻量总览加独立详情。只负责反推与交接，不执行生成。",
       "trigger_examples": [
         "反推这条视频",
         "这个视频怎么复刻",
@@ -39,7 +39,7 @@
       ],
       "validate_cmd": "npm --prefix skills/100x-video-reverse test",
       "extra_cmd": "python skills/100x-video-reverse/scripts/digest.py --help",
-      "note": "v2.2 保留 v2.1 的 execution_plan 机器契约，新增由 digest.py 确定性生成的原片／帧板／分段提示词联动视图和多包总览。依赖 ffmpeg、ffprobe、Python jsonschema；Node/AJV 验证 JSON 结构和跨引用，Python 严格验证器负责源哈希、真实媒体和 provenance。"
+      "note": "v2.3 保留 v2.1 的 execution_plan 机器契约，优化中文运营默认视图：每段固定首／高光／尾三帧同组，英文生成提示词按需展开，图片拖拽提供 JPEG 预览与原帧路径。依赖 ffmpeg、ffprobe、Python jsonschema；Node/AJV 验证 JSON 结构和跨引用，Python 严格验证器负责源哈希、真实媒体和 provenance。"
     },
     {
       "id": "100x-search-query",

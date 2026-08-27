@@ -56,9 +56,10 @@
 
 严格预检通过后运行 `scripts/digest.py`。用户视图只从当前 `reverse.json`、包内媒体和 `validation.json` 确定性生成，Agent 不手工重排：
 
-- Codex 使用 `--format fragment --fragment-dir <本轮 thread 可视化目录>`。首 tab 是左侧窄 9:16 播放器 + 右侧多列镜头帧板；窄屏改为上下结构和横向帧轨。
-- 点击镜头会暂停并定位视频，并把帧板切换为该镜头所属生成分段的完整提示词；播放跨镜头时当前镜头和提示词同步更新。界面必须标明生成单位是分段，不伪造逐镜头提示词。
-- 其余 tab 展示结论、分段计划、资产、文字层、音频与约束。`execution_plan.status`、模型和方式如实显示，`needs_model_selection` 与 `blocked` 不得冒充可执行。
+- Codex 使用 `--format fragment --fragment-dir <本轮 thread 可视化目录>`。首 tab 是左侧窄 9:16 播放器 + 右侧分段素材板，每段固定同组展示首帧／高光帧／尾帧；窄屏改为上下结构但三帧仍同组。
+- 分段三帧优先取 `execution_plan.input_references`，兼容新版包的 `recommendation.input_references`；缺失素材显示错误槽位。拖动图片输出 JPEG 预览，需要包内原图时复制原帧路径。
+- 点击三帧或次级“镜头定位”中的镜头会暂停并定位视频，并把素材板切换为所属分段的中文操作说明和完整英文生成提示词；播放跨镜头时当前镜头和提示词同步更新。界面必须标明生成单位是分段，不伪造逐镜头提示词。
+- 其余 tab 展示结论、分段计划、资产、文字层、音频与约束。默认可见标签和闭集枚举使用中文，英文模型提示词按需展开；`execution_plan.status`、模型 ID 和方式原值如实保留，`needs_model_selection` 与 `blocked` 不得冒充可执行。
 - 多包生成“1 个带首帧、编号和包名的轻量总览 + N 个独立详情”，不把不同包的资产、提示词或结论合并。
 - 其他客户端默认 `--format md`；判断不了客户端能力时走 Markdown。图片使用可点击绝对路径，机器契约继续保留包内相对路径。
 
