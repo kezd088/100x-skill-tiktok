@@ -1,7 +1,7 @@
 {
   "name": "100x-skill-tiktok",
   "description": "TikTok/UGC 内容生产 agent skill 合集：脚本分段、人物场景设定、搜索取材、提示词生成等通用能力框架。框架公开，真实客户语料不入仓。",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": {
     "name": "100x"
   }

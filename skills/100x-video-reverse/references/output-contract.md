@@ -1,4 +1,4 @@
-# 输出契约 v2.1
+# 输出契约 v2.2（机器 Schema 兼容 v2.1）
 
 ## 目录
 
@@ -72,7 +72,7 @@
 
 ## Agent 原生用户视图
 
-默认按 [native-output.md](native-output.md) 在当前对话中直接展示源视频、分镜三帧、资产和提示词、生成方案、叙事约束、成本耗时与机器包路径。回复从已验证的 `reverse.json` 和包内媒体生成，但不是新的文件或业务真源；不能只交付 JSON 路径。
+默认由 `scripts/digest.py` 按 [native-output.md](native-output.md) 从已验证的 `reverse.json`、`validation.json` 和包内媒体确定性投影。Codex 首 tab 展示完整时长压缩预览和可点击镜头帧板；点击镜头显示其所属分段的现有提示词，不能据此声称机器包存在独立逐镜头生成提示词。其余 tab 展示结论、分段计划、资产、文字层、音频与约束。回复不是新的文件或业务真源；不能只交付 JSON 路径。
 
 ## 下游兼容边界
 

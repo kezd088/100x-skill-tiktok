@@ -1,10 +1,10 @@
 {
   "name": "100x-video-reverse-validator",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Public structural and cross-reference validator for 100x-video-reverse.",
   "scripts": {
-    "test": "node scripts/validate.js --selftest"
+    "test": "node scripts/validate.js --selftest && python scripts/test_digest.py"
   },
   "dependencies": {
     "ajv": "^8.17.1"

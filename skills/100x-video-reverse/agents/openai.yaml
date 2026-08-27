@@ -1,6 +1,6 @@
 interface:
-  display_name: "100X Video Reverse"
-  short_description: "输入视频，直接获得可视化分镜、资产和生成方案"
-  default_prompt: "使用 $100x-video-reverse 反推这条参考视频，并在当前对话中直接展示源视频、分镜三帧、资产和生成方案。"
+  display_name: "100X Video Reverse v2.2"
+  short_description: "输入视频，联动审阅原片、镜头帧、分段提示词和资产"
+  default_prompt: "使用 $100x-video-reverse 反推这条参考视频，并在当前对话中用原片与镜头帧板审阅结果；点击镜头时显示其所属分段提示词。"
 policy:
   allow_implicit_invocation: true

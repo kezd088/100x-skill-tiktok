@@ -49,7 +49,7 @@
 
 | Skill | 做什么 | 触发词示例 | 状态 |
 |---|---|---|---|
-| [`100x-video-reverse`](./skills/100x-video-reverse) | 本地视频 → 严格证据包 → 对话内直接展示源视频、分镜三帧、人物／产品／场景资产、提示词和逐段生成方案 | 反推这条视频 · 这个视频怎么复刻 · reverse this video | ✅ v2.1 已验证 |
+| [`100x-video-reverse`](./skills/100x-video-reverse) | 本地视频 → 严格证据包 → 对话内用窄幅竖屏播放器、多列镜头帧板和所属分段提示词联动审阅；多包独立展开 | 反推这条视频 · 反推这几个视频 · reverse this video | ✅ v2.2 已验证 |
 | [`100x-segment`](./skills/100x-segment) | 口播脚本纯文本（英/西）→ 三层独立叠加切分：段落逻辑（10模块+7原型）+ 镜头目的预判 + 行内气口标记 | "帮我分段" · "这段哪里该喘气" · "segment this script" | ✅ 已验证 |
 | [`100x-localize`](./skills/100x-localize) | 源文案（任意源语言）→ 墨西哥西语默认本地化版本，贴合真实语料强度分布，非逐字翻译 | "本地化成西语" · "翻译成西语文案" · "Mexican Spanish localization" | ✅ 已验证 |
 | [`100x-persona`](./skills/100x-persona) | 脚本文案 → 讲述人物设定 + 独立场景设定，每条可回溯到脚本原文引用 | "给这条脚本配个人设" · "这个场景怎么设定" · "who should deliver this script" | ✅ 已验证 |
@@ -93,7 +93,7 @@ bash tools/install.sh
 反推这个视频
 ```
 
-`100x-video-reverse` 会在当前对话中展示源视频入口、每个镜头的首帧／高光帧／尾帧、人物／产品／场景资产与提示词、逐段模型／时长／生成方式／输入素材、限制、成本和耗时。客户端不能内联视频时会提供可点击视频路径，但分镜帧和资产图仍须可视化展示。
+`100x-video-reverse` 会在当前对话中提供“原片与帧图”审片工作台：桌面端左侧是只占播放所需宽度的 9:16 播放器，右侧是多列镜头帧板；点击镜头会定位视频并显示该镜头所属生成分段的完整提示词，播放跨镜头时同步更新。多条视频先显示带首帧和编号的轻量总览，再逐条显示独立详情。客户端不能使用 Codex 内联片段时回退到相同内容契约的 Markdown。
 
 ### 验证
 
@@ -102,13 +102,16 @@ bash tools/install.sh
 for d in skills/*/; do
   [ -f "$d/scripts/validate.js" ] && (cd "$d" && npm install && node scripts/validate.js --selftest)
 done
+
+# 视频反推额外验证确定性 Markdown／fragment 投影
+npm --prefix skills/100x-video-reverse test
 ```
 
 ## 能力边界
 
 README 只描述当前已建成、过验证的部分，不把已知局限藏起来：
 
-- `100x-video-reverse` v2.1 依赖 ffmpeg/ffprobe、Python 和 `jsonschema` 建立完整本地证据与严格交接；外部多模态分析不是默认权限。验证器全绿只代表时间轴、引用、路径和 provenance 可交接，不代表最终生成视频达到同等相似度。不同客户端的媒体渲染能力不同，因此保证同一内容结构，不承诺完全相同的播放器 UI
+- `100x-video-reverse` v2.2 依赖 ffmpeg/ffprobe、Python 和 `jsonschema` 建立完整本地证据与严格交接；外部多模态分析不是默认权限。验证器全绿只代表时间轴、引用、路径和 provenance 可交接，不代表最终生成视频达到同等相似度。Codex fragment 的完整时长低码率预览只是展示副本，1 MB 内装不下时会明确降级为帧图；不同客户端保证同一内容结构，不承诺完全相同的播放器 UI
 
 - `100x-search-query` 的敏感品类护栏（防止两性健康类文案无提示通过）：品类信号与权威宣称信号共享同一扫描范围（`category`/`product_name` 以及生成的 `queries.*.q`/`intent_cn`），信号词表覆盖常见近义词/委婉说法，但固定关键词表判据不是语义判据，表外的新说法依然能绕过——这条护栏不宣称"已完全解决"
 - `100x-persona` 的证据子串判据防不住"字面是原文子串、但摘录后语义被反转"的滥用（`checkEvidenceQuotes` 只做逐字包含检查），另有一层闭集自我怀疑短语强制披露作为缓解（`checkAuthorityHedgeRisk`），但反讽/引用-驳斥框架类反转依然检测不到，这是 JSON Schema 和字符串匹配两层机制共同的天花板

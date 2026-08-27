@@ -49,7 +49,7 @@ All 8 functional skills are built and have passed independent verification (7 or
 
 | Skill | What it does | Trigger phrase examples | Status |
 |---|---|---|---|
-| [`100x-video-reverse`](./skills/100x-video-reverse) | Local video → strict evidence package → in-chat source video, shot triptychs, people/product/scene assets, prompts and per-segment generation plans | 反推这条视频 · 这个视频怎么复刻 · reverse this video | ✅ v2.1 Verified |
+| [`100x-video-reverse`](./skills/100x-video-reverse) | Local video → strict evidence package → in-chat narrow portrait player, multi-column shot board, and owning-segment prompt review; multiple packages stay independent | 反推这条视频 · 反推这几个视频 · reverse this video | ✅ v2.2 Verified |
 | [`100x-segment`](./skills/100x-segment) | Voiceover script plain text (EN/ES) → three independently-layered splits: paragraph logic (10 modules + 7 archetypes), inferred shot purpose, inline breath marks | "帮我分段" · "这段哪里该喘气" · "segment this script" | ✅ Verified |
 | [`100x-localize`](./skills/100x-localize) | Source copy (any source language) → Mexican Spanish localization by default, matched to real-corpus intensity distribution, not word-for-word translation | "本地化成西语" · "翻译成西语文案" · "Mexican Spanish localization" | ✅ Verified |
 | [`100x-persona`](./skills/100x-persona) | Script copy → narrator persona + independent scene design, each traceable back to a quote from the original script | "给这条脚本配个人设" · "这个场景怎么设定" · "who should deliver this script" | ✅ Verified |
@@ -93,7 +93,7 @@ Attach a video or provide its local path, then say:
 Reverse this video
 ```
 
-`100x-video-reverse` displays the source-video entry, first/highlight/end frames for every shot, people/product/scene assets and prompts, per-segment model/duration/method/input plan, limitations, cost, and elapsed time in the current conversation. If the client cannot render video inline, it provides a clickable video path while still visualizing the shot and asset images.
+`100x-video-reverse` provides an “Original and Frames” review workbench in the current conversation. On desktop, a narrow 9:16 player sits beside a multi-column shot board. Clicking a shot seeks the video and shows the complete prompt for that shot’s owning generation segment; playback keeps the active shot and open prompt synchronized. Multiple videos use a lightweight numbered overview followed by independent detail views. Clients without Codex fragment support fall back to the same content contract in Markdown.
 
 ### Validate
 
@@ -102,13 +102,16 @@ Reverse this video
 for d in skills/*/; do
   [ -f "$d/scripts/validate.js" ] && (cd "$d" && npm install && node scripts/validate.js --selftest)
 done
+
+# Video reverse: also validate deterministic Markdown/fragment projections
+npm --prefix skills/100x-video-reverse test
 ```
 
 ## Capability Boundaries
 
 This README only describes what's currently built and verified — known limitations are not hidden either:
 
-- `100x-video-reverse` v2.1 requires ffmpeg/ffprobe, Python and `jsonschema` to build local evidence and enforce a strict handoff gate; external multimodal analysis is not authorized by default. A green validator means the timeline, references, paths and provenance are handoff-safe, not that a generated video reaches the same similarity score. Clients have different media-rendering capabilities, so the skill guarantees one content contract rather than an identical player UI
+- `100x-video-reverse` v2.2 requires ffmpeg/ffprobe, Python and `jsonschema` to build local evidence and enforce a strict handoff gate; external multimodal analysis is not authorized by default. A green validator means the timeline, references, paths and provenance are handoff-safe, not that a generated video reaches the same similarity score. The full-duration low-bitrate Codex preview is disposable and falls back to frames when it cannot fit under the 1 MB fragment budget. Clients share one content contract, not an identical player UI
 
 - `100x-search-query`'s sensitive-category guardrail (preventing sexual-health-type copy from passing without a warning): category signals and authority-claim signals share the same scan range (`category`/`product_name` plus the generated `queries.*.q`/`intent_cn`), and the synonym/euphemism word list covers common variants, but a fixed keyword list is not a semantic criterion — wordings outside the list can still slip through, this guardrail doesn't claim to be "fully solved"
 - `100x-persona`'s evidence-substring criterion can't stop abuse where "the excerpt is literally a substring of the original text but its meaning is reversed after excerpting" (`checkEvidenceQuotes` only does a literal-containment check); a closed-set self-doubt-phrase disclosure requirement (`checkAuthorityHedgeRisk`) acts as mitigation, but irony / quote-then-refute framed reversals still go undetected — this is the shared ceiling of JSON Schema and string matching
